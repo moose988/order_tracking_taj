@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin | Al Taj Al Malaky</title>
+  <link rel="stylesheet" href="../src/css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container navbar">
+      <a href="index.html" class="brand">
+        <h2>Al Taj Al Malaky</h2>
+        <span>Luxury Event Setup & Rental</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="order.html">Order</a>
+        <a href="track.html">Track Order</a>
+        <a href="reviews.html">Reviews</a>
+      </nav>
+
+      <button onclick="logout()" class="btn btn-secondary admin-logout-btn">Logout</button>
+      <button class="mobile-menu-btn">☰</button>
+    </div>
+  </header>
+
+  <main class="page-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Admin Dashboard</div>
+  
+      </div>
+
+      <div class="admin-grid">
+        <article class="admin-card">
+          <h3>Pending Requests</h3>
+          <p>12 incoming quote requests are awaiting review.</p>
+        </article>
+
+        <article class="admin-card">
+          <h3>Orders in Preparation</h3>
+          <p>4 orders are currently marked as being prepared.</p>
+        </article>
+
+        <article class="admin-card">
+          <h3>Delivered Orders</h3>
+          <p>28 completed event deliveries this month.</p>
+        </article>
+      </div>
+
+<!-- SEARCH + FILTER -->
+
+<div class="admin-controls" style="margin-bottom:20px; display:flex; gap:12px; flex-wrap:wrap;">
+
+  <input 
+    type="text" 
+    id="searchInput" 
+    placeholder="Search by Order ID or Customer..."
+    style="padding:10px;border-radius:8px;border:1px solid #ddd;flex:1;min-width:250px;"
+  >
+
+  <select id="statusFilter" style="padding:10px;border-radius:8px;border:1px solid #ddd;">
+    <option value="all">All Status</option>
+    <option value="quote-requested">Quote Requested</option>
+    <option value="confirmed">Confirmed</option>
+    <option value="preparing">Preparing</option>
+    <option value="out-for-delivery">Out for Delivery</option>
+    <option value="delivered">Delivered</option>
+    <option value="cancelled">Cancelled</option>
+  </select>
+
+</div>
+
+
+
+      <div class="admin-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Date</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Tracking</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody">
+            <tr>
+              <td colspan="6" style="text-align:center;padding:20px;">
+                Loading orders...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section class="calendar-section" aria-labelledby="calendarViewTitle">
+        <div class="calendar-header">
+          <div>
+            <div class="section-kicker">Planning</div>
+            <h2 id="calendarViewTitle">Calendar View</h2>
+          </div>
+
+          <div class="calendar-nav">
+            <button id="prevMonthBtn" class="btn btn-secondary" type="button">Previous</button>
+            <p id="calendarMonthLabel" class="calendar-month-label">Month Year</p>
+            <button id="nextMonthBtn" class="btn btn-secondary" type="button">Next</button>
+          </div>
+        </div>
+
+        <div class="calendar-shell">
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>Sun</span>
+            <span>Mon</span>
+            <span>Tue</span>
+            <span>Wed</span>
+            <span>Thu</span>
+            <span>Fri</span>
+            <span>Sat</span>
+          </div>
+
+          <div id="calendarGrid" class="calendar-grid" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="analytics-section" aria-labelledby="analyticsDashboardTitle">
+        <div class="section-head analytics-head">
+          <div>
+            <div class="section-kicker">Insights</div>
+            <h2 id="analyticsDashboardTitle" class="section-title">Analytics Dashboard</h2>
+          </div>
+
+          <div class="analytics-summary">
+            <article class="analytics-mini-card">
+              <span>Total Orders</span>
+              <strong id="analyticsTotalOrders">0</strong>
+            </article>
+
+            <article class="analytics-mini-card">
+              <span>Busiest Day</span>
+              <strong id="analyticsBusiestDay">N/A</strong>
+            </article>
+          </div>
+        </div>
+
+        <div class="analytics-grid">
+          <article class="analytics-card">
+            <div class="analytics-card-head">
+              <h3>Orders Per Day</h3>
+              <p>Daily event workload across your schedule.</p>
+            </div>
+            <div class="analytics-canvas-wrap">
+              <canvas id="ordersPerDayChart"></canvas>
+            </div>
+          </article>
+
+          <article class="analytics-card">
+            <div class="analytics-card-head">
+              <h3>Orders By Status</h3>
+              <p>See how work is distributed across fulfillment stages.</p>
+            </div>
+            <div class="analytics-canvas-wrap">
+              <canvas id="ordersByStatusChart"></canvas>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="analytics-section" aria-labelledby="topProductsTitle">
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">Inventory Insights</div>
+            <h2 id="topProductsTitle" class="section-title">Top Products</h2>
+          </div>
+        </div>
+
+        <article class="analytics-card analytics-card-wide">
+          <div class="analytics-card-head">
+            <h3>Most Requested Items</h3>
+            <p>Most requested rental items by total quantity.</p>
+          </div>
+          <div class="analytics-canvas-wrap">
+            <canvas id="topProductsChart"></canvas>
+          </div>
+        </article>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h4>Al Taj Al Malaky Parties & Events Management</h4>
+          <p>Luxury Event Setup & Rental</p>
+        </div>
+
+        <div>
+          <h4>Quick Links</h4>
+          <div class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="order.html">Order</a>
+            <a href="track.html">Track Order</a>
+            <a href="reviews.html">Reviews</a>
+          </div>
+        </div>
+
+        <div>
+          <h4>Contact</h4>
+          <div class="footer-links">
+            <a href="tel:+971505373383">+971 50 537 3383</a>
+            <a href="https://wa.me/971505373383" target="_blank">WhatsApp</a>
+            <a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
+            <span>Ajman, UAE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="copyright">
+        © <span class="current-year"></span> Al Taj Al Malaky Parties & Events Management. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="../src/js/firebase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="../src/js/admin.js"></script>
+
+
+<div id="orderModal" class="modal-overlay">
+
+  <div class="modal">
+
+    <div class="modal-content">
+
+      <button class="modal-close" id="closeModalBtn">✕</button>
+
+      <h3 id="modalOrderTitle"></h3>
+
+      <div class="modal-grid" style="margin-top:15px;">
+
+        <div>
+          <p><strong>Phone:</strong> <span id="modalPhone"></span></p>
+          <p><strong>Event Time:</strong> <span id="modalEventTime"></span></p>
+          <p><strong>Setup Time:</strong> <span id="modalSetupTime"></span></p>
+          <p><strong>Notes:</strong> <span id="modalNotes"></span></p>
+        </div>
+
+        <div>
+          <p><strong>Items:</strong></p>
+          <ul id="modalItems"></ul>
+        </div>
+
+      </div>
+
+      <div class="modal-actions" style="margin-top:20px;">
+        <button id="modalMapBtn" class="btn btn-secondary">Open Map</button>
+        <button id="modalCopyBtn" class="btn btn-dark">Copy Full Details</button>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+</body>
+</html>
+

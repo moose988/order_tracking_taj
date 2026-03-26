@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Track Order | Al Taj Al Malaky</title>
+<link rel="stylesheet" href="../src/css/styles.css" />
+</head>
+
+<body>
+
+<header class="site-header">
+<div class="container navbar">
+
+<a href="index.html" class="brand">
+<h2>Al Taj Al Malaky</h2>
+<span>Luxury Event Setup & Rental</span>
+</a>
+
+<nav class="nav-links">
+<a href="index.html">Home</a>
+<a href="order.html">Order</a>
+<a href="track.html" class="active">Track Order</a>
+<a href="reviews.html">Reviews</a>
+</nav>
+
+<button class="mobile-menu-btn">☰</button>
+
+</div>
+</header>
+
+
+<main class="page-section">
+
+<div class="container">
+
+<div class="section-head">
+<div class="section-kicker">Track Your Order</div>
+<h1 class="section-title">Check your current order status.</h1>
+<p class="section-text">
+Enter your order ID to see the latest update.
+</p>
+</div>
+
+
+<div class="track-grid">
+
+<section class="track-card">
+
+<h3>Enter Order ID</h3>
+
+<div class="form-group" style="margin-top:12px;">
+<input type="text" id="orderIdInput" placeholder="Example: TAJ-1024">
+</div>
+
+<div style="margin-top:14px;">
+<button class="btn btn-primary" onclick="trackOrder()">Track Order</button>
+</div>
+
+<div id="trackResult" style="margin-top:20px;"></div>
+<div id="statusSummary" style="font-weight:600;margin-bottom:10px;"></div>
+<div id="orderInfo" style="margin-bottom:20px;"></div>
+<div id="orderItems" style="margin-bottom:20px;"></div>
+
+<div class="status-list">
+<div class="status-step">
+<div class="status-dot"></div>
+<div>
+<strong>Request Received</strong>
+<p>Your quote request has been received successfully.</p>
+</div>
+</div>
+
+<div class="status-step">
+<div class="status-dot"></div>
+<div>
+<strong>Order Confirmed</strong>
+<p>Your order has been reviewed and confirmed.</p>
+</div>
+</div>
+
+<div class="status-step">
+<div class="status-dot"></div>
+<div>
+<strong>Being Prepared</strong>
+<p>Your event setup is currently being prepared.</p>
+</div>
+</div>
+
+<div class="status-step">
+<div class="status-dot"></div>
+<div>
+<strong>Out for Delivery</strong>
+<p>The team is on the way to your location.</p>
+</div>
+</div>
+
+<div class="status-step">
+<div class="status-dot"></div>
+<div>
+<strong>Delivered</strong>
+<p>Your order has arrived and setup is complete.</p>
+</div>
+</div>
+</div>
+
+<section id="reviewSection" class="review-section" style="margin-top:30px; display:none;">
+<div class="review-section-head">
+<h3>Rate Your Experience</h3>
+<p>We would love to hear how everything looked for your event.</p>
+</div>
+
+<p id="reviewStatusMessage" class="review-status-message" style="display:none;"></p>
+
+<form id="reviewForm" class="review-form">
+<div class="form-group">
+<label for="reviewStars">Rating</label>
+<select id="reviewStars">
+<option value="5">★★★★★</option>
+<option value="4">★★★★</option>
+<option value="3">★★★</option>
+<option value="2">★★</option>
+<option value="1">★</option>
+</select>
+</div>
+
+<div class="form-group">
+<label for="reviewComment">Comment</label>
+<textarea id="reviewComment" placeholder="Share your experience" required></textarea>
+</div>
+
+<div class="form-group">
+<label for="reviewName">Name (optional)</label>
+<input type="text" id="reviewName" placeholder="Your name">
+</div>
+
+<div class="form-group">
+<label for="reviewImage">Photo (optional)</label>
+<input type="file" id="reviewImage" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+<p class="help-text">Allowed: JPG, PNG, or WEBP up to 5 MB.</p>
+</div>
+
+<button id="reviewSubmitBtn" class="btn btn-primary review-submit-btn" type="submit">
+Submit Review
+</button>
+</form>
+</section>
+
+</section>
+
+
+<section class="track-card">
+
+<h3>Delivery Location</h3>
+
+<p style="color:var(--text-soft);margin-bottom:14px;">
+The event location is shown below.
+</p>
+
+<div id="locationInfo" style="margin-bottom:10px;"></div>
+
+<div id="mapContainer" style="height:350px;border-radius:12px;"></div>
+
+<div id="supportBox" class="support-box">
+<h4>Need Help?</h4>
+
+<select id="supportReason" class="support-select">
+<option value="general">General Inquiry</option>
+<option value="delay">Order Delay</option>
+<option value="edit">Edit Order</option>
+<option value="cancel">Cancel Order</option>
+<option value="location">Change Location</option>
+</select>
+
+<button id="supportBtn" class="btn btn-primary support-btn">
+Contact Support on WhatsApp
+</button>
+</div>
+
+</section>
+
+</div>
+
+</div>
+
+</main>
+
+<footer class="footer">
+<div class="container">
+<div class="footer-grid">
+<div>
+<h4>Al Taj Al Malaky Parties & Events Management</h4>
+<p>Luxury Event Setup & Rental</p>
+</div>
+
+<div>
+<h4>Quick Links</h4>
+<div class="footer-links">
+<a href="index.html">Home</a>
+<a href="order.html">Order</a>
+<a href="track.html">Track Order</a>
+<a href="reviews.html">Reviews</a>
+</div>
+</div>
+
+<div>
+<h4>Contact</h4>
+<div class="footer-links">
+<a href="tel:+971505373383">+971 50 537 3383</a>
+<a href="https://wa.me/971505373383" target="_blank">WhatsApp</a>
+<a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
+<span>Ajman, UAE</span>
+</div>
+</div>
+</div>
+
+<div class="copyright">
+© <span class="current-year"></span> Al Taj Al Malaky Parties & Events Management. All rights reserved.
+</div>
+</div>
+</footer>
+
+<script type="module" src="../src/js/tracking.js"></script>
+
+</body>
+</html>

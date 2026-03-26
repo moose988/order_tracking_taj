@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quote Request | Al Taj Al Malaky</title>
+  <link rel="stylesheet" href="../src/css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container navbar">
+      <a href="index.html" class="brand">
+        <h2>Al Taj Al Malaky</h2>
+        <span>Luxury Event Setup & Rental</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="order.html" class="active">Order</a>
+        <a href="track.html">Track Order</a>
+        <a href="reviews.html">Reviews</a>
+      </nav>
+
+      <button class="mobile-menu-btn">☰</button>
+    </div>
+  </header>
+
+  <main class="page-section">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-kicker">Quote Request</div>
+        <h1 class="section-title">Complete your details and send your order directly to WhatsApp.</h1>
+        <p class="section-text">
+          Review your selected items, add your event details, and submit your quote request.
+        </p>
+      </div>
+
+      <div class="quote-layout">
+        <section class="form-card">
+          <form id="quoteForm" class="form-grid">
+            <div class="form-grid two-col">
+              <div class="form-group">
+                <label for="customerName">Customer Name</label>
+                <input type="text" id="customerName" placeholder="Ahmed" required />
+              </div>
+
+              <div class="form-group">
+                <label for="customerPhone">Phone Number</label>
+                <input type="tel" id="customerPhone" placeholder="05xxxxxxxx" required />
+              </div>
+            </div>
+
+            <div class="form-grid two-col">
+              <div class="form-group">
+                <label for="eventDate">Event Date</label>
+                <input type="date" id="eventDate" required />
+              </div>
+            
+              <div class="form-group">
+                <label for="eventTime">Event Time</label>
+                <input type="time" id="eventTime" required />
+              </div>
+            </div>
+
+
+            <div class="form-grid two-col">
+              <div class="form-group">
+                <label for="setupTime">Setup Time</label>
+                <input type="time" id="setupTime" required />
+                <p class="help-text">When should our team arrive for setup?</p>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="eventLocation">Event Location</label>
+              <input type="text" id="eventLocation" placeholder="Dubai, Business Bay" required />
+              <p class="help-text">Please enter the exact accurate location (street number, building name, and floor).</p>
+            </div>
+            
+            <div class="form-group">
+              <label for="mapLink">Google Maps Link</label>
+              <input type="url" id="mapLink" placeholder="Paste Google Maps location link here" required />
+            </div>
+            
+            <div class="form-group">
+              <button type="button" class="btn btn-secondary" id="useLocationBtn">
+                Use My Current Location
+              </button>
+              <p class="help-text">Paste the Google Maps location link or press "Use My Current Location".</p>
+            </div>
+            
+
+            <div class="form-group">
+              <label for="eventNotes">Notes</label>
+              <textarea id="eventNotes" placeholder="Outdoor event, evening setup, special seating request, etc."></textarea>
+              <p class="help-text">Add any important details you want the team to know.</p>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Send Quote Request via WhatsApp</button>
+          </form>
+        </section>
+
+        <aside class="quote-summary-card">
+          <h3>Your Selected Items</h3>
+
+          <div id="quoteEmptyState" class="empty-state">
+            No items selected yet. Go back to the order page and add products first.
+          </div>
+
+          <div id="quoteItemsList" class="quote-items-list"></div>
+
+          <div style="margin-top: 20px;">
+            <a href="order.html" class="btn btn-secondary">Back to Order Page</a>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h4>Al Taj Al Malaky Parties & Events Management</h4>
+          <p>Luxury Event Setup & Rental</p>
+        </div>
+
+        <div>
+          <h4>Quick Links</h4>
+          <div class="footer-links">
+            <a href="index.html">Home</a>
+            <a href="order.html">Order</a>
+            <a href="track.html">Track Order</a>
+            <a href="reviews.html">Reviews</a>
+          </div>
+        </div>
+
+        <div>
+          <h4>Contact</h4>
+          <div class="footer-links">
+            <a href="tel:+971505373383">+971 50 537 3383</a>
+            <a href="https://wa.me/971505373383" target="_blank">WhatsApp</a>
+            <a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
+            <span>Ajman, UAE</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="copyright">
+        © <span class="current-year"></span> Al Taj Al Malaky Parties & Events Management. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="../src/js/firebase.js"></script>
+  <script type="module" src="../src/js/main.js"></script>
+</body>
+</html>

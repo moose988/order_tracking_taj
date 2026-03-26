@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order - Al Taj Al Malaky</title>
+<link rel="stylesheet" href="../src/css/styles.css">
+</head>
+
+<body>
+
+<header class="site-header">
+  <div class="container navbar">
+    <a href="index.html" class="brand">
+      <h2>Al Taj Al Malaky</h2>
+      <span>Luxury Event Setup & Rental</span>
+    </a>
+
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="order.html" class="active">Order</a>
+      <a href="track.html">Track Order</a>
+      <a href="reviews.html">Reviews</a>
+    </nav>
+
+    <button class="mobile-menu-btn">☰</button>
+  </div>
+</header>
+
+
+<main>
+
+<section class="page-section">
+<div class="container">
+
+<header class="section-head">
+<h2 class="section-title">Our Collection</h2>
+
+<div class="product-filters">
+<button class="filter-btn active" onclick="filterProducts('All', this)">All</button>
+<button class="filter-btn" onclick="filterProducts('Tables', this)">Tables</button>
+<button class="filter-btn" onclick="filterProducts('Chairs', this)">Chairs</button>
+</div>
+</header>
+
+
+<div class="order-layout">
+
+<section id="productsGrid" class="products-grid"></section>
+
+
+<aside class="order-summary">
+
+<h3>Your Order</h3>
+
+<div id="orderItemsList"></div>
+
+<p id="orderTotalText">0 items selected</p>
+
+<div class="summary-actions">
+<button class="btn btn-secondary" onclick="clearOrder()">Clear All</button>
+<button class="btn btn-primary" onclick="goToQuotePage()">Get Quote</button>
+</div>
+
+</aside>
+
+</div>
+
+</div>
+</section>
+
+</main>
+
+
+
+<!-- PRODUCT MODAL -->
+
+<div id="productModal" class="modal-overlay">
+
+<div class="modal">
+
+<div class="modal-grid">
+
+<div class="modal-gallery">
+
+<img id="modalImage" src="" alt="Product Image">
+
+<div class="gallery-nav">
+<button onclick="prevImage()">❮</button>
+<button onclick="nextImage()">❯</button>
+</div>
+
+</div>
+
+
+
+<div class="modal-content">
+
+<button class="modal-close" onclick="closeProductModal()">✕</button>
+
+<h3 id="modalProductTitle"></h3>
+
+<p id="modalProductDescription"></p>
+
+<p><strong>Measurements:</strong> <span id="modalMeasurements"></span></p>
+
+<ul id="modalDetailsList" class="detail-list"></ul>
+
+
+<div class="qty-box">
+<button onclick="decreaseQty()">−</button>
+<input
+type="number"
+id="modalQuantity"
+min="1"
+value="1"
+inputmode="numeric"
+oninput="handleManualQtyInput()"
+onblur="handleManualQtyInput()"
+onfocus="this.select()"
+aria-label="Quantity"
+>
+<button onclick="increaseQty()">+</button>
+</div>
+<p class="qty-hint">Type a quantity or use the + / − buttons.</p>
+
+
+<div class="modal-actions">
+<button class="btn btn-primary" onclick="addToOrder()">Add to Order</button>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+
+      <div>
+        <h4>Al Taj Al Malaky Parties & Events Management</h4>
+        <p>Luxury Event Setup & Rental</p>
+      </div>
+
+      <div>
+        <h4>Quick Links</h4>
+        <div class="footer-links">
+          <a href="index.html">Home</a>
+          <a href="order.html">Order</a>
+          <a href="track.html">Track Order</a>
+          <a href="reviews.html">Reviews</a>
+        </div>
+      </div>
+
+      <div>
+        <h4>Contact</h4>
+        <div class="footer-links">
+          <a href="tel:+971505373383">+971 50 537 3383</a>
+          <a href="https://wa.me/971505373383" target="_blank">WhatsApp</a>
+          <a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
+          <span>Ajman, UAE</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="copyright">
+      © <span class="current-year"></span> Al Taj Al Malaky Parties & Events Management. All rights reserved.
+    </div>
+  </div>
+</footer>
+
+
+
+<script>
+
+const PRODUCTS = [
+
+{
+id:1,
+name:"Round Table",
+category:"Tables",
+shortDescription:"Elegant round table suitable for weddings and formal setups.",
+measurements:"Approx. 150 cm diameter",
+details:[
+"Premium indoor/outdoor use",
+"Spacious tabletop",
+"Luxury presentation"
+],
+images:[
+"https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80"
+]
+},
+
+{
+id:2,
+name:"Rectangular Table",
+category:"Tables",
+shortDescription:"Versatile option for buffet setups and large gatherings.",
+measurements:"Approx. 180 x 75 cm",
+details:[
+"Ideal for dining",
+"Works for indoor halls",
+"Minimal premium finish"
+],
+images:[
+"https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=80"
+]
+},
+
+{
+id:3,
+name:"White Chair",
+category:"Chairs",
+shortDescription:"Classic clean chair design for formal events.",
+measurements:"Standard event size",
+details:[
+"Elegant white finish",
+"Comfortable seating",
+"Matches luxury tables"
+],
+images:[
+"../images/IN9A9418.JPG",
+"../images/IN9A9423.jpg"
+]
+},
+
+{
+id:4,
+name:"Gold Chair",
+category:"Chairs",
+shortDescription:"Luxury gold seating for high-end occasions.",
+measurements:"Standard event size",
+details:[
+"Premium gold aesthetic",
+"Perfect for VIP tables",
+"Adds refined statement"
+],
+images:[
+"https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80"
+]
+}
+
+];
+
+
+let order = JSON.parse(localStorage.getItem("tajOrder")) || [];
+let selectedProduct = null;
+let selectedQuantity = 1;
+let currentImageIndex = 0;
+
+
+
+function saveOrder(){
+localStorage.setItem("tajOrder", JSON.stringify(order));
+}
+
+
+
+function updateQuantityDisplay(){
+document.getElementById("modalQuantity").value = selectedQuantity;
+}
+
+
+
+function increaseQty(){
+selectedQuantity++;
+updateQuantityDisplay();
+}
+
+
+
+function decreaseQty(){
+if(selectedQuantity>1){
+selectedQuantity--;
+updateQuantityDisplay();
+}
+}
+
+
+
+function handleManualQtyInput(){
+
+const input = document.getElementById("modalQuantity");
+
+let value = parseInt(input.value, 10);
+
+if(!input.value || Number.isNaN(value) || value < 1){
+value = 1;
+}
+
+selectedQuantity = value;
+updateQuantityDisplay();
+
+}
+
+
+
+function clearOrder(){
+
+if(confirm("Are you sure you want to clear your entire order?")){
+
+order=[];
+saveOrder();
+renderOrderSummary();
+
+}
+
+}
+
+
+
+function renderProducts(filter="All"){
+
+const grid=document.getElementById("productsGrid");
+
+const filtered = filter==="All"
+? PRODUCTS
+: PRODUCTS.filter(p=>p.category===filter);
+
+
+grid.innerHTML = filtered.map(product=>`
+
+<article class="product-card" onclick="openProductModal(${product.id})">
+
+<img class="product-thumb" src="${product.images[0]}" alt="${product.name}">
+
+<div class="product-copy">
+
+<span class="badge">${product.category}</span>
+
+<h3>${product.name}</h3>
+
+<p>${product.shortDescription}</p>
+
+<div class="product-meta">
+<span>${product.measurements}</span>
+<span>View Details</span>
+</div>
+
+</div>
+
+</article>
+
+`).join("");
+
+}
+
+
+
+function filterProducts(category,btn){
+
+renderProducts(category);
+
+document.querySelectorAll(".filter-btn")
+.forEach(b=>b.classList.remove("active"));
+
+btn.classList.add("active");
+
+}
+
+
+
+function renderOrderSummary(){
+
+const list=document.getElementById("orderItemsList");
+const totalText=document.getElementById("orderTotalText");
+
+if(order.length===0){
+
+list.innerHTML='<p style="color:#888;text-align:center;padding:10px;">Empty</p>';
+totalText.textContent="0 items selected";
+return;
+
+}
+
+list.innerHTML = order.map(item=>`
+
+<div class="order-item-row">
+
+<div>
+<strong>${item.name}</strong><br>
+<small>${item.category}</small>
+</div>
+
+<div>x${item.quantity}</div>
+
+</div>
+
+`).join("");
+
+const count = order.reduce((sum,item)=>sum+item.quantity,0);
+
+totalText.textContent = `${count} item${count!==1?"s":""} selected`;
+
+}
+
+
+
+function openProductModal(id){
+
+selectedProduct = PRODUCTS.find(p=>p.id===id);
+selectedQuantity = 1;
+currentImageIndex = 0;
+
+document.getElementById("modalProductTitle").textContent = selectedProduct.name;
+document.getElementById("modalProductDescription").textContent = selectedProduct.shortDescription;
+document.getElementById("modalMeasurements").textContent = selectedProduct.measurements;
+document.getElementById("modalImage").src = selectedProduct.images[0];
+
+document.getElementById("modalDetailsList").innerHTML =
+selectedProduct.details.map(d=>`<li>${d}</li>`).join("");
+
+updateQuantityDisplay();
+
+document.getElementById("productModal").classList.add("active");
+
+document.body.style.overflow="hidden";
+
+}
+
+
+
+function closeProductModal(){
+
+document.getElementById("productModal").classList.remove("active");
+document.body.style.overflow="auto";
+
+
+}
+
+function nextImage(){
+
+currentImageIndex =
+(currentImageIndex + 1) % selectedProduct.images.length;
+
+document.getElementById("modalImage").src =
+selectedProduct.images[currentImageIndex];
+
+}
+
+function prevImage(){
+
+currentImageIndex =
+(currentImageIndex - 1 + selectedProduct.images.length) %
+selectedProduct.images.length;
+
+document.getElementById("modalImage").src =
+selectedProduct.images[currentImageIndex];
+
+}
+
+
+function addToOrder(){
+
+const existing = order.find(i=>i.id===selectedProduct.id);
+
+if(existing){
+existing.quantity += selectedQuantity;
+}else{
+order.push({...selectedProduct,quantity:selectedQuantity});
+}
+
+saveOrder();
+renderOrderSummary();
+closeProductModal();
+
+}
+
+
+
+function goToQuotePage(){
+
+if(order.length===0){
+alert("Add items first.");
+return;
+}
+
+window.location.href="quote.html";
+
+}
+
+
+
+document.addEventListener("DOMContentLoaded",()=>{
+
+renderProducts();
+renderOrderSummary();
+
+});
+
+</script>
+<script type="module" src="../src/js/firebase.js"></script>
+<script type="module" src="../src/js/order.js"></script>
+
+</body>
+</html>
+  

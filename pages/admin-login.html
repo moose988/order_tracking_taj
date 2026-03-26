@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login | Al Taj Al Malaky</title>
+  <link rel="stylesheet" href="../src/css/styles.css" />
+</head>
+<body class="admin-login-page">
+
+  <main class="admin-login-shell">
+    <div class="container">
+      <section class="admin-login-layout" aria-labelledby="adminLoginTitle">
+        <article class="admin-login-brand">
+          <div class="admin-login-brand-inner">
+            <span class="admin-login-eyebrow">Private Access</span>
+            <h1>Al Taj Al Malaky</h1>
+            <h2>Admin Dashboard</h2>
+            <p>
+              Manage events, orders, and operations in one place.
+            </p>
+
+            <div class="admin-login-brand-note">
+              Luxury event planning, delivery coordination, and order tracking in one secure workspace.
+            </div>
+          </div>
+        </article>
+
+        <article class="admin-login-card form-card">
+          <div class="admin-login-card-head">
+            <span class="admin-login-kicker">Secure Sign In</span>
+            <h2 id="adminLoginTitle">Welcome back</h2>
+            <p>Use your admin credentials to access the dashboard.</p>
+          </div>
+
+          <form id="adminLoginForm" class="form-grid" novalidate>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" placeholder="admin@company.com" autocomplete="email" required />
+            </div>
+
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required />
+            </div>
+
+            <button id="loginBtn" class="btn btn-primary admin-login-btn" type="submit">
+              Login to Dashboard
+            </button>
+
+            <p id="error" class="admin-login-error" role="alert" aria-live="polite"></p>
+          </form>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="../src/js/admin-auth.js"></script>
+
+</body>
+</html>
