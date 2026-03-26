@@ -161,6 +161,133 @@ function escapeHtml(value){
     .replaceAll("'", "&#39;");
 }
 
+let order = [];
+
+function initMobileMenu(){
+  const menuBtn = document.querySelector(".mobile-menu-btn");
+  const navLinks = document.querySelector(".nav-links");
+
+  if(!menuBtn || !navLinks){
+    return;
+  }
+
+  menuBtn.addEventListener("click", () => {
+    navLinks.classList.toggle("active");
+  });
+
+  navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      navLinks.classList.remove("active");
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    if(window.innerWidth > 760){
+      navLinks.classList.remove("active");
+    }
+  });
+}
+
+function saveOrder(){
+  localStorage.setItem("tajOrder", JSON.stringify(order));
+}
+
+function syncQuoteOrderFromStorage(){
+  order = JSON.parse(localStorage.getItem("tajOrder")) || [];
+  renderQuoteItems();
+}
+
+function getOrderItemCount(){
+  return order.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+}
+
+function updateQuoteSummary(){
+  const itemCount = document.getElementById("quoteItemCount");
+  const submitButton = document.getElementById("quoteSubmitBtn");
+  const clearButton = document.getElementById("quoteClearAllBtn");
+
+  if(itemCount){
+    const count = getOrderItemCount();
+    itemCount.textContent = `${count} item${count !== 1 ? "s" : ""} selected`;
+  }
+
+  if(submitButton){
+    submitButton.disabled = order.length === 0;
+  }
+
+  if(clearButton){
+    clearButton.hidden = order.length === 0;
+  }
+}
+
+function renderQuoteItems(){
+  const list = document.getElementById("quoteItemsList");
+  const empty = document.getElementById("quoteEmptyState");
+
+  if(!list || !empty){
+    return;
+  }
+
+  if(order.length === 0){
+    empty.style.display = "block";
+    list.innerHTML = "";
+    updateQuoteSummary();
+    return;
+  }
+
+  empty.style.display = "none";
+  list.innerHTML = order.map(item => `
+    <div class="quote-item">
+      <div class="quote-item-info">
+        <strong>${escapeHtml(item.name)}</strong>
+        <div class="item-category">${escapeHtml(item.category || "")}</div>
+      </div>
+
+      <div class="qty-controls">
+        <button type="button" class="qty-minus" data-id="${escapeHtml(item.id)}">-</button>
+        <span>${item.quantity}</span>
+        <button type="button" class="qty-plus" data-id="${escapeHtml(item.id)}">+</button>
+      </div>
+    </div>
+  `).join("");
+  updateQuoteSummary();
+}
+
+function increaseQuantity(id){
+  const item = order.find((entry) => String(entry.id) === String(id));
+
+  if(!item){
+    return;
+  }
+
+  item.quantity += 1;
+  saveOrder();
+  renderQuoteItems();
+}
+
+function decreaseQuantity(id){
+  const itemIndex = order.findIndex((entry) => String(entry.id) === String(id));
+
+  if(itemIndex === -1){
+    return;
+  }
+
+  if(order[itemIndex].quantity <= 1){
+    order.splice(itemIndex, 1);
+  }else{
+    order[itemIndex].quantity -= 1;
+  }
+
+  saveOrder();
+  renderQuoteItems();
+}
+
+function clearQuoteOrder(){
+  order = [];
+  saveOrder();
+  renderQuoteItems();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const yearEls = document.querySelectorAll(".current-year");
   const currentYear = new Date().getFullYear();
@@ -169,30 +296,42 @@ document.addEventListener("DOMContentLoaded", () => {
     el.textContent = currentYear;
   });
 
+  initMobileMenu();
   loadHomepageReviews();
 
   const list = document.getElementById("quoteItemsList");
-  const empty = document.getElementById("quoteEmptyState");
+  const clearButton = document.getElementById("quoteClearAllBtn");
 
   if(list){
-    const order = JSON.parse(localStorage.getItem("tajOrder")) || [];
+    syncQuoteOrderFromStorage();
 
-    if(order.length === 0){
-      empty.style.display = "block";
-    }else{
-      empty.style.display = "none";
+    list.addEventListener("click", (event) => {
+      const plusButton = event.target.closest(".qty-plus");
+      const minusButton = event.target.closest(".qty-minus");
 
-      list.innerHTML = order.map(item => `
-        <div class="quote-item">
-          <div>
-            <strong>${item.name}</strong>
-            <div style="color:#888;font-size:13px">${item.category}</div>
-          </div>
-          <div>x${item.quantity}</div>
-        </div>
-      `).join("");
-    }
+      if(plusButton){
+        increaseQuantity(plusButton.dataset.id);
+      }
+
+      if(minusButton){
+        decreaseQuantity(minusButton.dataset.id);
+      }
+    });
   }
+
+  if(clearButton){
+    clearButton.addEventListener("click", () => {
+      clearQuoteOrder();
+    });
+  }
+
+  window.addEventListener("pageshow", () => {
+    syncQuoteOrderFromStorage();
+  });
+
+  window.addEventListener("focus", () => {
+    syncQuoteOrderFromStorage();
+  });
 
   const locationBtn = document.getElementById("useLocationBtn");
   const mapLinkInput = document.getElementById("mapLink");

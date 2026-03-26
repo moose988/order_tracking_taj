@@ -31,10 +31,12 @@ const ordersByStatusCanvas = document.getElementById("ordersByStatusChart");
 const topProductsCanvas = document.getElementById("topProductsChart");
 
 let allOrders = [];
+let driversList = [];
 let currentCalendarDate = new Date();
 let ordersPerDayChart = null;
 let ordersByStatusChart = null;
 let topProductsChart = null;
+let selectedOrderId = null;
 
 const STATUS_META = {
   "quote-requested": { label: "quote requested", className: "is-quote-requested" },
@@ -44,6 +46,31 @@ const STATUS_META = {
   delivered: { label: "delivered", className: "is-delivered" },
   cancelled: { label: "cancelled", className: "is-cancelled" }
 };
+
+function initMobileMenu(){
+  const menuBtn = document.querySelector(".mobile-menu-btn");
+  const navLinks = document.querySelector(".nav-links");
+
+  if(!menuBtn || !navLinks){
+    return;
+  }
+
+  menuBtn.addEventListener("click", () => {
+    navLinks.classList.toggle("active");
+  });
+
+  navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      navLinks.classList.remove("active");
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    if(window.innerWidth > 760){
+      navLinks.classList.remove("active");
+    }
+  });
+}
 
 /* LOAD ORDERS */
 
@@ -56,6 +83,14 @@ async function loadOrders(){
   updateStats(allOrders);
   generateAnalytics();
   renderCalendar();
+}
+
+async function loadDrivers(){
+  const snapshot = await getDocs(collection(db, "drivers"));
+  driversList = snapshot.docs.map((driverDoc) => ({
+    id: driverDoc.id,
+    ...driverDoc.data()
+  }));
 }
 
 /* RENDER TABLE */
@@ -100,6 +135,10 @@ function renderOrders(orders){
 
           <button class="btn btn-primary wa-btn no-modal" data-id="${order.orderId}">
             WhatsApp
+          </button>
+
+          <button class="btn btn-secondary assign-driver-btn no-modal" data-id="${order.orderId}">
+            ${order.driver?.name ? `Driver: ${order.driver.name}` : "Assign Driver"}
           </button>
 
           ${order.status === "delivered" ? `
@@ -282,6 +321,36 @@ ${reviewLink}
     });
   });
 
+  document.querySelectorAll(".assign-driver-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      selectedOrderId = btn.dataset.id;
+
+      const select = document.getElementById("driverSelect");
+      const order = allOrders.find((item) => item.orderId === selectedOrderId);
+
+      if(!select){
+        return;
+      }
+
+      if(!driversList.length){
+        select.innerHTML = '<option value="">No drivers available</option>';
+        document.getElementById("confirmAssignDriver").disabled = true;
+      }else{
+        select.innerHTML = driversList.map((driver) => `
+          <option value="${driver.phone}" ${order?.driver?.phone === driver.phone ? "selected" : ""}>
+            ${driver.name} (${driver.phone})
+          </option>
+        `).join("");
+        document.getElementById("confirmAssignDriver").disabled = false;
+      }
+
+      document.getElementById("driverModal").classList.add("active");
+      document.body.style.overflow = "hidden";
+    });
+  });
+
 }
 
 /* MODAL FUNCTIONS */
@@ -345,6 +414,47 @@ ${order.notes || "None"}
 function closeOrderModal(){
   document.getElementById("orderModal").classList.remove("active");
   document.body.style.overflow = "auto";
+}
+
+function closeDriverModal(){
+  document.getElementById("driverModal").classList.remove("active");
+  selectedOrderId = null;
+  document.body.style.overflow = "auto";
+}
+
+async function assignDriverToOrder(){
+  const select = document.getElementById("driverSelect");
+
+  if(!select || !selectedOrderId){
+    return;
+  }
+
+  const selectedPhone = select.value;
+  const driver = driversList.find((item) => item.phone === selectedPhone);
+
+  if(!driver){
+    alert("Please select a driver.");
+    return;
+  }
+
+  await updateDoc(doc(db, "orders", selectedOrderId), {
+    driver: {
+      name: driver.name,
+      phone: driver.phone
+    }
+  });
+
+  const targetOrder = allOrders.find((order) => order.orderId === selectedOrderId);
+  if(targetOrder){
+    targetOrder.driver = {
+      name: driver.name,
+      phone: driver.phone
+    };
+  }
+
+  closeDriverModal();
+  applyFilters();
+  alert("Driver assigned");
 }
 
 function generateAnalytics(){
@@ -694,11 +804,13 @@ function updateStats(orders){
 
 /* INIT */
 
-document.addEventListener("DOMContentLoaded", ()=>{
+document.addEventListener("DOMContentLoaded", async ()=>{
+  initMobileMenu();
   document.getElementById("closeModalBtn").addEventListener("click", closeOrderModal);
+  document.getElementById("confirmAssignDriver")?.addEventListener("click", assignDriverToOrder);
   prevMonthBtn?.addEventListener("click", ()=> changeMonth(-1));
   nextMonthBtn?.addEventListener("click", ()=> changeMonth(1));
-  loadOrders();
+  await Promise.all([loadDrivers(), loadOrders()]);
 
   document.getElementById("searchInput").addEventListener("input", applyFilters);
   document.getElementById("statusFilter").addEventListener("change", applyFilters);
@@ -712,6 +824,12 @@ document.getElementById("orderModal").addEventListener("click", (e)=>{
   }
 });
 
+document.getElementById("driverModal")?.addEventListener("click", (e)=>{
+  if(e.target.id === "driverModal"){
+    closeDriverModal();
+  }
+});
+
 import { signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 window.logout = function(){
@@ -719,3 +837,4 @@ window.logout = function(){
 };
 
 window.closeOrderModal = closeOrderModal;
+window.closeDriverModal = closeDriverModal;

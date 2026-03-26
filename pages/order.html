@@ -23,7 +23,7 @@
       <a href="reviews.html">Reviews</a>
     </nav>
 
-    <button class="mobile-menu-btn">☰</button>
+    <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
   </div>
 </header>
 
@@ -53,13 +53,13 @@
 
 <h3>Your Order</h3>
 
-<div id="orderItemsList"></div>
+<div id="orderItemsList" class="order-items-list"></div>
 
 <p id="orderTotalText">0 items selected</p>
 
 <div class="summary-actions">
-<button class="btn btn-secondary" onclick="clearOrder()">Clear All</button>
 <button class="btn btn-primary" onclick="goToQuotePage()">Get Quote</button>
+<button class="btn btn-secondary btn-small" onclick="clearOrder()">Clear All</button>
 </div>
 
 </aside>
@@ -104,8 +104,6 @@
 
 <p><strong>Measurements:</strong> <span id="modalMeasurements"></span></p>
 
-<ul id="modalDetailsList" class="detail-list"></ul>
-
 
 <div class="qty-box">
 <button onclick="decreaseQty()">−</button>
@@ -149,22 +147,10 @@ aria-label="Quantity"
       </div>
 
       <div>
-        <h4>Quick Links</h4>
-        <div class="footer-links">
-          <a href="index.html">Home</a>
-          <a href="order.html">Order</a>
-          <a href="track.html">Track Order</a>
-          <a href="reviews.html">Reviews</a>
-        </div>
-      </div>
-
-      <div>
         <h4>Contact</h4>
         <div class="footer-links">
-          <a href="tel:+971505373383">+971 50 537 3383</a>
           <a href="https://wa.me/971505373383" target="_blank">WhatsApp</a>
           <a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
-          <span>Ajman, UAE</span>
         </div>
       </div>
 
@@ -188,11 +174,6 @@ name:"Round Table",
 category:"Tables",
 shortDescription:"Elegant round table suitable for weddings and formal setups.",
 measurements:"Approx. 150 cm diameter",
-details:[
-"Premium indoor/outdoor use",
-"Spacious tabletop",
-"Luxury presentation"
-],
 images:[
 "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=800&q=80"
 ]
@@ -204,11 +185,6 @@ name:"Rectangular Table",
 category:"Tables",
 shortDescription:"Versatile option for buffet setups and large gatherings.",
 measurements:"Approx. 180 x 75 cm",
-details:[
-"Ideal for dining",
-"Works for indoor halls",
-"Minimal premium finish"
-],
 images:[
 "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=800&q=80"
 ]
@@ -220,11 +196,6 @@ name:"White Chair",
 category:"Chairs",
 shortDescription:"Classic clean chair design for formal events.",
 measurements:"Standard event size",
-details:[
-"Elegant white finish",
-"Comfortable seating",
-"Matches luxury tables"
-],
 images:[
 "../images/IN9A9418.JPG",
 "../images/IN9A9423.jpg"
@@ -237,11 +208,6 @@ name:"Gold Chair",
 category:"Chairs",
 shortDescription:"Luxury gold seating for high-end occasions.",
 measurements:"Standard event size",
-details:[
-"Premium gold aesthetic",
-"Perfect for VIP tables",
-"Adds refined statement"
-],
 images:[
 "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80"
 ]
@@ -259,6 +225,81 @@ let currentImageIndex = 0;
 
 function saveOrder(){
 localStorage.setItem("tajOrder", JSON.stringify(order));
+}
+
+
+
+function initMobileMenu(){
+
+const menuBtn = document.querySelector(".mobile-menu-btn");
+const navLinks = document.querySelector(".nav-links");
+
+if(!menuBtn || !navLinks){
+return;
+}
+
+menuBtn.addEventListener("click", () => {
+navLinks.classList.toggle("active");
+});
+
+navLinks.querySelectorAll("a").forEach((link) => {
+link.addEventListener("click", () => {
+navLinks.classList.remove("active");
+});
+});
+
+window.addEventListener("resize", () => {
+if(window.innerWidth > 760){
+navLinks.classList.remove("active");
+}
+});
+
+}
+
+
+
+function syncOrderFromStorage(){
+
+order = JSON.parse(localStorage.getItem("tajOrder")) || [];
+renderOrderSummary();
+
+}
+
+
+
+function increaseOrderItemQuantity(id){
+
+const item = order.find(entry => String(entry.id) === String(id));
+
+if(!item){
+return;
+}
+
+item.quantity += 1;
+saveOrder();
+renderOrderSummary();
+
+}
+
+
+
+function decreaseOrderItemQuantity(id){
+
+const itemIndex = order.findIndex(entry => String(entry.id) === String(id));
+
+if(itemIndex === -1){
+return;
+}
+
+if(order[itemIndex].quantity <= 1){
+order.splice(itemIndex, 1);
+}else{
+order[itemIndex].quantity -= 1;
+}
+
+saveOrder();
+renderOrderSummary();
+
 }
 
 
@@ -386,10 +427,14 @@ list.innerHTML = order.map(item=>`
 
 <div>
 <strong>${item.name}</strong><br>
-<small>${item.category}</small>
+<small class="item-category">${item.category}</small>
 </div>
 
-<div>x${item.quantity}</div>
+<div class="qty-controls">
+<button type="button" class="qty-minus" data-id="${item.id}">-</button>
+<span>${item.quantity}</span>
+<button type="button" class="qty-plus" data-id="${item.id}">+</button>
+</div>
 
 </div>
 
@@ -413,9 +458,6 @@ document.getElementById("modalProductTitle").textContent = selectedProduct.name;
 document.getElementById("modalProductDescription").textContent = selectedProduct.shortDescription;
 document.getElementById("modalMeasurements").textContent = selectedProduct.measurements;
 document.getElementById("modalImage").src = selectedProduct.images[0];
-
-document.getElementById("modalDetailsList").innerHTML =
-selectedProduct.details.map(d=>`<li>${d}</li>`).join("");
 
 updateQuantityDisplay();
 
@@ -490,14 +532,42 @@ window.location.href="quote.html";
 
 document.addEventListener("DOMContentLoaded",()=>{
 
+initMobileMenu();
 renderProducts();
-renderOrderSummary();
+syncOrderFromStorage();
+
+const orderItemsList = document.getElementById("orderItemsList");
+
+orderItemsList.addEventListener("click", (event) => {
+
+const plusButton = event.target.closest(".qty-plus");
+const minusButton = event.target.closest(".qty-minus");
+
+if(plusButton){
+increaseOrderItemQuantity(plusButton.dataset.id);
+}
+
+if(minusButton){
+decreaseOrderItemQuantity(minusButton.dataset.id);
+}
 
 });
 
+});
+
+
+
+window.addEventListener("pageshow", () => {
+syncOrderFromStorage();
+});
+
+
+
+window.addEventListener("focus", () => {
+syncOrderFromStorage();
+});
+
 </script>
-<script type="module" src="../src/js/firebase.js"></script>
-<script type="module" src="../src/js/order.js"></script>
 
 </body>
 </html>

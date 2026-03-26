@@ -21,7 +21,7 @@
         <a href="reviews.html">Reviews</a>
       </nav>
 
-      <button class="mobile-menu-btn">☰</button>
+      <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
     </div>
   </header>
 
@@ -96,20 +96,30 @@
               <p class="help-text">Add any important details you want the team to know.</p>
             </div>
 
-            <button type="submit" class="btn btn-primary">Send Quote Request via WhatsApp</button>
           </form>
         </section>
 
         <aside class="quote-summary-card">
-          <h3>Your Selected Items</h3>
+          <div class="quote-summary-head">
+            <h3>Your Selected Items</h3>
+            <button type="button" id="quoteClearAllBtn" class="clear-all">Clear all</button>
+          </div>
 
           <div id="quoteEmptyState" class="empty-state">
-            No items selected yet. Go back to the order page and add products first.
+            Your order is empty
           </div>
 
           <div id="quoteItemsList" class="quote-items-list"></div>
 
-          <div style="margin-top: 20px;">
+          <div id="quoteOrderSummary" class="quote-order-summary">
+            <div id="quoteItemCount">Total items: 0</div>
+          </div>
+
+          <button type="submit" form="quoteForm" id="quoteSubmitBtn" class="btn btn-primary quote-submit-btn">
+            Send via WhatsApp
+          </button>
+
+          <div class="quote-summary-footer">
             <a href="order.html" class="btn btn-secondary">Back to Order Page</a>
           </div>
         </aside>
@@ -126,22 +136,10 @@
         </div>
 
         <div>
-          <h4>Quick Links</h4>
-          <div class="footer-links">
-            <a href="index.html">Home</a>
-            <a href="order.html">Order</a>
-            <a href="track.html">Track Order</a>
-            <a href="reviews.html">Reviews</a>
-          </div>
-        </div>
-
-        <div>
           <h4>Contact</h4>
           <div class="footer-links">
-            <a href="tel:+971505373383">+971 50 537 3383</a>
             <a href="https://wa.me/971505373383" target="_blank">WhatsApp</a>
             <a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
-            <span>Ajman, UAE</span>
           </div>
         </div>
       </div>

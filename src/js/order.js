@@ -7,11 +7,6 @@ const PRODUCTS = [
   category: "Tables",
   shortDescription: "Elegant round table suitable for weddings, parties, and formal setups.",
   measurements: "Approx. 150 cm diameter",
-  details: [
-  "Suitable for premium indoor and outdoor events",
-  "Spacious tabletop for guest seating and decor",
-  "Clean luxury presentation for formal occasions"
-  ],
   images: [
   "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1200&q=80",
   "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=80",
@@ -24,11 +19,6 @@ const PRODUCTS = [
   category: "Tables",
   shortDescription: "A versatile table option for buffet setups, family events, and large gatherings.",
   measurements: "Approx. 180 x 75 cm",
-  details: [
-  "Ideal for dining setups and serving stations",
-  "Works well for indoor halls and outdoor gatherings",
-  "Minimal premium finish for modern events"
-  ],
   images: [
   "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
   "https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=1200&q=80",
@@ -41,11 +31,6 @@ const PRODUCTS = [
     category: "Chairs",
     shortDescription: "Classic clean chair design that matches most event themes and setups.",
     measurements: "Standard event seating dimensions",
-    details: [
-    "Elegant white finish for weddings and formal events",
-    "Comfortable seating for long functions",
-    "Pairs beautifully with luxury table arrangements"
-    ],
     images: [
     "../images/IN9A9418.JPG",
     "../images/IN9A9423.jpg"
@@ -57,11 +42,6 @@ const PRODUCTS = [
   category: "Chairs",
   shortDescription: "Luxury gold seating option for high-end weddings and special occasions.",
   measurements: "Standard event seating dimensions",
-  details: [
-  "Premium gold aesthetic for luxury setups",
-  "Perfect for VIP tables and elegant themes",
-  "Adds a refined statement to event decor"
-  ],
   images: [
   "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
   "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
@@ -179,12 +159,6 @@ const PRODUCTS = [
   document.getElementById("modalImage").src = selectedProduct.images[0];
   
   document.getElementById("modalQuantity").value = 1;
-  
-  const details = document.getElementById("modalDetailsList");
-  
-  details.innerHTML = selectedProduct.details
-  .map(d=>`<li>${d}</li>`)
-  .join("");
   
   document.getElementById("productModal").classList.add("active");
   document.body.style.overflow="hidden";

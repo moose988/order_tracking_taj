@@ -19,6 +19,31 @@ const reviewThanksMessage = `Thank you for your feedback ${String.fromCodePoint(
 const ALLOWED_REVIEW_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_REVIEW_IMAGE_SIZE = 5 * 1024 * 1024;
 
+function initMobileMenu(){
+  const menuBtn = document.querySelector(".mobile-menu-btn");
+  const navLinks = document.querySelector(".nav-links");
+
+  if(!menuBtn || !navLinks){
+    return;
+  }
+
+  menuBtn.addEventListener("click", () => {
+    navLinks.classList.toggle("active");
+  });
+
+  navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      navLinks.classList.remove("active");
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    if(window.innerWidth > 760){
+      navLinks.classList.remove("active");
+    }
+  });
+}
+
 function convertToEmbedLink(link, fallbackLocation = ""){
   const query = extractMapQuery(link) || fallbackLocation;
 
@@ -426,6 +451,7 @@ async function trackOrder(){
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  initMobileMenu();
   document.getElementById("reviewForm")?.addEventListener("submit", submitReview);
 
   const urlOrderId = getOrderIdFromURL();

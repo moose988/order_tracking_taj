@@ -3,6 +3,31 @@ import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/
 
 const reviewsGrid = document.getElementById("reviewsGrid");
 
+function initMobileMenu(){
+  const menuBtn = document.querySelector(".mobile-menu-btn");
+  const navLinks = document.querySelector(".nav-links");
+
+  if(!menuBtn || !navLinks){
+    return;
+  }
+
+  menuBtn.addEventListener("click", () => {
+    navLinks.classList.toggle("active");
+  });
+
+  navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      navLinks.classList.remove("active");
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    if(window.innerWidth > 760){
+      navLinks.classList.remove("active");
+    }
+  });
+}
+
 async function loadReviews(){
   if(!reviewsGrid){
     return;
@@ -79,4 +104,7 @@ function escapeHtml(value){
     .replaceAll("'", "&#39;");
 }
 
-document.addEventListener("DOMContentLoaded", loadReviews);
+document.addEventListener("DOMContentLoaded", () => {
+  initMobileMenu();
+  loadReviews();
+});
