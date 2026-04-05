@@ -14,8 +14,9 @@ onAuthStateChanged(auth, (user) => {
 import { db } from "./firebase.js";
 import {
   collection,
-  getDocs,
+  deleteDoc,
   doc,
+  onSnapshot,
   updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -29,6 +30,20 @@ const analyticsBusiestDay = document.getElementById("analyticsBusiestDay");
 const ordersPerDayCanvas = document.getElementById("ordersPerDayChart");
 const ordersByStatusCanvas = document.getElementById("ordersByStatusChart");
 const topProductsCanvas = document.getElementById("topProductsChart");
+const opsPanel = document.getElementById("opsPanel");
+const opsPanelSummary = document.getElementById("opsPanelSummary");
+const driverPanel = document.getElementById("driverPanel");
+const driverPanelSummary = document.getElementById("driverPanelSummary");
+const editOrderModal = document.getElementById("editOrderModal");
+const editOrderForm = document.getElementById("editOrderForm");
+const editItemsContainer = document.getElementById("editItemsContainer");
+const editOrderTitle = document.getElementById("editOrderTitle");
+const editOrderStatus = document.getElementById("editOrderStatus");
+const editSaveBtn = document.getElementById("editOrderSaveBtn");
+const editDeleteBtn = document.getElementById("editOrderDeleteBtn");
+const closeEditOrderBtn = document.getElementById("closeEditOrderBtn");
+const cancelEditOrderBtn = document.getElementById("cancelEditOrderBtn");
+const adminToast = document.getElementById("adminToast");
 
 let allOrders = [];
 let driversList = [];
@@ -37,6 +52,14 @@ let ordersPerDayChart = null;
 let ordersByStatusChart = null;
 let topProductsChart = null;
 let selectedOrderId = null;
+let currentEditingOrder = null;
+let currentPage = 1;
+let activeOpsFilter = "all";
+const ordersPerPage = 6;
+let ordersUnsubscribe = null;
+let driversUnsubscribe = null;
+let isSavingEditOrder = false;
+let isDeletingOrder = false;
 
 const STATUS_META = {
   "quote-requested": { label: "quote requested", className: "is-quote-requested" },
@@ -74,43 +97,63 @@ function initMobileMenu(){
 
 /* LOAD ORDERS */
 
-async function loadOrders(){
-  const snapshot = await getDocs(collection(db, "orders"));
+function subscribeToOrders(){
+  ordersUnsubscribe?.();
+  ordersUnsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
+    allOrders = snapshot.docs.map((orderDoc) => ({
+      id: orderDoc.id,
+      ...orderDoc.data()
+    }));
 
-  allOrders = snapshot.docs.map(doc => doc.data());
-
-  renderOrders(allOrders);
-  updateStats(allOrders);
-  generateAnalytics();
-  renderCalendar();
+    syncCurrentEditingOrder();
+    renderOpsPanel();
+    renderDriverPanel();
+    applyFilters();
+    updateStats(allOrders);
+    generateAnalytics();
+    renderCalendar();
+  }, (error) => {
+    console.error("Failed to subscribe to orders:", error);
+  });
 }
 
-async function loadDrivers(){
-  const snapshot = await getDocs(collection(db, "drivers"));
-  driversList = snapshot.docs.map((driverDoc) => ({
-    id: driverDoc.id,
-    ...driverDoc.data()
-  }));
+function subscribeToDrivers(){
+  driversUnsubscribe?.();
+  driversUnsubscribe = onSnapshot(collection(db, "drivers"), (snapshot) => {
+    driversList = snapshot.docs.map((driverDoc) => ({
+      id: driverDoc.id,
+      ...driverDoc.data()
+    }));
+
+    renderDriverPanel();
+  }, (error) => {
+    console.error("Failed to subscribe to drivers:", error);
+  });
 }
 
 /* RENDER TABLE */
 
 function renderOrders(orders){
+  const sortedOrders = sortOrders(orders);
+  const paginatedOrders = getPaginatedOrders(sortedOrders);
 
   if(orders.length === 0){
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6" style="text-align:center;padding:20px;">
+        <td colspan="8" style="text-align:center;padding:20px;">
           No orders found
         </td>
       </tr>
     `;
+
+    updatePaginationControls(orders.length);
     return;
   }
 
   tableBody.innerHTML = "";
 
-  orders.forEach(order => {
+  paginatedOrders.forEach(order => {
+    const priority = getPriorityValue(order.priority);
 
     const row = document.createElement("tr");
     row.classList.add("order-row");
@@ -119,30 +162,48 @@ function renderOrders(orders){
     <td>${order.orderId}</td>
     <td>${order.customerName}</td>
     <td>${order.eventDate}</td>
+    <td>${order.eventTime || "N/A"}</td>
     <td>${order.eventLocation}</td>
   
     <td>
-      <select class="status-select no-modal" data-id="${order.orderId}">
+      <select class="status-select no-modal" data-id="${order.id}">
           ${getStatusOptions(order.status)}
         </select>
       </td>
 
+    <td>
+      <div class="priority-cell">
+        <span class="priority-badge ${getPriorityBadgeClass(priority)}">${getPriorityBadgeMarkup(priority)}</span>
+        <select class="priority-select no-modal" data-id="${order.id}">
+          ${getPriorityOptions(priority)}
+        </select>
+      </div>
+    </td>
+
       <td>
         <div class="action-buttons">
-          <button class="btn btn-secondary copy-btn no-modal" data-id="${order.orderId}">
-            Copy Link
+          <button class="btn btn-secondary edit-order-btn no-modal" data-id="${order.id}" type="button">
+            Edit
           </button>
 
-          <button class="btn btn-primary wa-btn no-modal" data-id="${order.orderId}">
+          <button class="btn btn-primary wa-btn no-modal" data-id="${order.id}">
             WhatsApp
           </button>
 
-          <button class="btn btn-secondary assign-driver-btn no-modal" data-id="${order.orderId}">
-            ${order.driver?.name ? `Driver: ${order.driver.name}` : "Assign Driver"}
-          </button>
+          ${order.status === "delivered"
+            ? `<span class="admin-badge no-modal completed-badge">Delivered</span>`
+            : order.driver
+            ? `<button class="btn btn-secondary driver-btn no-modal" data-id="${order.id}" type="button">
+                Driver: ${order.driver.name}
+              </button>`
+            : order.status === "preparing"
+              ? `<button class="btn btn-secondary assign-driver-btn no-modal" data-id="${order.id}" type="button">
+                  Assign Driver
+                </button>`
+              : ""}
 
           ${order.status === "delivered" ? `
-            <button class="btn btn-dark review-request-btn no-modal" data-id="${order.orderId}">
+            <button class="btn btn-dark review-request-btn no-modal" data-id="${order.id}">
               Send Review Request
             </button>
           ` : ""}
@@ -164,6 +225,357 @@ function renderOrders(orders){
   });
 
   attachEvents();
+  updatePaginationControls(orders.length);
+}
+
+function getPaginatedOrders(orders){
+  const totalPages = Math.max(1, Math.ceil(orders.length / ordersPerPage));
+  currentPage = Math.min(currentPage, totalPages);
+
+  const start = (currentPage - 1) * ordersPerPage;
+  const end = start + ordersPerPage;
+
+  return orders.slice(start, end);
+}
+
+function updatePaginationControls(totalOrders){
+  const prevPageBtn = document.getElementById("prevPage");
+  const nextPageBtn = document.getElementById("nextPage");
+  const pageInfo = document.getElementById("pageInfo");
+  const totalPages = Math.max(1, Math.ceil(totalOrders / ordersPerPage));
+
+  currentPage = Math.min(currentPage, totalPages);
+
+  if(pageInfo){
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  }
+
+  if(prevPageBtn){
+    prevPageBtn.disabled = currentPage === 1 || totalOrders === 0;
+  }
+
+  if(nextPageBtn){
+    nextPageBtn.disabled = currentPage === totalPages || totalOrders === 0;
+  }
+}
+
+function sortOrders(orders){
+  return [...orders].sort((a, b) => {
+    const timeA = getCreatedAtValue(a.createdAt);
+    const timeB = getCreatedAtValue(b.createdAt);
+    return timeB - timeA;
+  });
+}
+
+function getCreatedAtValue(createdAt){
+  if(!createdAt){
+    return 0;
+  }
+
+  if(typeof createdAt.toDate === "function"){
+    return createdAt.toDate().getTime();
+  }
+
+  if(typeof createdAt.seconds === "number"){
+    return createdAt.seconds * 1000;
+  }
+
+  return new Date(createdAt).getTime() || 0;
+}
+
+function isToday(dateStr){
+  const today = new Date();
+  const date = parseEventDate(dateStr);
+
+  return Boolean(date) && date.toDateString() === today.toDateString();
+}
+
+function isTomorrow(dateStr){
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const date = parseEventDate(dateStr);
+
+  return Boolean(date) && date.toDateString() === tomorrow.toDateString();
+}
+
+function isWithinNextHours(dateStr, timeStr, hours = 3){
+  const now = new Date();
+  const event = parseEventDateTime(dateStr, timeStr);
+
+  if(!event){
+    return false;
+  }
+
+  const diff = (event - now) / (1000 * 60 * 60);
+  return diff > 0 && diff <= hours;
+}
+
+function parseEventDate(dateStr){
+  if(!dateStr){
+    return null;
+  }
+
+  const parts = String(dateStr).split("-");
+
+  if(parts.length === 3){
+    const [year, month, day] = parts.map(Number);
+    const date = new Date(year, month - 1, day);
+
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const fallback = new Date(dateStr);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
+function parseEventDateTime(dateStr, timeStr){
+  const date = parseEventDate(dateStr);
+
+  if(!date || !timeStr){
+    return null;
+  }
+
+  const match = String(timeStr).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+  if(!match){
+    return null;
+  }
+
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const meridiem = match[3].toUpperCase();
+
+  if(meridiem === "PM" && hours !== 12){
+    hours += 12;
+  }
+
+  if(meridiem === "AM" && hours === 12){
+    hours = 0;
+  }
+
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+function getOpsBuckets(){
+  const todayOrders = allOrders.filter(order => isToday(order.eventDate));
+  const upcomingOrders = allOrders.filter(order => isWithinNextHours(order.eventDate, order.eventTime));
+  const tomorrowOrders = allOrders.filter(order => isTomorrow(order.eventDate));
+
+  return { todayOrders, upcomingOrders, tomorrowOrders };
+}
+
+function renderOpsPanel(){
+  if(!opsPanel){
+    return;
+  }
+
+  const { todayOrders, upcomingOrders, tomorrowOrders } = getOpsBuckets();
+  const cards = [
+    { key: "today", eyebrow: "Today", label: "Orders happening today", count: todayOrders.length },
+    { key: "upcoming", eyebrow: "Next 3h", label: "Starting within 3 hours", count: upcomingOrders.length },
+    { key: "tomorrow", eyebrow: "Tomorrow", label: "Orders scheduled tomorrow", count: tomorrowOrders.length }
+  ];
+
+  opsPanel.innerHTML = cards.map(card => `
+    <button
+      type="button"
+      class="ops-card ${activeOpsFilter === card.key ? "is-active" : ""}"
+      data-filter="${card.key}"
+      aria-pressed="${activeOpsFilter === card.key ? "true" : "false"}"
+    >
+      <span class="ops-card-label">${card.eyebrow}</span>
+      <strong class="ops-card-count">${card.count}</strong>
+      <span class="ops-card-meta">${card.label}</span>
+    </button>
+  `).join("");
+
+  if(opsPanelSummary){
+    opsPanelSummary.textContent = activeOpsFilter === "all"
+      ? `${todayOrders.length} today, ${upcomingOrders.length} in the next 3 hours, ${tomorrowOrders.length} tomorrow.`
+      : `${formatOpsFilterLabel(activeOpsFilter)} filter is active. Click the same card again to clear it.`;
+  }
+
+  attachOpsPanelEvents();
+}
+
+function attachOpsPanelEvents(){
+  document.querySelectorAll(".ops-card").forEach(button => {
+    button.addEventListener("click", () => {
+      const selectedFilter = button.dataset.filter || "all";
+      activeOpsFilter = activeOpsFilter === selectedFilter ? "all" : selectedFilter;
+      renderOpsPanel();
+      applyFilters(true);
+    });
+  });
+}
+
+function formatOpsFilterLabel(filter){
+  const labels = {
+    today: "Today",
+    upcoming: "Next 3h",
+    tomorrow: "Tomorrow",
+    all: "All orders"
+  };
+
+  return labels[filter] || "Selected";
+}
+
+function getPriorityValue(priority){
+  const normalized = String(priority || "normal").toLowerCase().trim();
+
+  if(normalized === "urgent" || normalized === "vip"){
+    return normalized;
+  }
+
+  return "normal";
+}
+
+function normalizeEmail(email){
+  return String(email || "").trim().toLowerCase();
+}
+
+function getPriorityOptions(currentPriority){
+  const priorities = [
+    { value: "normal", label: "Normal" },
+    { value: "urgent", label: "Urgent" },
+    { value: "vip", label: "VIP" }
+  ];
+
+  return priorities.map(priority => `
+    <option value="${priority.value}" ${priority.value === currentPriority ? "selected" : ""}>
+      ${priority.label}
+    </option>
+  `).join("");
+}
+
+function getPriorityBadge(priority){
+  if(priority === "urgent"){
+    return "!";
+  }
+
+  if(priority === "vip"){
+    return "*";
+  }
+
+  return "";
+}
+
+function getPriorityBadgeMarkup(priority){
+  const badge = getPriorityBadge(priority);
+  const label = formatPriorityLabel(priority);
+
+  return badge ? `${badge} ${label}` : label;
+}
+
+function getPriorityBadgeClass(priority){
+  if(priority === "urgent"){
+    return "is-urgent";
+  }
+
+  if(priority === "vip"){
+    return "is-vip";
+  }
+
+  return "is-normal";
+}
+
+function formatPriorityLabel(priority){
+  if(priority === "urgent"){
+    return "Urgent";
+  }
+
+  if(priority === "vip"){
+    return "VIP";
+  }
+
+  return "Normal";
+}
+
+function getDriverWorkload(){
+  const activeOrders = allOrders.filter(order =>
+    order.status === "preparing" || order.status === "out-for-delivery"
+  );
+  const driverMap = {};
+
+  driversList.forEach(driver => {
+    const name = driver.name || "Unnamed Driver";
+    driverMap[name] = {
+      name,
+      orders: []
+    };
+  });
+
+  activeOrders.forEach(order => {
+    const driverName = order.driver?.name || "Unassigned";
+
+    if(!driverMap[driverName]){
+      driverMap[driverName] = {
+        name: driverName,
+        orders: []
+      };
+    }
+
+    driverMap[driverName].orders.push(order);
+  });
+
+  return Object.values(driverMap)
+    .sort((first, second) => {
+      if(second.orders.length !== first.orders.length){
+        return second.orders.length - first.orders.length;
+      }
+
+      return first.name.localeCompare(second.name);
+    });
+}
+
+function renderDriverPanel(){
+  if(!driverPanel){
+    return;
+  }
+
+  const workload = getDriverWorkload();
+  const activeDriverCount = workload.filter(driver => driver.orders.length > 0 && driver.name !== "Unassigned").length;
+  const unassignedCount = workload.find(driver => driver.name === "Unassigned")?.orders.length || 0;
+
+  if(driverPanelSummary){
+    if(!workload.length){
+      driverPanelSummary.textContent = "No drivers or active assignments yet.";
+    }else if(unassignedCount > 0){
+      driverPanelSummary.textContent = `${activeDriverCount} active driver${activeDriverCount === 1 ? "" : "s"} and ${unassignedCount} unassigned active order${unassignedCount === 1 ? "" : "s"}.`;
+    }else{
+      driverPanelSummary.textContent = `${activeDriverCount} active driver${activeDriverCount === 1 ? "" : "s"} currently handling live orders.`;
+    }
+  }
+
+  if(!workload.length){
+    driverPanel.innerHTML = '<article class="driver-card is-empty">No driver workload to show yet.</article>';
+    return;
+  }
+
+  driverPanel.innerHTML = workload.map(driver => `
+    <article class="driver-card ${driver.orders.length > 0 ? "is-busy" : "is-available"}">
+      <div class="driver-card-top">
+        <strong>${driver.name}</strong>
+        <span class="driver-card-badge ${driver.orders.length > 0 ? "is-busy" : "is-available"}">
+          ${driver.orders.length > 0 ? "Busy" : "Available"}
+        </span>
+      </div>
+      <div class="driver-card-count">${driver.orders.length} active order${driver.orders.length === 1 ? "" : "s"}</div>
+      <div class="driver-card-meta">${driver.name === "Unassigned" ? "Needs driver assignment" : "Live order status"}</div>
+      ${driver.orders.length ? `
+        <div class="driver-orders-list">
+          ${driver.orders.map(order => `
+            <div class="driver-order-item">
+              <span class="driver-order-text">${order.orderId} - ${order.customerName}</span>
+              <span class="order-status">${formatStatusLabel(order.status).replace(/\b\w/g, (letter) => letter.toUpperCase())}</span>
+            </div>
+          `).join("")}
+        </div>
+      ` : ""}
+    </article>
+  `).join("");
 }
 
 /* STATUS OPTIONS */
@@ -189,6 +601,19 @@ function getStatusOptions(current){
 /* EVENTS */
 
 function attachEvents(){
+  document.querySelectorAll(".priority-select").forEach(select => {
+    select.addEventListener("change", async (event) => {
+      event.stopPropagation();
+
+      const orderId = select.dataset.id;
+      const nextPriority = getPriorityValue(select.value);
+
+      await updateDoc(doc(db, "orders", orderId), {
+        priority: nextPriority
+      });
+      showToast("Priority updated");
+    });
+  });
 
   /* STATUS CHANGE */
   document.querySelectorAll(".status-select").forEach(select => {
@@ -203,37 +628,20 @@ function attachEvents(){
       await updateDoc(doc(db, "orders", orderId), {
         status: newStatus
       });
-
-      const targetOrder = allOrders.find(order => order.orderId === orderId);
-      if(targetOrder){
-        targetOrder.status = newStatus;
-      }
-
-      updateStats(allOrders);
-      generateAnalytics();
-      renderCalendar();
-      applyFilters();
-
-      alert("Status updated");
+      showToast("Status updated");
     });
 
   });
 
-  /* COPY LINK */
-  document.querySelectorAll(".copy-btn").forEach(btn => {
-
-    btn.addEventListener("click", (e)=>{
-
+  document.querySelectorAll(".edit-order-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
       e.stopPropagation();
 
-      const orderId = btn.dataset.id;
-      const link = `${window.location.origin}/pages/track.html?id=${orderId}`;
-
-      navigator.clipboard.writeText(link);
-
-      alert("Tracking link copied");
+      const order = allOrders.find(item => item.id === btn.dataset.id);
+      if(order){
+        openEditOrderModal(order);
+      }
     });
-
   });
 
   /* WHATSAPP */
@@ -244,15 +652,14 @@ document.querySelectorAll(".wa-btn").forEach(btn => {
     e.stopPropagation();
 
     const orderId = btn.dataset.id;
-
-    const order = allOrders.find(o => o.orderId === orderId);
+    const order = allOrders.find(o => o.id === orderId);
 
     const itemsText = order.items
   .map(i => `• ${i.name} × ${i.quantity}`)
   .join("\n");
 
 // 🔥 dynamic tracking link
-const trackingLink = `${window.location.origin}/track.html?id=${order.orderId}`;
+const trackingLink = `${window.location.origin}/pages/track.html?id=${encodeURIComponent(order.id)}`;
 
 const message = `
 Hello ${order.customerName},
@@ -291,7 +698,7 @@ ${trackingLink}
       e.stopPropagation();
 
       const orderId = btn.dataset.id;
-      const order = allOrders.find(item => item.orderId === orderId);
+      const order = allOrders.find(item => item.id === orderId);
 
       if(!order){
         return;
@@ -304,7 +711,7 @@ ${trackingLink}
         formattedPhone = "971" + cleanPhone.slice(1);
       }
 
-      const reviewLink = `${window.location.origin}/pages/track.html?id=${order.orderId}`;
+      const reviewLink = `${window.location.origin}/pages/track.html?id=${encodeURIComponent(order.id)}`;
       const message = `Hello ${order.customerName},
 
 We hope everything looked perfect for your event 🙌
@@ -321,33 +728,11 @@ ${reviewLink}
     });
   });
 
-  document.querySelectorAll(".assign-driver-btn").forEach(btn => {
+  document.querySelectorAll(".assign-driver-btn, .driver-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
 
-      selectedOrderId = btn.dataset.id;
-
-      const select = document.getElementById("driverSelect");
-      const order = allOrders.find((item) => item.orderId === selectedOrderId);
-
-      if(!select){
-        return;
-      }
-
-      if(!driversList.length){
-        select.innerHTML = '<option value="">No drivers available</option>';
-        document.getElementById("confirmAssignDriver").disabled = true;
-      }else{
-        select.innerHTML = driversList.map((driver) => `
-          <option value="${driver.phone}" ${order?.driver?.phone === driver.phone ? "selected" : ""}>
-            ${driver.name} (${driver.phone})
-          </option>
-        `).join("");
-        document.getElementById("confirmAssignDriver").disabled = false;
-      }
-
-      document.getElementById("driverModal").classList.add("active");
-      document.body.style.overflow = "hidden";
+      openDriverAssignmentModal(btn.dataset.id);
     });
   });
 
@@ -416,10 +801,339 @@ function closeOrderModal(){
   document.body.style.overflow = "auto";
 }
 
+function openEditOrderModal(order){
+  currentEditingOrder = order;
+
+  if(editOrderTitle){
+    editOrderTitle.textContent = `Edit ${order.orderId}`;
+  }
+
+  if(editOrderStatus){
+    editOrderStatus.textContent = `${order.customerName || "Unknown customer"} • ${formatStatusLabel(order.status)}`;
+  }
+
+  if(editOrderForm){
+    editOrderForm.customerName.value = order.customerName || "";
+    editOrderForm.phone.value = order.phone || "";
+    editOrderForm.eventDate.value = order.eventDate || "";
+    editOrderForm.eventTime.value = convertTimeToInputValue(order.eventTime);
+    editOrderForm.setupTime.value = convertTimeToInputValue(order.setupTime);
+    editOrderForm.eventLocation.value = order.eventLocation || "";
+    editOrderForm.mapLink.value = order.mapLink || "";
+  }
+
+  renderEditableItems(order.items || []);
+  setEditSaveState(false);
+  setEditDeleteState(false);
+  editOrderModal?.classList.add("active");
+  document.body.style.overflow = "hidden";
+}
+
+function closeEditOrderModal(force = false){
+  if(isDeletingOrder && !force){
+    return;
+  }
+
+  editOrderModal?.classList.remove("active");
+  currentEditingOrder = null;
+  editOrderForm?.reset();
+  if(editItemsContainer){
+    editItemsContainer.innerHTML = "";
+  }
+  isSavingEditOrder = false;
+  isDeletingOrder = false;
+  syncEditModalActionState();
+  document.body.style.overflow = "auto";
+}
+
+function renderEditableItems(items){
+  if(!editItemsContainer){
+    return;
+  }
+
+  const normalizedItems = items.length
+    ? items
+    : [{ name: "", quantity: 1 }];
+
+  editItemsContainer.innerHTML = normalizedItems.map((item, index) => `
+    <div class="edit-item-row" data-index="${index}">
+      <input
+        type="text"
+        class="edit-item-name"
+        value="${escapeAttribute(item.name || "")}"
+        placeholder="Item name"
+        aria-label="Item name ${index + 1}"
+      />
+      <input
+        type="number"
+        min="1"
+        step="1"
+        class="edit-item-quantity"
+        value="${Number(item.quantity) > 0 ? Number(item.quantity) : 1}"
+        aria-label="Item quantity ${index + 1}"
+      />
+      <button type="button" class="btn btn-dark remove-edit-item-btn">Remove</button>
+    </div>
+  `).join("");
+
+  attachEditableItemEvents();
+}
+
+function attachEditableItemEvents(){
+  document.querySelectorAll(".remove-edit-item-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      const rows = Array.from(document.querySelectorAll(".edit-item-row"));
+
+      if(rows.length <= 1){
+        rows[0]?.querySelector(".edit-item-name")?.focus();
+        showToast("At least one item is required", "warning");
+        return;
+      }
+
+      button.closest(".edit-item-row")?.remove();
+    });
+  });
+}
+
+function addEditableItem(){
+  if(!editItemsContainer){
+    return;
+  }
+
+  const itemRow = document.createElement("div");
+  itemRow.className = "edit-item-row";
+  itemRow.innerHTML = `
+    <input type="text" class="edit-item-name" value="" placeholder="Item name" aria-label="Item name" />
+    <input type="number" min="1" step="1" class="edit-item-quantity" value="1" aria-label="Item quantity" />
+    <button type="button" class="btn btn-dark remove-edit-item-btn">Remove</button>
+  `;
+
+  editItemsContainer.appendChild(itemRow);
+  attachEditableItemEvents();
+  itemRow.querySelector(".edit-item-name")?.focus();
+}
+
+function getUpdatedItemsFromUI(){
+  return Array.from(document.querySelectorAll(".edit-item-row"))
+    .map((row) => ({
+      name: row.querySelector(".edit-item-name")?.value.trim() || "",
+      quantity: Number(row.querySelector(".edit-item-quantity")?.value) || 0
+    }))
+    .filter((item) => item.name && item.quantity > 0);
+}
+
+function convertTimeToInputValue(timeString){
+  if(!timeString){
+    return "";
+  }
+
+  const trimmed = String(timeString).trim();
+
+  if(/^\d{2}:\d{2}$/.test(trimmed)){
+    return trimmed;
+  }
+
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if(!match){
+    return "";
+  }
+
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const meridiem = match[3].toUpperCase();
+
+  if(meridiem === "PM" && hours !== 12){
+    hours += 12;
+  }
+
+  if(meridiem === "AM" && hours === 12){
+    hours = 0;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${minutes}`;
+}
+
+function formatTimeTo12Hour(timeString){
+  if(!timeString){
+    return "";
+  }
+
+  const match = String(timeString).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if(!match){
+    return String(timeString).trim();
+  }
+
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const meridiem = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+
+  return `${hours}:${minutes} ${meridiem}`;
+}
+
+function escapeAttribute(value){
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function syncCurrentEditingOrder(){
+  if(!currentEditingOrder){
+    return;
+  }
+
+  const nextOrder = allOrders.find((order) => order.id === currentEditingOrder.id);
+
+  if(!nextOrder){
+    closeEditOrderModal();
+    return;
+  }
+
+  currentEditingOrder = nextOrder;
+}
+
+function setEditSaveState(isSaving){
+  isSavingEditOrder = isSaving;
+  syncEditModalActionState();
+}
+
+function setEditDeleteState(isDeleting){
+  isDeletingOrder = isDeleting;
+  syncEditModalActionState();
+}
+
+function syncEditModalActionState(){
+  if(editSaveBtn){
+    editSaveBtn.disabled = isSavingEditOrder || isDeletingOrder;
+    editSaveBtn.textContent = isSavingEditOrder ? "Saving..." : "Save Changes";
+  }
+
+  if(editDeleteBtn){
+    editDeleteBtn.disabled = isSavingEditOrder || isDeletingOrder;
+    editDeleteBtn.textContent = isDeletingOrder ? "Deleting..." : "Delete Order";
+  }
+
+  if(closeEditOrderBtn){
+    closeEditOrderBtn.disabled = isDeletingOrder;
+  }
+
+  if(cancelEditOrderBtn){
+    cancelEditOrderBtn.disabled = isDeletingOrder;
+  }
+}
+
+function showToast(message, type = "success"){
+  if(!adminToast){
+    return;
+  }
+
+  adminToast.textContent = message;
+  adminToast.className = `admin-toast is-visible is-${type}`;
+
+  window.clearTimeout(showToast.timeoutId);
+  showToast.timeoutId = window.setTimeout(() => {
+    adminToast.className = "admin-toast";
+  }, 2600);
+}
+
+async function handleEditOrderSubmit(event){
+  event.preventDefault();
+
+  if(!currentEditingOrder || !editOrderForm || isDeletingOrder){
+    return;
+  }
+
+  const items = getUpdatedItemsFromUI();
+
+  if(!items.length){
+    showToast("Add at least one valid item", "warning");
+    return;
+  }
+
+  const updatedData = {
+    customerName: editOrderForm.customerName.value.trim(),
+    phone: editOrderForm.phone.value.trim(),
+    eventDate: editOrderForm.eventDate.value,
+    eventTime: formatTimeTo12Hour(editOrderForm.eventTime.value),
+    setupTime: formatTimeTo12Hour(editOrderForm.setupTime.value),
+    eventLocation: editOrderForm.eventLocation.value.trim(),
+    mapLink: editOrderForm.mapLink.value.trim(),
+    items
+  };
+
+  setEditSaveState(true);
+
+  try{
+    await updateDoc(doc(db, "orders", currentEditingOrder.id), updatedData);
+    closeEditOrderModal();
+    showToast("Order updated successfully");
+  }catch(error){
+    console.error("Failed to update order:", error);
+    showToast("Could not save changes", "error");
+  }finally{
+    setEditSaveState(false);
+  }
+}
+
+async function handleDeleteOrder(){
+  if(!currentEditingOrder || isDeletingOrder){
+    return;
+  }
+
+  const orderIdLabel = currentEditingOrder.orderId || "this order";
+  const shouldDelete = window.confirm(
+    `Are you sure you want to permanently delete ${orderIdLabel}? This action cannot be undone.`
+  );
+
+  if(!shouldDelete){
+    return;
+  }
+
+  setEditDeleteState(true);
+
+  try{
+    await deleteDoc(doc(db, "orders", currentEditingOrder.id));
+    closeEditOrderModal(true);
+    showToast("Order deleted successfully");
+  }catch(error){
+    console.error("Failed to delete order:", error);
+    showToast("Could not delete order", "error");
+    setEditDeleteState(false);
+  }
+}
+
 function closeDriverModal(){
   document.getElementById("driverModal").classList.remove("active");
   selectedOrderId = null;
   document.body.style.overflow = "auto";
+}
+
+function openDriverAssignmentModal(orderId){
+  selectedOrderId = orderId;
+
+  const select = document.getElementById("driverSelect");
+  const order = allOrders.find((item) => item.id === selectedOrderId);
+
+  if(!select){
+    return;
+  }
+
+  if(!driversList.length){
+    select.innerHTML = '<option value="">No drivers available</option>';
+    document.getElementById("confirmAssignDriver").disabled = true;
+  }else{
+    select.innerHTML = driversList.map((driver) => `
+      <option value="${driver.id}" ${order?.driver?.uid === driver.uid || order?.driver?.phone === driver.phone ? "selected" : ""}>
+        ${driver.name} (${driver.email || driver.phone})
+      </option>
+    `).join("");
+    document.getElementById("confirmAssignDriver").disabled = false;
+  }
+
+  document.getElementById("driverModal").classList.add("active");
+  document.body.style.overflow = "hidden";
 }
 
 async function assignDriverToOrder(){
@@ -429,8 +1143,8 @@ async function assignDriverToOrder(){
     return;
   }
 
-  const selectedPhone = select.value;
-  const driver = driversList.find((item) => item.phone === selectedPhone);
+  const selectedDriverId = select.value;
+  const driver = driversList.find((item) => item.id === selectedDriverId);
 
   if(!driver){
     alert("Please select a driver.");
@@ -440,21 +1154,14 @@ async function assignDriverToOrder(){
   await updateDoc(doc(db, "orders", selectedOrderId), {
     driver: {
       name: driver.name,
-      phone: driver.phone
+      phone: driver.phone,
+      email: normalizeEmail(driver.email),
+      uid: driver.uid || ""
     }
   });
 
-  const targetOrder = allOrders.find((order) => order.orderId === selectedOrderId);
-  if(targetOrder){
-    targetOrder.driver = {
-      name: driver.name,
-      phone: driver.phone
-    };
-  }
-
   closeDriverModal();
-  applyFilters();
-  alert("Driver assigned");
+  showToast("Driver assigned");
 }
 
 function generateAnalytics(){
@@ -687,7 +1394,7 @@ function renderCalendar(){
         <button
           type="button"
           class="calendar-event ${statusMeta.className}"
-          data-order-id="${order.orderId}"
+          data-order-id="${order.id}"
           title="${order.customerName} | ${statusMeta.label}"
         >
           <span class="calendar-event-name">${order.customerName || "Unknown"}</span>
@@ -715,7 +1422,7 @@ function renderCalendar(){
 function attachCalendarEvents(){
   document.querySelectorAll(".calendar-event").forEach(button => {
     button.addEventListener("click", () => {
-      const order = allOrders.find(item => item.orderId === button.dataset.orderId);
+      const order = allOrders.find(item => item.id === button.dataset.orderId);
       if(order){
         openOrderModal(order);
       }
@@ -763,17 +1470,45 @@ function getStatusColor(status){
 
 /* SEARCH + FILTER */
 
-function applyFilters(){
+function applyFilters(resetPage = false){
+  if(resetPage){
+    currentPage = 1;
+  }
 
-  const search = document.getElementById("searchInput").value.toLowerCase();
-  const status = document.getElementById("statusFilter").value;
+  renderOrders(getFilteredOrders());
+}
+
+function handlePageChange(direction){
+  const totalPages = Math.max(1, Math.ceil(getFilteredOrders().length / ordersPerPage));
+  const nextPage = currentPage + direction;
+
+  if(nextPage < 1 || nextPage > totalPages){
+    return;
+  }
+
+  currentPage = nextPage;
+  renderOrders(getFilteredOrders());
+}
+
+function getFilteredOrders(){
+  const search = document.getElementById("searchInput")?.value.toLowerCase() || "";
+  const status = document.getElementById("statusFilter")?.value || "all";
+  const priority = document.getElementById("priorityFilter")?.value || "all";
 
   let filtered = allOrders;
 
+  if(activeOpsFilter === "today"){
+    filtered = filtered.filter(o => isToday(o.eventDate));
+  }else if(activeOpsFilter === "upcoming"){
+    filtered = filtered.filter(o => isWithinNextHours(o.eventDate, o.eventTime));
+  }else if(activeOpsFilter === "tomorrow"){
+    filtered = filtered.filter(o => isTomorrow(o.eventDate));
+  }
+
   if(search){
     filtered = filtered.filter(o =>
-      (o.orderId || "").toLowerCase().includes(search) ||
-      (o.customerName || "").toLowerCase().includes(search)
+      o.orderId.toLowerCase().includes(search) ||
+      o.customerName.toLowerCase().includes(search)
     );
   }
 
@@ -781,7 +1516,11 @@ function applyFilters(){
     filtered = filtered.filter(o => o.status === status);
   }
 
-  renderOrders(filtered);
+  if(priority !== "all"){
+    filtered = filtered.filter(o => getPriorityValue(o.priority) === priority);
+  }
+
+  return filtered;
 }
 
 /* STATS */
@@ -807,14 +1546,27 @@ function updateStats(orders){
 document.addEventListener("DOMContentLoaded", async ()=>{
   initMobileMenu();
   document.getElementById("closeModalBtn").addEventListener("click", closeOrderModal);
+  closeEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
+  cancelEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
+  document.getElementById("addEditItemBtn")?.addEventListener("click", addEditableItem);
+  editOrderForm?.addEventListener("submit", handleEditOrderSubmit);
+  editDeleteBtn?.addEventListener("click", handleDeleteOrder);
   document.getElementById("confirmAssignDriver")?.addEventListener("click", assignDriverToOrder);
+  document.getElementById("prevPage")?.addEventListener("click", () => handlePageChange(-1));
+  document.getElementById("nextPage")?.addEventListener("click", () => handlePageChange(1));
   prevMonthBtn?.addEventListener("click", ()=> changeMonth(-1));
   nextMonthBtn?.addEventListener("click", ()=> changeMonth(1));
-  await Promise.all([loadDrivers(), loadOrders()]);
+  subscribeToDrivers();
+  subscribeToOrders();
 
-  document.getElementById("searchInput").addEventListener("input", applyFilters);
-  document.getElementById("statusFilter").addEventListener("change", applyFilters);
-
+  document.getElementById("searchInput").addEventListener("input", () => applyFilters(true));
+  document.getElementById("statusFilter").addEventListener("change", () => applyFilters(true));
+  document.getElementById("priorityFilter").addEventListener("change", () => applyFilters(true));
+  editOrderModal?.addEventListener("click", (event) => {
+    if(event.target === editOrderModal){
+      closeEditOrderModal();
+    }
+  });
 });
 
 

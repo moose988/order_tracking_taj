@@ -4,6 +4,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  serverTimestamp,
   setDoc,
   updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -402,8 +403,9 @@ document.addEventListener("DOMContentLoaded", () => {
       mapLink: mapLink || "",
       notes: notes || "",
       items: order,
+      priority: "normal",
       status: "quote-requested",
-      createdAt: new Date()
+      createdAt: serverTimestamp()
     });
 
     const itemsText = order.map(item => `${item.name} x${item.quantity}`).join("\n");

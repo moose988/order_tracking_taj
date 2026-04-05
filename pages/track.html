@@ -134,12 +134,6 @@ Enter your order ID to see the latest update.
 <input type="text" id="reviewName" placeholder="Your name">
 </div>
 
-<div class="form-group">
-<label for="reviewImage">Photo (optional)</label>
-<input type="file" id="reviewImage" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
-<p class="help-text">Allowed: JPG, PNG, or WEBP up to 5 MB.</p>
-</div>
-
 <button id="reviewSubmitBtn" class="btn btn-primary review-submit-btn" type="submit">
 Submit Review
 </button>
@@ -160,6 +154,19 @@ The event location is shown below.
 <div id="locationInfo" style="margin-bottom:10px;"></div>
 
 <div id="mapContainer" style="height:350px;border-radius:12px;"></div>
+
+<div id="driverInfoBox" class="track-card" style="display:none;">
+<h3>Driver Details</h3>
+
+<p><strong>Name:</strong> <span id="driverName"></span></p>
+<p><strong>Phone:</strong> <span id="driverPhone"></span></p>
+
+<div style="margin-top:12px;">
+<a id="driverWhatsappBtn" class="btn btn-primary" target="_blank">
+Contact Driver on WhatsApp
+</a>
+</div>
+</div>
 
 <div id="supportBox" class="support-box">
 <h4>Need Help?</h4>

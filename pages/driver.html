@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Driver Dashboard | Al Taj Al Malaky</title>
+  <link rel="stylesheet" href="../src/css/styles.css" />
+</head>
+<body class="driver-dashboard-page">
+  <header class="site-header">
+    <div class="container navbar">
+      <a href="index.html" class="brand">
+        <h2>Al Taj Al Malaky</h2>
+        <span>Luxury Event Setup & Rental</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="track.html">Track Order</a>
+        <a href="driver.html" class="active">Driver Dashboard</a>
+      </nav>
+
+      <button id="driverLogoutBtn" class="btn btn-secondary admin-logout-btn" type="button">Logout</button>
+      <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
+    </div>
+  </header>
+
+  <main class="page-section">
+    <div class="container">
+      <section class="driver-hero">
+        <div>
+          <span class="section-kicker">Driver Dashboard</span>
+          <h1 class="section-title">Hello, <span id="driverWelcomeName">Driver</span></h1>
+          <p id="driverSummaryText" class="section-text">Assigned deliveries will appear here in real time.</p>
+        </div>
+
+        <div class="driver-pill-row">
+          <span id="activeDeliveryPill" class="driver-pill">Active order: none</span>
+          <span id="locationSharingPill" class="driver-pill">Location sharing: off</span>
+        </div>
+      </section>
+
+      <div id="driverDashboardStatus" class="driver-dashboard-message is-info" role="status" aria-live="polite">
+        Connecting to your assigned orders...
+      </div>
+
+      <section class="driver-section" aria-labelledby="driverActiveOrdersTitle">
+        <div class="driver-section-head">
+          <div>
+            <span class="section-kicker">Assigned Work</span>
+            <h2 id="driverActiveOrdersTitle" class="section-title">Active Orders</h2>
+          </div>
+          <p id="driverActiveOrdersSummary" class="driver-section-summary">Loading your active deliveries...</p>
+        </div>
+
+        <section id="driverOrders" class="driver-orders-grid" aria-live="polite">
+          <article class="driver-empty-state">
+            <strong>Loading assigned orders...</strong>
+            <p>Please wait while your dashboard connects.</p>
+          </article>
+        </section>
+      </section>
+
+      <section class="driver-section driver-completed-section" aria-labelledby="driverCompletedOrdersTitle">
+        <div class="driver-section-head">
+          <div>
+            <span class="section-kicker">Delivery History</span>
+            <h2 id="driverCompletedOrdersTitle" class="section-title">Completed Orders</h2>
+          </div>
+          <p id="driverCompletedOrdersSummary" class="driver-section-summary">Delivered orders you complete will appear here automatically.</p>
+        </div>
+
+        <div class="driver-history-toolbar">
+          <label class="driver-history-control">
+            <span>Range</span>
+            <select id="completedRangeFilter">
+              <option value="month">This Month</option>
+              <option value="all">All Time</option>
+            </select>
+          </label>
+
+          <label class="driver-history-control">
+            <span>Sort</span>
+            <select id="completedSortFilter">
+              <option value="recent">Most Recent First</option>
+              <option value="oldest">Oldest First</option>
+            </select>
+          </label>
+
+          <label class="driver-history-control driver-history-search">
+            <span>Search</span>
+            <input id="completedSearchInput" type="search" placeholder="Order ID or customer name" />
+          </label>
+        </div>
+
+        <section id="driverCompletedOrders" class="driver-orders-grid driver-completed-grid" aria-live="polite">
+          <article class="driver-empty-state is-soft">
+            <strong>No completed orders yet</strong>
+            <p>Finished deliveries will move here automatically.</p>
+          </article>
+        </section>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="../src/js/driver.js"></script>
+</body>
+</html>

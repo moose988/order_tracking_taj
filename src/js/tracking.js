@@ -1,23 +1,23 @@
-import { db, storage } from "./firebase.js";
+import { db } from "./firebase.js";
 import {
   addDoc,
   collection,
   doc,
-  getDoc,
+  documentId,
   getDocs,
+  onSnapshot,
   query,
   where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {
-  getDownloadURL,
-  ref,
-  uploadBytes
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
 let currentOrder = null;
+let orderUnsubscribe = null;
 const reviewThanksMessage = `Thank you for your feedback ${String.fromCodePoint(0x1F64C)}`;
-const ALLOWED_REVIEW_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_REVIEW_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function clearOrderSubscription(){
+  orderUnsubscribe?.();
+  orderUnsubscribe = null;
+}
 
 function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
@@ -52,6 +52,41 @@ function convertToEmbedLink(link, fallbackLocation = ""){
   }
 
   return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
+}
+
+function convertDriverLocationToEmbedLink(location){
+  const lat = Number(location?.lat);
+  const lng = Number(location?.lng);
+
+  if(!Number.isFinite(lat) || !Number.isFinite(lng)){
+    return null;
+  }
+
+  return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}&output=embed`;
+}
+
+function formatLocationTimestamp(value){
+  if(!value){
+    return "";
+  }
+
+  if(typeof value.toDate === "function"){
+    return value.toDate().toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  }
+
+  const parsedDate = new Date(value);
+
+  if(Number.isNaN(parsedDate.getTime())){
+    return "";
+  }
+
+  return parsedDate.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function extractMapQuery(link){
@@ -123,23 +158,72 @@ function getOrderIdFromURL(){
 
 async function loadOrder(orderId){
   resetTrackState();
+  clearOrderSubscription();
 
-  const orderRef = doc(db, "orders", orderId);
-  const snap = await getDoc(orderRef);
+  const resolvedOrderRef = await resolveOrderRef(orderId);
 
-  if(!snap.exists()){
-    document.getElementById("trackResult").innerHTML = "<p>Order not found.</p>";
+  if(!resolvedOrderRef){
+    renderTrackMessage("Order not found", "This order may have been removed or the ID is incorrect.", "not-found");
     return;
   }
 
-  currentOrder = snap.data();
-  document.getElementById("trackResult").innerHTML = "";
+  orderUnsubscribe = onSnapshot(resolvedOrderRef, async (snap) => {
+    if(!snap.exists()){
+      clearOrderSubscription();
+      resetTrackState();
+      renderTrackMessage("Order not found", "This order may have been removed or the ID is incorrect.", "not-found");
+      return;
+    }
 
-  await renderOrder(currentOrder);
+    currentOrder = {
+      id: snap.id,
+      ...snap.data()
+    };
+    document.getElementById("trackResult").innerHTML = "";
+
+    await renderOrder(currentOrder);
+  }, (error) => {
+    console.error("Failed to subscribe to order:", error);
+    renderTrackMessage("Unable to load this order", "Please try again in a moment.", "error");
+  });
+}
+
+function renderTrackMessage(title, description = "", tone = "not-found"){
+  const trackResult = document.getElementById("trackResult");
+
+  if(!trackResult){
+    return;
+  }
+
+  trackResult.innerHTML = `
+    <div class="track-status-message is-${tone}">
+      <strong>${title}</strong>
+      ${description ? `<p>${description}</p>` : ""}
+    </div>
+  `;
+}
+
+async function resolveOrderRef(orderId){
+  const directRef = doc(db, "orders", orderId);
+  const directSnapshot = await getDocs(query(collection(db, "orders"), where(documentId(), "==", orderId)));
+
+  if(!directSnapshot.empty){
+    return directRef;
+  }
+
+  const orderQuery = query(collection(db, "orders"), where("orderId", "==", orderId));
+  const orderSnapshot = await getDocs(orderQuery);
+
+  if(orderSnapshot.empty){
+    return null;
+  }
+
+  return doc(db, "orders", orderSnapshot.docs[0].id);
 }
 
 async function renderOrder(order){
   const info = document.getElementById("orderInfo");
+  const normalizedStatus = normalizeStatus(order.status);
 
   info.innerHTML = `
 <p><strong>Order ID:</strong> ${order.orderId}</p>
@@ -158,8 +242,7 @@ Open Location
 
   bindSupportButton(order);
 
-  const summary = document.getElementById("statusSummary");
-  summary.innerHTML = `Current Status: ${formatStatusLabel(order.status)}`;
+  renderStatusSummary(normalizedStatus || order.status);
 
   const itemsBox = document.getElementById("orderItems");
   itemsBox.innerHTML = `
@@ -171,7 +254,11 @@ ${(order.items || []).map(item => `<li>${item.name} × ${item.quantity}</li>`).j
 
   const mapContainer = document.getElementById("mapContainer");
   const locationInfo = document.getElementById("locationInfo");
-  const embedLink = convertToEmbedLink(order.mapLink, order.eventLocation);
+  const driverEmbedLink = normalizedStatus === "out-for-delivery"
+    ? convertDriverLocationToEmbedLink(order.driverLocation)
+    : null;
+  const embedLink = driverEmbedLink || convertToEmbedLink(order.mapLink, order.eventLocation);
+  const liveLocationTime = formatLocationTimestamp(order.driverLocation?.updatedAt);
 
   if(locationInfo){
     locationInfo.innerHTML = `
@@ -181,6 +268,18 @@ ${(order.items || []).map(item => `<li>${item.name} × ${item.quantity}</li>`).j
 Open Location
 </a>
 </p>
+${driverEmbedLink ? `
+<div class="track-live-location-note">
+  <strong>Live Driver Location Active</strong>
+  <p>${liveLocationTime ? `Last updated at ${liveLocationTime}.` : "Your driver is currently sharing live location."}</p>
+</div>
+` : ""}
+${normalizedStatus === "delivered" ? `
+<div class="track-live-location-note">
+  <strong>Delivery Complete</strong>
+  <p>This order has been delivered successfully.</p>
+</div>
+` : ""}
 `;
   }
 
@@ -199,8 +298,32 @@ Open Location
       : '<div class="empty-state">Map preview unavailable.</div>';
   }
 
-  renderStatus(order.status);
+  updateDriverInfo(order, normalizedStatus);
+  renderStatus(normalizedStatus);
   await updateReviewUI(order);
+}
+
+function renderStatusSummary(status){
+  const summary = document.getElementById("statusSummary");
+
+  if(!summary){
+    return;
+  }
+
+  const normalizedStatus = normalizeStatus(status);
+
+  if(normalizedStatus === "cancelled"){
+    summary.innerHTML = `
+      <div class="track-status-message is-cancelled">
+        <strong>Order Cancelled</strong>
+        <p>This order is marked as cancelled. Please contact support if you need help.</p>
+      </div>
+    `;
+    return;
+  }
+
+  summary.className = "";
+  summary.innerHTML = `Current Status: ${formatStatusLabel(normalizedStatus || status)}`;
 }
 
 function bindSupportButton(order){
@@ -310,17 +433,9 @@ async function submitReview(event){
   const rating = Number(document.getElementById("reviewStars").value);
   const comment = document.getElementById("reviewComment").value.trim();
   const name = document.getElementById("reviewName").value.trim();
-  const imageFile = document.getElementById("reviewImage").files[0];
 
   if(!rating || rating < 1 || rating > 5 || !comment){
     setReviewMessage("Please add a rating and comment before submitting.", "error");
-    return;
-  }
-
-  const imageValidationError = validateReviewImage(imageFile);
-
-  if(imageValidationError){
-    setReviewMessage(imageValidationError, "error");
     return;
   }
 
@@ -337,22 +452,11 @@ async function submitReview(event){
       return;
     }
 
-    let imageUrl = "";
-
-    if(imageFile){
-      const safeFileName = (imageFile.name || "image.jpg").replace(/\s+/g, "-");
-      const storageRef = ref(storage, `reviews/${currentOrder.orderId}/${Date.now()}-${safeFileName}`);
-
-      await withTimeout(uploadBytes(storageRef, imageFile), 20000, "Image upload timed out.");
-      imageUrl = await withTimeout(getDownloadURL(storageRef), 10000, "Could not fetch uploaded image URL.");
-    }
-
     await addDoc(collection(db, "reviews"), {
       orderId: currentOrder.orderId,
       rating,
       comment,
       name: name || "",
-      imageUrl,
       createdAt: new Date()
     });
 
@@ -366,31 +470,6 @@ async function submitReview(event){
     submitButton.disabled = false;
     submitButton.textContent = "Submit Review";
   }
-}
-
-function validateReviewImage(file){
-  if(!file){
-    return "";
-  }
-
-  if(!ALLOWED_REVIEW_IMAGE_TYPES.includes(file.type)){
-    return "Please upload a JPG, PNG, or WEBP image.";
-  }
-
-  if(file.size > MAX_REVIEW_IMAGE_SIZE){
-    return "Please upload an image smaller than 5 MB.";
-  }
-
-  return "";
-}
-
-function withTimeout(promise, timeoutMs, message){
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      window.setTimeout(() => reject(new Error(message)), timeoutMs);
-    })
-  ]);
 }
 
 function setReviewMessage(message, type){
@@ -418,6 +497,7 @@ function resetTrackState(){
   document.getElementById("orderItems").innerHTML = "";
   document.getElementById("locationInfo").innerHTML = "";
   document.getElementById("mapContainer").innerHTML = "";
+  updateDriverInfo(null, "");
   renderStatus("quote-requested");
 
   const reviewSection = document.getElementById("reviewSection");
@@ -437,6 +517,48 @@ function resetTrackState(){
 
 function formatStatusLabel(status){
   return (status || "unknown").replaceAll("-", " ");
+}
+
+function normalizeStatus(status){
+  return (status || "").toLowerCase().trim().replaceAll(" ", "-");
+}
+
+function updateDriverInfo(order, normalizedStatus){
+  const driverInfoBox = document.getElementById("driverInfoBox");
+  const driverName = document.getElementById("driverName");
+  const driverPhone = document.getElementById("driverPhone");
+  const driverWhatsappBtn = document.getElementById("driverWhatsappBtn");
+
+  if(!driverInfoBox || !driverName || !driverPhone || !driverWhatsappBtn){
+    return;
+  }
+
+  const shouldShowDriver =
+    normalizedStatus === "out-for-delivery" &&
+    order?.driver &&
+    (order.driver.name || order.driver.phone);
+
+  if(!shouldShowDriver){
+    driverInfoBox.style.display = "none";
+    driverName.textContent = "";
+    driverPhone.textContent = "";
+    driverWhatsappBtn.removeAttribute("href");
+    return;
+  }
+
+  const phone = String(order.driver.phone || "").replace(/\D/g, "");
+  const message = `
+Hello ${order.driver.name || "Driver"},
+
+I'm contacting you regarding my order ${order.orderId}.
+`;
+
+  driverInfoBox.style.display = "block";
+  driverName.textContent = order.driver.name || "N/A";
+  driverPhone.textContent = order.driver.phone || "N/A";
+  driverWhatsappBtn.href = phone
+    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : "#";
 }
 
 async function trackOrder(){

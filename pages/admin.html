@@ -50,6 +50,20 @@
         </article>
       </div>
 
+      <section class="ops-panel-wrap" aria-labelledby="opsPanelTitle">
+        <div class="ops-panel-head">
+          <div>
+            <div class="section-kicker">Today & Upcoming Orders</div>
+            <h2 id="opsPanelTitle" class="section-title">What needs attention now</h2>
+          </div>
+          <p id="opsPanelSummary" class="ops-panel-summary">Loading schedule insights...</p>
+        </div>
+
+        <div id="opsPanel" class="ops-panel">
+          <button type="button" class="ops-card is-loading" disabled>Loading...</button>
+        </div>
+      </section>
+
 <!-- SEARCH + FILTER -->
 
 <div class="admin-controls" style="margin-bottom:20px; display:flex; gap:12px; flex-wrap:wrap;">
@@ -71,6 +85,13 @@
     <option value="cancelled">Cancelled</option>
   </select>
 
+  <select id="priorityFilter" style="padding:10px;border-radius:8px;border:1px solid #ddd;">
+    <option value="all">All Priorities</option>
+    <option value="normal">Normal</option>
+    <option value="urgent">Urgent</option>
+    <option value="vip">VIP</option>
+  </select>
+
 </div>
 
 
@@ -82,19 +103,27 @@
               <th>Order ID</th>
               <th>Customer</th>
               <th>Date</th>
+              <th>Event Time</th>
               <th>Location</th>
               <th>Status</th>
-              <th>Tracking</th>
+              <th>Priority</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="ordersTableBody">
             <tr>
-              <td colspan="6" style="text-align:center;padding:20px;">
+              <td colspan="8" style="text-align:center;padding:20px;">
                 Loading orders...
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="pagination">
+        <button id="prevPage" class="btn btn-secondary" type="button">← Previous</button>
+        <span id="pageInfo">Page 1 of 1</span>
+        <button id="nextPage" class="btn btn-secondary" type="button">Next →</button>
       </div>
 
       <section class="calendar-section" aria-labelledby="calendarViewTitle">
@@ -123,6 +152,20 @@
           </div>
 
           <div id="calendarGrid" class="calendar-grid" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="driver-panel-wrap" aria-labelledby="driverPanelTitle">
+        <div class="driver-panel-head">
+          <div>
+            <div class="section-kicker">Driver Workload</div>
+            <h2 id="driverPanelTitle" class="section-title">Active drivers and assignments</h2>
+          </div>
+          <p id="driverPanelSummary" class="driver-panel-summary">Loading driver workload...</p>
+        </div>
+
+        <div id="driverPanel" class="driver-panel">
+          <article class="driver-card is-loading">Loading...</article>
         </div>
       </section>
 
@@ -225,7 +268,7 @@
 
     <div class="modal-content">
 
-      <button class="modal-close" id="closeModalBtn">✕</button>
+      <button class="modal-close" id="closeModalBtn" type="button" aria-label="Close modal">&times;</button>
 
       <h3 id="modalOrderTitle"></h3>
 
@@ -259,7 +302,7 @@
 <div id="driverModal" class="modal-overlay">
   <div class="modal driver-modal">
     <div class="modal-content">
-      <button class="modal-close" type="button" onclick="closeDriverModal()">✕</button>
+      <button class="modal-close" type="button" onclick="closeDriverModal()" aria-label="Close modal">&times;</button>
 
       <h3>Select Driver</h3>
 
@@ -275,6 +318,78 @@
     </div>
   </div>
 </div>
+
+<div id="editOrderModal" class="modal-overlay">
+  <div class="modal edit-order-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeEditOrderBtn" type="button" aria-label="Close modal">&times;</button>
+
+      <div class="edit-order-head">
+        <h3 id="editOrderTitle">Edit Order</h3>
+        <p id="editOrderStatus">Update order details and items.</p>
+      </div>
+
+      <form id="editOrderForm" class="edit-order-form">
+        <div class="modal-grid" style="margin-top:15px;">
+          <div class="form-group">
+            <label for="editCustomerName">Customer Name</label>
+            <input id="editCustomerName" name="customerName" type="text" required />
+          </div>
+
+          <div class="form-group">
+            <label for="editPhone">Phone</label>
+            <input id="editPhone" name="phone" type="tel" required />
+          </div>
+
+          <div class="form-group">
+            <label for="editEventDate">Event Date</label>
+            <input id="editEventDate" name="eventDate" type="date" required />
+          </div>
+
+          <div class="form-group">
+            <label for="editEventTime">Event Time</label>
+            <input id="editEventTime" name="eventTime" type="time" />
+          </div>
+
+          <div class="form-group">
+            <label for="editSetupTime">Setup Time</label>
+            <input id="editSetupTime" name="setupTime" type="time" />
+          </div>
+
+          <div class="form-group">
+            <label for="editEventLocation">Location</label>
+            <input id="editEventLocation" name="eventLocation" type="text" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editMapLink">Map Link</label>
+          <input id="editMapLink" name="mapLink" type="url" placeholder="https://maps.google.com/?q=..." />
+        </div>
+
+        <section class="edit-order-items" aria-labelledby="editItemsTitle">
+          <div class="edit-order-items-head">
+            <div>
+              <h4 id="editItemsTitle">Items</h4>
+              <p>Add, remove, or change quantities before saving.</p>
+            </div>
+            <button id="addEditItemBtn" class="btn btn-secondary" type="button">Add Item</button>
+          </div>
+
+          <div id="editItemsContainer" class="edit-items-container"></div>
+        </section>
+
+        <div class="modal-actions" style="margin-top:20px;">
+          <button id="editOrderSaveBtn" type="submit" class="btn btn-primary">Save Changes</button>
+          <button id="editOrderDeleteBtn" type="button" class="btn btn-dark">Delete Order</button>
+          <button id="cancelEditOrderBtn" type="button" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="adminToast" class="admin-toast" role="status" aria-live="polite"></div>
 
 </body>
 </html>
