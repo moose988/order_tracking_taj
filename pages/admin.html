@@ -68,16 +68,21 @@
 
 <div class="admin-controls" style="margin-bottom:20px; display:flex; gap:12px; flex-wrap:wrap;">
 
-  <input 
-    type="text" 
-    id="searchInput" 
-    placeholder="Search by Order ID or Customer..."
-    style="padding:10px;border-radius:8px;border:1px solid #ddd;flex:1;min-width:250px;"
+  <button id="openCreateOrderBtn" class="btn btn-primary" type="button">
+    Create Order
+  </button>
+
+  <input
+    type="text"
+    id="searchInput"
+    placeholder="Search by Order ID, customer, or phone"
+    style="padding:10px;border-radius:8px;border:1px solid #ddd;flex:1;min-width:320px;"
   >
 
   <select id="statusFilter" style="padding:10px;border-radius:8px;border:1px solid #ddd;">
     <option value="all">All Status</option>
     <option value="quote-requested">Quote Requested</option>
+    <option value="quote-sent">Quote Sent</option>
     <option value="confirmed">Confirmed</option>
     <option value="preparing">Preparing</option>
     <option value="out-for-delivery">Out for Delivery</option>
@@ -90,6 +95,10 @@
     <option value="normal">Normal</option>
     <option value="urgent">Urgent</option>
     <option value="vip">VIP</option>
+  </select>
+
+  <select id="driverFilter" style="padding:10px;border-radius:8px;border:1px solid #ddd;">
+    <option value="all">All Drivers</option>
   </select>
 
 </div>
@@ -259,6 +268,7 @@
 
   <script type="module" src="../src/js/firebase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script type="module" src="../src/js/admin.js"></script>
 
 
@@ -385,6 +395,279 @@
           <button id="cancelEditOrderBtn" type="button" class="btn btn-secondary">Cancel</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<div id="createOrderModal" class="modal-overlay">
+  <div class="modal create-order-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeCreateOrderBtn" type="button" aria-label="Close modal">&times;</button>
+
+      <div class="edit-order-head">
+        <h3>Create Order</h3>
+        <p>Create a new order manually and send it straight into the live admin workflow.</p>
+      </div>
+
+      <form id="createOrderForm" class="edit-order-form">
+        <div class="modal-grid" style="margin-top:15px;">
+          <div class="form-group">
+            <label for="createCustomerName">Customer Name</label>
+            <input id="createCustomerName" name="customerName" type="text" required />
+          </div>
+
+          <div class="form-group">
+            <label for="createPhone">Phone</label>
+            <input id="createPhone" name="phone" type="tel" required />
+          </div>
+
+          <div class="form-group">
+            <label for="createEventDate">Event Date</label>
+            <input id="createEventDate" name="eventDate" type="date" required />
+          </div>
+
+          <div class="form-group">
+            <label for="createEventTime">Event Time</label>
+            <input id="createEventTime" name="eventTime" type="time" />
+          </div>
+
+          <div class="form-group">
+            <label for="createSetupTime">Setup Time</label>
+            <input id="createSetupTime" name="setupTime" type="time" />
+          </div>
+
+          <div class="form-group">
+            <label for="createEventLocation">Event Location</label>
+            <input id="createEventLocation" name="eventLocation" type="text" required />
+          </div>
+
+          <div class="form-group">
+            <label for="createPriority">Priority</label>
+            <select id="createPriority" name="priority">
+              <option value="normal" selected>Normal</option>
+              <option value="urgent">Urgent</option>
+              <option value="vip">VIP</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="createStatus">Status</label>
+            <select id="createStatus" name="status">
+              <option value="confirmed" selected>Confirmed</option>
+              <option value="quote-requested">Quote Requested</option>
+              <option value="quote-sent">Quote Sent</option>
+              <option value="preparing">Preparing</option>
+              <option value="out-for-delivery">Out for Delivery</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="createMapLink">Map Link</label>
+          <input id="createMapLink" name="mapLink" type="url" placeholder="https://maps.google.com/?q=..." />
+        </div>
+
+        <div class="form-group">
+          <label for="createNotes">Notes</label>
+          <textarea id="createNotes" name="notes" placeholder="Optional notes for the order"></textarea>
+        </div>
+
+        <section class="edit-order-items" aria-labelledby="createItemsTitle">
+          <div class="edit-order-items-head">
+            <div>
+              <h4 id="createItemsTitle">Items</h4>
+              <p>Add at least one valid item for this order.</p>
+            </div>
+            <button id="addCreateItemBtn" class="btn btn-secondary" type="button">Add Item</button>
+          </div>
+
+          <div id="createItemsContainer" class="edit-items-container"></div>
+        </section>
+
+        <div class="modal-actions" style="margin-top:20px;">
+          <button id="createOrderSubmitBtn" type="submit" class="btn btn-primary">Create Order</button>
+          <button id="cancelCreateOrderBtn" type="button" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="quoteModal" class="modal-overlay">
+  <div class="modal quote-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeQuoteModalBtn" type="button" aria-label="Close modal">&times;</button>
+
+      <div class="quote-builder-head">
+        <div>
+          <h3 id="quoteModalTitle">Prepare Quote</h3>
+          <p id="quoteModalSubtitle">Build and save quotation versions for this order.</p>
+        </div>
+        <div id="quoteBuilderStatus" class="quote-builder-status">Ready</div>
+      </div>
+
+      <div class="quote-builder-layout">
+        <div class="quote-builder-main">
+          <section class="quote-builder-section">
+            <div class="quote-builder-section-head">
+              <div>
+                <h4>Quotation Details</h4>
+                <p>Quote number is linked to the order ID and item quantities stay synced by default.</p>
+              </div>
+            </div>
+
+            <div class="quote-builder-grid quote-builder-grid-three">
+              <div class="form-group">
+                <label for="quoteNumberInput">Quotation Number</label>
+                <input id="quoteNumberInput" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="quoteLanguageSelect">Language</label>
+                <select id="quoteLanguageSelect">
+                  <option value="en">English</option>
+                  <option value="ar">Arabic</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="quoteBankPresetSelect">Bank Details Preset</label>
+                <select id="quoteBankPresetSelect"></select>
+              </div>
+            </div>
+
+            <div class="quote-builder-grid quote-builder-grid-two">
+              <div class="form-group">
+                <label for="quoteCustomerNameInput">Customer Name</label>
+                <input id="quoteCustomerNameInput" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="quoteCustomerPhoneInput">Customer Phone</label>
+                <input id="quoteCustomerPhoneInput" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="quoteEventDateInput">Event Date</label>
+                <input id="quoteEventDateInput" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="quoteEventTimeInput">Event Time</label>
+                <input id="quoteEventTimeInput" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="quoteSetupTimeInput">Setup Time</label>
+                <input id="quoteSetupTimeInput" type="text" readonly />
+              </div>
+
+              <div class="form-group">
+                <label for="quoteRentalDaysInput">Rental Days</label>
+                <input id="quoteRentalDaysInput" type="number" min="1" step="1" value="1" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="quoteEventLocationInput">Event Location</label>
+              <input id="quoteEventLocationInput" type="text" readonly />
+            </div>
+
+            <div class="form-group">
+              <label for="quoteNotesInput">Notes</label>
+              <textarea id="quoteNotesInput" readonly></textarea>
+            </div>
+          </section>
+
+          <section class="quote-builder-section">
+            <div class="quote-builder-section-head">
+              <div>
+                <h4>Quote Items</h4>
+                <p>Unit price drives each line amount automatically. Use Edit Item only if the order needs a change.</p>
+              </div>
+            </div>
+
+            <div id="quoteItemsContainer" class="quote-builder-items"></div>
+          </section>
+
+          <section class="quote-builder-section">
+            <div class="quote-builder-section-head">
+              <div>
+                <h4>Charges</h4>
+                <p>Subtotal is based on item amounts plus delivery charge minus discount. VAT stays fixed at 5%.</p>
+              </div>
+            </div>
+
+            <div class="quote-builder-grid quote-builder-grid-three">
+              <div class="form-group">
+                <label for="quoteDeliveryChargeInput">Delivery Charge</label>
+                <input id="quoteDeliveryChargeInput" type="number" min="0" step="0.01" value="0" />
+              </div>
+
+              <div class="form-group">
+                <label for="quoteDiscountInput">Discount</label>
+                <input id="quoteDiscountInput" type="number" min="0" step="0.01" value="0" />
+              </div>
+
+              <div class="form-group">
+                <label>VAT</label>
+                <input id="quoteVatRateInput" type="text" value="5%" readonly />
+              </div>
+            </div>
+
+            <div class="quote-totals-card">
+              <div class="quote-total-row">
+                <span>Items Total</span>
+                <strong id="quoteItemsTotalValue">AED 0.00</strong>
+              </div>
+              <div class="quote-total-row">
+                <span>Subtotal</span>
+                <strong id="quoteSubtotalValue">AED 0.00</strong>
+              </div>
+              <div class="quote-total-row">
+                <span>VAT 5%</span>
+                <strong id="quoteVatValue">AED 0.00</strong>
+              </div>
+              <div class="quote-total-row is-grand-total">
+                <span>Grand Total</span>
+                <strong id="quoteGrandTotalValue">AED 0.00</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="quote-builder-sidebar">
+          <section class="quote-builder-section">
+            <div class="quote-builder-section-head">
+              <div>
+                <h4>Quote History</h4>
+                <p>Previous versions stay saved for this order and can be reopened at any time.</p>
+              </div>
+            </div>
+
+            <div id="quoteHistoryList" class="quote-history-list">
+              <div class="quote-history-empty">No saved quotations yet.</div>
+            </div>
+          </section>
+
+          <section class="quote-builder-section">
+            <div class="quote-builder-section-head">
+              <div>
+                <h4>Actions</h4>
+                <p>Generate the PDF first, then open WhatsApp and attach it manually.</p>
+              </div>
+            </div>
+
+            <div class="quote-builder-actions">
+              <button id="generateQuoteBtn" class="btn btn-primary" type="button">Generate Quote PDF</button>
+              <button id="sendQuoteWhatsappBtn" class="btn btn-secondary" type="button" disabled>Send on WhatsApp</button>
+              <button id="resetQuoteDraftBtn" class="btn btn-dark" type="button">Reset to Order</button>
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
   </div>
 </div>

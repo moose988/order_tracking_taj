@@ -1,287 +1,362 @@
-import { db } from "./firebase.js";
-console.log("Firebase connected:", db);
-const PRODUCTS = [
-  {
-  id: 1,
-  name: "Round Table",
-  category: "Tables",
-  shortDescription: "Elegant round table suitable for weddings, parties, and formal setups.",
-  measurements: "Approx. 150 cm diameter",
-  images: [
-  "https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80"
-  ]
-  },
-  {
-  id: 2,
-  name: "Rectangular Table",
-  category: "Tables",
-  shortDescription: "A versatile table option for buffet setups, family events, and large gatherings.",
-  measurements: "Approx. 180 x 75 cm",
-  images: [
-  "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1505236858219-8359eb29e329?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=1200&q=80"
-  ]
-  },
-  {
-    id: 3,
-    name: "White Chair",
-    category: "Chairs",
-    shortDescription: "Classic clean chair design that matches most event themes and setups.",
-    measurements: "Standard event seating dimensions",
-    images: [
-    "../images/IN9A9418.JPG",
-    "../images/IN9A9423.jpg"
-    ]
-    },
-  {
-  id: 4,
-  name: "Gold Chair",
-  category: "Chairs",
-  shortDescription: "Luxury gold seating option for high-end weddings and special occasions.",
-  measurements: "Standard event seating dimensions",
-  images: [
-  "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=1200&q=80",
-  "https://images.unsplash.com/photo-1464890100898-a385f744067f?auto=format&fit=crop&w=1200&q=80"
-  ]
+import { PRODUCTS } from "../data/products.js";
+
+let order = JSON.parse(localStorage.getItem("tajOrder")) || [];
+let selectedProduct = null;
+let selectedQuantity = 1;
+let currentImageIndex = 0;
+
+function initMobileMenu(){
+  const menuBtn = document.querySelector(".mobile-menu-btn");
+  const navLinks = document.querySelector(".nav-links");
+
+  if(!menuBtn || !navLinks){
+    return;
   }
-  ];
-  
-  let order = JSON.parse(localStorage.getItem("tajOrder")) || [];
-  let selectedProduct = null;
-  let selectedQuantity = 1;
-  let currentImageIndex = 0;
-  
-  /* FILTER SYSTEM */
-  
-  function renderProducts(filter = "All") {
-  
-  const grid = document.getElementById("productsGrid");
-  if (!grid) return;
-  
-  let filteredProducts = PRODUCTS;
-  
-  if (filter !== "All") {
-  filteredProducts = PRODUCTS.filter(
-  product => product.category === filter
-  );
-  }
-  
-  grid.innerHTML = filteredProducts.map(product => `
-  <article class="product-card" onclick="openProductModal(${product.id})">
-  
-  <img class="product-thumb" src="${product.images[0]}" alt="${product.name}">
-  
-  <div class="product-copy">
-  
-  <span class="badge">${product.category}</span>
-  
-  <h3>${product.name}</h3>
-  
-  <p>${product.shortDescription}</p>
-  
-  <div class="product-meta">
-  <span>${product.measurements}</span>
-  <span>View Details</span>
-  </div>
-  
-  </div>
-  
-  </article>
-  `).join("");
-  
-  }
-  
-  function filterProducts(category, button) {
-  
-  renderProducts(category);
-  
-  document.querySelectorAll(".filter-btn").forEach(btn=>{
-  btn.classList.remove("active");
+
+  menuBtn.addEventListener("click", () => {
+    navLinks.classList.toggle("active");
   });
-  
-  button.classList.add("active");
-  
-  }
-  
-  /* ORDER STORAGE */
-  
-  function saveOrder() {
+
+  navLinks.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => {
+      navLinks.classList.remove("active");
+    });
+  });
+
+  window.addEventListener("resize", () => {
+    if(window.innerWidth > 760){
+      navLinks.classList.remove("active");
+    }
+  });
+}
+
+function saveOrder(){
   localStorage.setItem("tajOrder", JSON.stringify(order));
+}
+
+function getFilterCategories(){
+  return [...new Set(PRODUCTS.map((product) => product.category).filter(Boolean))];
+}
+
+function renderFilterButtons(activeCategory = "All"){
+  const filtersContainer = document.getElementById("productFilters");
+
+  if(!filtersContainer){
+    return;
   }
-  
-  function getOrderCount() {
-  return order.reduce((sum, item) => sum + item.quantity, 0);
-  }
-  
-  /* ORDER SUMMARY */
-  
-  function renderOrderSummary() {
-  
-  const list = document.getElementById("orderItemsList");
-  if (!list) return;
-  
-  if(order.length===0){
-  list.innerHTML="";
-  return;
-  }
-  
-  list.innerHTML = order.map(item=>`
-  <div class="order-item-row">
-  
-  <div>
-  <strong>${item.name}</strong>
-  <div style="color:#888;font-size:13px">${item.category}</div>
-  </div>
-  
-  <div>x${item.quantity}</div>
-  
-  </div>
+
+  const categories = ["All", ...getFilterCategories()];
+  filtersContainer.innerHTML = categories.map((category) => `
+    <button
+      class="filter-btn ${category === activeCategory ? "active" : ""}"
+      type="button"
+      data-category="${category}"
+    >
+      ${category}
+    </button>
   `).join("");
-  
+}
+
+function renderProducts(filter = "All"){
+  const grid = document.getElementById("productsGrid");
+
+  if(!grid){
+    return;
   }
-  
-  /* MODAL */
-  
-  function openProductModal(productId){
-  
-  selectedProduct = PRODUCTS.find(p=>p.id===productId);
+
+  const filteredProducts = filter === "All"
+    ? PRODUCTS
+    : PRODUCTS.filter((product) => product.category === filter);
+
+  grid.innerHTML = filteredProducts.map((product) => `
+    <article class="product-card" data-product-id="${product.id}">
+      <img class="product-thumb" src="${product.images[0]}" alt="${product.name}">
+
+      <div class="product-copy">
+        <span class="badge">${product.category}</span>
+        <h3>${product.name}</h3>
+        <p>${product.shortDescription}</p>
+
+        <div class="product-meta">
+          <span>${product.measurements}</span>
+          <span>View Details</span>
+        </div>
+      </div>
+    </article>
+  `).join("");
+}
+
+function filterProducts(category, button = null){
+  renderProducts(category);
+
+  document.querySelectorAll(".filter-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn === button || btn.dataset.category === category);
+  });
+}
+
+function syncOrderFromStorage(){
+  order = JSON.parse(localStorage.getItem("tajOrder")) || [];
+  renderOrderSummary();
+}
+
+function increaseOrderItemQuantity(id){
+  const item = order.find((entry) => String(entry.id) === String(id));
+
+  if(!item){
+    return;
+  }
+
+  item.quantity += 1;
+  saveOrder();
+  renderOrderSummary();
+}
+
+function decreaseOrderItemQuantity(id){
+  const itemIndex = order.findIndex((entry) => String(entry.id) === String(id));
+
+  if(itemIndex === -1){
+    return;
+  }
+
+  if(order[itemIndex].quantity <= 1){
+    order.splice(itemIndex, 1);
+  }else{
+    order[itemIndex].quantity -= 1;
+  }
+
+  saveOrder();
+  renderOrderSummary();
+}
+
+function updateQuantityDisplay(){
+  const quantityInput = document.getElementById("modalQuantity");
+
+  if(quantityInput){
+    quantityInput.value = selectedQuantity;
+  }
+}
+
+function increaseQty(){
+  selectedQuantity += 1;
+  updateQuantityDisplay();
+}
+
+function decreaseQty(){
+  if(selectedQuantity > 1){
+    selectedQuantity -= 1;
+    updateQuantityDisplay();
+  }
+}
+
+function handleManualQtyInput(){
+  const input = document.getElementById("modalQuantity");
+
+  if(!input){
+    return;
+  }
+
+  let value = parseInt(input.value, 10);
+
+  if(!input.value || Number.isNaN(value) || value < 1){
+    value = 1;
+  }
+
+  selectedQuantity = value;
+  updateQuantityDisplay();
+}
+
+function clearOrder(){
+  if(window.confirm("Are you sure you want to clear your entire order?")){
+    order = [];
+    saveOrder();
+    renderOrderSummary();
+  }
+}
+
+function renderOrderSummary(){
+  const list = document.getElementById("orderItemsList");
+  const totalText = document.getElementById("orderTotalText");
+
+  if(!list || !totalText){
+    return;
+  }
+
+  if(order.length === 0){
+    list.innerHTML = '<p style="color:#888;text-align:center;padding:10px;">Empty</p>';
+    totalText.textContent = "0 items selected";
+    return;
+  }
+
+  list.innerHTML = order.map((item) => `
+    <div class="order-item-row">
+      <div>
+        <strong>${item.name}</strong><br>
+        <small class="item-category">${item.category}</small>
+      </div>
+
+      <div class="qty-controls">
+        <button type="button" class="qty-minus" data-id="${item.id}">-</button>
+        <span>${item.quantity}</span>
+        <button type="button" class="qty-plus" data-id="${item.id}">+</button>
+      </div>
+    </div>
+  `).join("");
+
+  const count = order.reduce((sum, item) => sum + item.quantity, 0);
+  totalText.textContent = `${count} item${count !== 1 ? "s" : ""} selected`;
+}
+
+function openProductModal(id){
+  selectedProduct = PRODUCTS.find((product) => product.id === id) || null;
+
+  if(!selectedProduct){
+    return;
+  }
+
   selectedQuantity = 1;
   currentImageIndex = 0;
-  
+
   document.getElementById("modalProductTitle").textContent = selectedProduct.name;
   document.getElementById("modalProductDescription").textContent = selectedProduct.shortDescription;
   document.getElementById("modalMeasurements").textContent = selectedProduct.measurements;
-  
   document.getElementById("modalImage").src = selectedProduct.images[0];
-  
-  document.getElementById("modalQuantity").value = 1;
-  
+
+  updateQuantityDisplay();
+
   document.getElementById("productModal").classList.add("active");
-  document.body.style.overflow="hidden";
-  
-  }
-  
-  function closeProductModal(){
+  document.body.style.overflow = "hidden";
+}
+
+function closeProductModal(){
   document.getElementById("productModal").classList.remove("active");
-  document.body.style.overflow="auto";
+  document.body.style.overflow = "auto";
+}
+
+function nextImage(){
+  if(!selectedProduct){
+    return;
   }
-  
-  /* IMAGE SLIDER */
-  
-  function nextImage(){
-  
-  currentImageIndex =
-  (currentImageIndex + 1) % selectedProduct.images.length;
-  
-  document.getElementById("modalImage").src =
-  selectedProduct.images[currentImageIndex];
-  
+
+  currentImageIndex = (currentImageIndex + 1) % selectedProduct.images.length;
+  document.getElementById("modalImage").src = selectedProduct.images[currentImageIndex];
+}
+
+function prevImage(){
+  if(!selectedProduct){
+    return;
   }
-  
-  function prevImage(){
-  
-  currentImageIndex =
-  (currentImageIndex - 1 + selectedProduct.images.length) %
-  selectedProduct.images.length;
-  
-  document.getElementById("modalImage").src =
-  selectedProduct.images[currentImageIndex];
-  
+
+  currentImageIndex = (currentImageIndex - 1 + selectedProduct.images.length) % selectedProduct.images.length;
+  document.getElementById("modalImage").src = selectedProduct.images[currentImageIndex];
+}
+
+function addToOrder(){
+  if(!selectedProduct){
+    return;
   }
-  
-  /* QUANTITY */
-  
-  function increaseQty(){
-  
-  selectedQuantity++;
-  
-  document.getElementById("modalQuantity").value = selectedQuantity;
-  
-  }
-  
-  function decreaseQty(){
-  
-  if(selectedQuantity>1){
-  
-  selectedQuantity--;
-  
-  document.getElementById("modalQuantity").value = selectedQuantity;
-  
-  }
-  
-  }
-  
-  function handleManualQtyInput(){
-  
-  const input = document.getElementById("modalQuantity");
-  
-  let value = parseInt(input.value);
-  
-  if(isNaN(value) || value<1) value=1;
-  
-  selectedQuantity=value;
-  
-  input.value=selectedQuantity;
-  
-  }
-  
-  /* ADD TO ORDER */
-  
-  function addToOrder(){
-  
-  const existing = order.find(i=>i.id===selectedProduct.id);
-  
+
+  const existing = order.find((item) => item.id === selectedProduct.id);
+
   if(existing){
-  
-  existing.quantity += selectedQuantity;
-  
+    existing.quantity += selectedQuantity;
   }else{
-  
-  order.push({
-  id:selectedProduct.id,
-  name:selectedProduct.name,
-  category:selectedProduct.category,
-  quantity:selectedQuantity
-  });
-  
+    order.push({
+      ...selectedProduct,
+      quantity: selectedQuantity
+    });
   }
-  
+
   saveOrder();
   renderOrderSummary();
   closeProductModal();
-  
+}
+
+function goToQuotePage(){
+  if(order.length === 0){
+    alert("Add items first.");
+    return;
   }
-  
-  /* GO TO QUOTE */
-  
-  function goToQuotePage(){
-  
-  if(order.length===0){
-  alert("Please add items first.");
-  return;
-  }
-  
-  window.location.href="quote.html";
-  
-  }
-  
-  /* INIT */
-  
-  document.addEventListener("DOMContentLoaded",()=>{
-  
-  renderProducts();
-  renderOrderSummary();
-  
+
+  window.location.href = "quote.html";
+}
+
+function attachOrderEvents(){
+  const filtersContainer = document.getElementById("productFilters");
+  const productsGrid = document.getElementById("productsGrid");
+  const orderItemsList = document.getElementById("orderItemsList");
   const modal = document.getElementById("productModal");
-  
-  if(modal){
-  modal.addEventListener("click",e=>{
-  if(e.target===modal) closeProductModal();
+
+  filtersContainer?.addEventListener("click", (event) => {
+    const button = event.target.closest(".filter-btn");
+
+    if(!button){
+      return;
+    }
+
+    filterProducts(button.dataset.category || "All", button);
   });
-  }
-  
+
+  productsGrid?.addEventListener("click", (event) => {
+    const card = event.target.closest(".product-card");
+
+    if(!card){
+      return;
+    }
+
+    openProductModal(Number(card.dataset.productId));
   });
+
+  orderItemsList?.addEventListener("click", (event) => {
+    const plusButton = event.target.closest(".qty-plus");
+    const minusButton = event.target.closest(".qty-minus");
+
+    if(plusButton){
+      increaseOrderItemQuantity(plusButton.dataset.id);
+    }
+
+    if(minusButton){
+      decreaseOrderItemQuantity(minusButton.dataset.id);
+    }
+  });
+
+  modal?.addEventListener("click", (event) => {
+    if(event.target === modal){
+      closeProductModal();
+    }
+  });
+}
+
+function setCurrentYear(){
+  document.querySelectorAll(".current-year").forEach((element) => {
+    element.textContent = String(new Date().getFullYear());
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  setCurrentYear();
+  initMobileMenu();
+  renderFilterButtons();
+  renderProducts();
+  syncOrderFromStorage();
+  attachOrderEvents();
+});
+
+window.addEventListener("pageshow", () => {
+  syncOrderFromStorage();
+});
+
+window.addEventListener("focus", () => {
+  syncOrderFromStorage();
+});
+
+window.filterProducts = filterProducts;
+window.openProductModal = openProductModal;
+window.closeProductModal = closeProductModal;
+window.prevImage = prevImage;
+window.nextImage = nextImage;
+window.decreaseQty = decreaseQty;
+window.increaseQty = increaseQty;
+window.handleManualQtyInput = handleManualQtyInput;
+window.addToOrder = addToOrder;
+window.goToQuotePage = goToQuotePage;
+window.clearOrder = clearOrder;

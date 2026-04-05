@@ -65,7 +65,9 @@ function setDashboardMessage(message, type = "info"){
 }
 
 function formatStatusLabel(status){
-  return (status || "unknown").replaceAll("-", " ");
+  return (status || "unknown")
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function normalizeEmail(email){
@@ -366,6 +368,14 @@ function getLiveDeliveryOrders(orders = currentOrders){
   );
 }
 
+function isAnyLocationSharingActive(orders = currentOrders){
+  return locationWatchId !== null && getLiveDeliveryOrders(orders).length > 0;
+}
+
+function isOrderLocationSharingActive(order){
+  return order?.status === "out-for-delivery" && !finishingOrderIds.has(order.id) && isAnyLocationSharingActive();
+}
+
 function getActionBlock(order, options){
   const isStarting = startingOrderIds.has(order.id);
   const isOutForDelivery = order.status === "out-for-delivery";
@@ -373,13 +383,15 @@ function getActionBlock(order, options){
   const isCancelled = order.status === "cancelled";
   const isClosed = isDelivered || isCancelled;
   const isFinishing = finishingOrderIds.has(order.id);
-  const isSharingLocation = locationWatchId !== null;
+  const isSharingLocation = isOrderLocationSharingActive(order);
+  const needsLocationWarning = isOutForDelivery && !isSharingLocation;
   const mapActionClass = isClosed ? "is-disabled" : "";
   const contactActionClass = order.phone && !isClosed ? "" : "is-disabled";
   const isCompletedCard = options.variant === "completed";
 
   let statusAction = "";
   let primaryActions = "";
+  let locationStateBlock = "";
 
   if(order.status === "preparing" && isStarting){
     statusAction = `
@@ -400,8 +412,19 @@ function getActionBlock(order, options){
         <strong>On the Way</strong>
       </div>
     `;
+    locationStateBlock = isSharingLocation ? `
+      <div class="driver-location-state is-on">
+        <strong>Live location is ON</strong>
+        <p>Customer can now see your movement</p>
+      </div>
+    ` : `
+      <div class="driver-location-warning" role="alert">
+        <strong>Live location is OFF</strong>
+        <p>Press "Share Live Location" so the customer can track you</p>
+      </div>
+    `;
     primaryActions = `
-      <button class="btn btn-secondary share-location-btn" data-id="${order.id}" type="button">
+      <button class="btn btn-secondary share-location-btn ${needsLocationWarning ? "is-highlighted" : ""}" data-id="${order.id}" type="button">
         ${isSharingLocation ? "Sharing Live Location" : "Share Live Location"}
       </button>
       <button class="btn btn-primary finish-order-btn" data-id="${order.id}" type="button" ${isFinishing ? "disabled" : ""}>
@@ -436,6 +459,11 @@ function getActionBlock(order, options){
       ${statusAction ? `
         <div class="driver-action-row driver-action-row-status">
           ${statusAction}
+        </div>
+      ` : ""}
+      ${locationStateBlock ? `
+        <div class="driver-action-row driver-action-row-status">
+          ${locationStateBlock}
         </div>
       ` : ""}
       ${primaryActions ? `
@@ -601,9 +629,12 @@ function updateDashboardSummary(){
 
   if(locationSharingPill){
     const liveOrderCount = getLiveDeliveryOrders().length;
-    locationSharingPill.textContent = locationWatchId !== null
-      ? `Location sharing: ON for ${liveOrderCount} delivery${liveOrderCount === 1 ? "" : "ies"}`
+    const isSharingActive = isAnyLocationSharingActive();
+    locationSharingPill.textContent = isSharingActive
+      ? "Location sharing: ON"
       : "Location sharing: OFF";
+    locationSharingPill.classList.toggle("is-on", isSharingActive);
+    locationSharingPill.classList.toggle("is-off", !isSharingActive || !liveOrderCount);
   }
 }
 

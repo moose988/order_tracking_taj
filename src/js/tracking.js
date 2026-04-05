@@ -358,10 +358,11 @@ function bindSupportButton(order){
 function renderStatus(status){
   const steps = {
     "quote-requested": 0,
-    confirmed: 1,
-    preparing: 2,
-    "out-for-delivery": 3,
-    delivered: 4,
+    "quote-sent": 1,
+    confirmed: 2,
+    preparing: 3,
+    "out-for-delivery": 4,
+    delivered: 5,
     cancelled: -1
   };
 
@@ -516,7 +517,9 @@ function resetTrackState(){
 }
 
 function formatStatusLabel(status){
-  return (status || "unknown").replaceAll("-", " ");
+  return (status || "unknown")
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function normalizeStatus(status){
