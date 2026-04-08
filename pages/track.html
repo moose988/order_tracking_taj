@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Track Order | Al Taj Al Malaky</title>
 <link rel="stylesheet" href="../src/css/styles.css" />
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
 </head>
 
 <body>
@@ -13,8 +19,11 @@
 <div class="container navbar">
 
 <a href="index.html" class="brand">
+<img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo">
+<div class="brand-copy">
 <h2>Al Taj Al Malaky</h2>
 <span>Luxury Event Setup & Rental</span>
+</div>
 </a>
 
 <nav class="nav-links">
@@ -159,7 +168,13 @@ Submit Review
 The event location is shown below.
 </p>
 
-<div id="locationInfo" style="margin-bottom:10px;"></div>
+<div class="track-map-status-shell">
+<div id="etaInfo" class="track-map-status-hero"></div>
+<div class="track-map-status-main">
+<div id="locationInfo" class="track-map-status-details"></div>
+<div id="mapLegend" class="track-map-status-legend"></div>
+</div>
+</div>
 
 <div id="mapContainer" style="height:350px;border-radius:12px;"></div>
 
@@ -204,8 +219,13 @@ Contact Support on WhatsApp
 <div class="container">
 <div class="footer-grid">
 <div>
+<div class="footer-brand">
+<img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo">
+<div>
 <h4>Al Taj Al Malaky Parties & Events Management</h4>
 <p>Luxury Event Setup & Rental</p>
+</div>
+</div>
 </div>
 
 <div>
@@ -223,6 +243,11 @@ Contact Support on WhatsApp
 </div>
 </footer>
 
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
 <script type="module" src="../src/js/tracking.js"></script>
 
 </body>

@@ -5,13 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quote Request | Al Taj Al Malaky</title>
   <link rel="stylesheet" href="../src/css/styles.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 </head>
 <body>
   <header class="site-header">
     <div class="container navbar">
       <a href="index.html" class="brand">
-        <h2>Al Taj Al Malaky</h2>
-        <span>Luxury Event Setup & Rental</span>
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" />
+        <div class="brand-copy">
+          <h2>Al Taj Al Malaky</h2>
+          <span>Luxury Event Setup & Rental</span>
+        </div>
       </a>
 
       <nav class="nav-links">
@@ -62,8 +71,13 @@
               </div>
             </div>
 
-
             <div class="form-grid two-col">
+              <div class="form-group">
+                <label for="rentalDays">Rental Days</label>
+                <input type="number" id="rentalDays" min="1" step="1" value="1" required />
+                <p class="help-text">How many days should the rental remain reserved?</p>
+              </div>
+
               <div class="form-group">
                 <label for="setupTime">Setup Time</label>
                 <input type="time" id="setupTime" required />
@@ -79,14 +93,21 @@
             
             <div class="form-group">
               <label for="mapLink">Google Maps Link</label>
-              <input type="url" id="mapLink" placeholder="Paste Google Maps location link here" required />
+              <input type="url" id="mapLink" placeholder="Paste Google Maps location link here" />
+              <p class="help-text">Optional. A confirmed map pin is used as the exact delivery destination.</p>
             </div>
-            
+
             <div class="form-group">
-              <button type="button" class="btn btn-secondary" id="useLocationBtn">
-                Use My Current Location
-              </button>
-              <p class="help-text">Paste the Google Maps location link or press "Use My Current Location".</p>
+              <div class="location-field-actions">
+                <button type="button" class="btn btn-primary" id="pickEventLocationBtn">
+                  Pick Event Location on Map
+                </button>
+                <button type="button" class="btn btn-secondary" id="useLocationBtn">
+                  Use My Current Location
+                </button>
+              </div>
+              <p class="help-text">Search for a venue or tap directly on the map to lock the exact destination for delivery tracking.</p>
+              <div id="quoteLocationSummary" class="location-selection-shell"></div>
             </div>
             
 
@@ -131,8 +152,13 @@
     <div class="container">
       <div class="footer-grid">
         <div>
-          <h4>Al Taj Al Malaky Parties & Events Management</h4>
-          <p>Luxury Event Setup & Rental</p>
+          <div class="footer-brand">
+            <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" />
+            <div>
+              <h4>Al Taj Al Malaky Parties & Events Management</h4>
+              <p>Luxury Event Setup & Rental</p>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -150,6 +176,11 @@
     </div>
   </footer>
 
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
   <script type="module" src="../src/js/firebase.js"></script>
   <script type="module" src="../src/js/main.js"></script>
 </body>

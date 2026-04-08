@@ -5,13 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin | Al Taj Al Malaky</title>
   <link rel="stylesheet" href="../src/css/styles.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 </head>
 <body>
   <header class="site-header">
     <div class="container navbar">
       <a href="index.html" class="brand">
-        <h2>Al Taj Al Malaky</h2>
-        <span>Luxury Event Setup & Rental</span>
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" />
+        <div class="brand-copy">
+          <h2>Al Taj Al Malaky</h2>
+          <span>Luxury Event Setup & Rental</span>
+        </div>
       </a>
 
       <nav class="nav-links">
@@ -34,17 +43,17 @@
       </div>
 
       <div class="admin-grid">
-        <article class="admin-card">
+        <article class="admin-card admin-summary-card" data-status-filter="quote-requested" role="button" tabindex="0" aria-pressed="false">
           <h3>Pending Requests</h3>
           <p>12 incoming quote requests are awaiting review.</p>
         </article>
 
-        <article class="admin-card">
+        <article class="admin-card admin-summary-card" data-status-filter="preparing" role="button" tabindex="0" aria-pressed="false">
           <h3>Orders in Preparation</h3>
           <p>4 orders are currently marked as being prepared.</p>
         </article>
 
-        <article class="admin-card">
+        <article class="admin-card admin-summary-card" data-status-filter="delivered" role="button" tabindex="0" aria-pressed="false">
           <h3>Delivered Orders</h3>
           <p>28 completed event deliveries this month.</p>
         </article>
@@ -240,6 +249,129 @@
         </article>
       </section>
 
+      <section class="inventory-section" aria-labelledby="inventoryManagementTitle">
+        <div class="inventory-section-head">
+          <div>
+            <div class="section-kicker">Products & Stock</div>
+            <h2 id="inventoryManagementTitle" class="section-title">Inventory Management</h2>
+            <p class="section-text">Track catalog-linked and internal rental items with date-based reservations.</p>
+          </div>
+          <button id="addInventoryItemBtn" class="btn btn-primary" type="button">Add Inventory Item</button>
+        </div>
+
+        <div class="inventory-summary-grid">
+          <article class="inventory-summary-card">
+            <span>Total SKUs</span>
+            <strong id="inventoryTotalSkus">0</strong>
+          </article>
+          <article class="inventory-summary-card">
+            <span>Total Available Units</span>
+            <strong id="inventoryAvailableUnits">0</strong>
+          </article>
+          <article class="inventory-summary-card">
+            <span>Total Reserved Units</span>
+            <strong id="inventoryReservedUnits">0</strong>
+          </article>
+          <article class="inventory-summary-card">
+            <span>Total Damaged Units</span>
+            <strong id="inventoryDamagedUnits">0</strong>
+          </article>
+          <article class="inventory-summary-card is-warning">
+            <span>Low Stock Items</span>
+            <strong id="inventoryLowStockItems">0</strong>
+          </article>
+        </div>
+
+        <div class="inventory-toolbar">
+          <input id="inventorySearchInput" type="search" placeholder="Search inventory by name, category, or variant" />
+          <select id="inventorySourceFilter">
+            <option value="all">All Sources</option>
+            <option value="catalog">Catalog</option>
+            <option value="custom">Custom</option>
+          </select>
+          <select id="inventoryStatusFilter">
+            <option value="all">All Status</option>
+            <option value="healthy">Healthy</option>
+            <option value="low">Low Stock</option>
+            <option value="overbooked">Overbooked</option>
+            <option value="damaged">Has Damaged Units</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+
+        <div class="admin-table inventory-table">
+          <table>
+            <thead>
+              <tr>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="name">Product Name</button></th>
+                <th>Variant</th>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="category">Category</button></th>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="sourceType">Source</button></th>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="totalStock">Total Stock</button></th>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="availableStock">Available</button></th>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="reservedStock">Reserved</button></th>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="damagedStock">Damaged</button></th>
+                <th><button class="inventory-sort-btn" type="button" data-sort-key="lowStockThreshold">Low Stock Threshold</button></th>
+                <th>Warning/Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inventoryTableBody">
+              <tr>
+                <td colspan="11" class="inventory-empty-cell">Loading inventory...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <section class="upcoming-reservations-panel" aria-labelledby="upcomingReservationsTitle">
+          <div class="upcoming-reservations-head">
+            <div>
+              <h3 id="upcomingReservationsTitle">Upcoming Reservations</h3>
+              <p id="inventoryReservationsSummary">Choose a date to review reserved quantities.</p>
+            </div>
+            <div class="form-group inventory-date-filter">
+              <label for="reservationDateFilter">Date Filter</label>
+              <input id="reservationDateFilter" type="date" />
+            </div>
+          </div>
+
+          <div class="admin-table inventory-reservations-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Item</th>
+                  <th>Quantity</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="upcomingReservationsBody">
+                <tr>
+                  <td colspan="6" class="inventory-empty-cell">Loading reservations...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="admin-support-section" aria-labelledby="adminSupportTitle">
+        <article class="admin-support-card">
+          <div class="admin-support-icon" aria-hidden="true">☎</div>
+          <div class="admin-support-copy">
+            <div class="section-kicker">Technical Support</div>
+            <h2 id="adminSupportTitle" class="section-title">Technical Support</h2>
+            <p>For any technical issues or bugs, please contact MR Mohamad Daya.</p>
+          </div>
+          <a class="admin-support-link" href="tel:+971505349907">
+            +971 50 534 9907
+          </a>
+        </article>
+      </section>
+
     </div>
   </main>
 
@@ -247,8 +379,13 @@
     <div class="container">
       <div class="footer-grid">
         <div>
-          <h4>Al Taj Al Malaky Parties & Events Management</h4>
-          <p>Luxury Event Setup & Rental</p>
+          <div class="footer-brand">
+            <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" />
+            <div>
+              <h4>Al Taj Al Malaky Parties & Events Management</h4>
+              <p>Luxury Event Setup & Rental</p>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -268,6 +405,12 @@
 
   <script type="module" src="../src/js/firebase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script type="module" src="../src/js/admin.js"></script>
 
@@ -357,6 +500,11 @@
           </div>
 
           <div class="form-group">
+            <label for="editRentalDays">Rental Days</label>
+            <input id="editRentalDays" name="rentalDays" type="number" min="1" step="1" value="1" required />
+          </div>
+
+          <div class="form-group">
             <label for="editEventTime">Event Time</label>
             <input id="editEventTime" name="eventTime" type="time" />
           </div>
@@ -375,6 +523,14 @@
         <div class="form-group">
           <label for="editMapLink">Map Link</label>
           <input id="editMapLink" name="mapLink" type="url" placeholder="https://maps.google.com/?q=..." />
+          <p class="help-text">Optional. The confirmed map pin is used for tracking and ETA.</p>
+        </div>
+
+        <div class="form-group">
+          <div class="location-field-actions">
+            <button id="editPickLocationBtn" class="btn btn-primary" type="button">Pick Event Location on Map</button>
+          </div>
+          <div id="editLocationSummary" class="location-selection-shell"></div>
         </div>
 
         <section class="edit-order-items" aria-labelledby="editItemsTitle">
@@ -388,6 +544,8 @@
 
           <div id="editItemsContainer" class="edit-items-container"></div>
         </section>
+
+        <div id="editInventoryWarnings" class="inventory-warning-box" hidden></div>
 
         <div class="modal-actions" style="margin-top:20px;">
           <button id="editOrderSaveBtn" type="submit" class="btn btn-primary">Save Changes</button>
@@ -424,6 +582,11 @@
           <div class="form-group">
             <label for="createEventDate">Event Date</label>
             <input id="createEventDate" name="eventDate" type="date" required />
+          </div>
+
+          <div class="form-group">
+            <label for="createRentalDays">Rental Days</label>
+            <input id="createRentalDays" name="rentalDays" type="number" min="1" step="1" value="1" required />
           </div>
 
           <div class="form-group">
@@ -467,6 +630,14 @@
         <div class="form-group">
           <label for="createMapLink">Map Link</label>
           <input id="createMapLink" name="mapLink" type="url" placeholder="https://maps.google.com/?q=..." />
+          <p class="help-text">Optional. The confirmed map pin is used for tracking and ETA.</p>
+        </div>
+
+        <div class="form-group">
+          <div class="location-field-actions">
+            <button id="createPickLocationBtn" class="btn btn-primary" type="button">Pick Event Location on Map</button>
+          </div>
+          <div id="createLocationSummary" class="location-selection-shell"></div>
         </div>
 
         <div class="form-group">
@@ -485,6 +656,8 @@
 
           <div id="createItemsContainer" class="edit-items-container"></div>
         </section>
+
+        <div id="createInventoryWarnings" class="inventory-warning-box" hidden></div>
 
         <div class="modal-actions" style="margin-top:20px;">
           <button id="createOrderSubmitBtn" type="submit" class="btn btn-primary">Create Order</button>
@@ -637,37 +810,120 @@
             </div>
           </section>
         </div>
-
-        <aside class="quote-builder-sidebar">
-          <section class="quote-builder-section">
-            <div class="quote-builder-section-head">
-              <div>
-                <h4>Quote History</h4>
-                <p>Previous versions stay saved for this order and can be reopened at any time.</p>
-              </div>
-            </div>
-
-            <div id="quoteHistoryList" class="quote-history-list">
-              <div class="quote-history-empty">No saved quotations yet.</div>
-            </div>
-          </section>
-
-          <section class="quote-builder-section">
-            <div class="quote-builder-section-head">
-              <div>
-                <h4>Actions</h4>
-                <p>Generate the PDF first, then open WhatsApp and attach it manually.</p>
-              </div>
-            </div>
-
-            <div class="quote-builder-actions">
-              <button id="generateQuoteBtn" class="btn btn-primary" type="button">Generate Quote PDF</button>
-              <button id="sendQuoteWhatsappBtn" class="btn btn-secondary" type="button" disabled>Send on WhatsApp</button>
-              <button id="resetQuoteDraftBtn" class="btn btn-dark" type="button">Reset to Order</button>
-            </div>
-          </section>
-        </aside>
       </div>
+
+      <div class="quote-builder-bottom">
+        <section class="quote-builder-section">
+          <div class="quote-builder-section-head">
+            <div>
+              <h4>Quote History</h4>
+              <p>Previous versions stay saved for this order and can be reopened at any time.</p>
+            </div>
+          </div>
+
+          <div id="quoteHistoryList" class="quote-history-list">
+            <div class="quote-history-empty">No saved quotations yet.</div>
+          </div>
+        </section>
+
+        <section class="quote-builder-section quote-builder-actions-section">
+          <div class="quote-builder-section-head">
+            <div>
+              <h4>Actions</h4>
+              <p>Generate the PDF first, then open WhatsApp and attach it manually.</p>
+            </div>
+          </div>
+
+          <div class="quote-builder-actions">
+            <button id="generateQuoteBtn" class="btn btn-primary" type="button">Generate Quote PDF</button>
+            <button id="sendQuoteWhatsappBtn" class="btn btn-secondary" type="button" disabled>Send on WhatsApp</button>
+            <button id="resetQuoteDraftBtn" class="btn btn-dark" type="button">Reset to Order</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="inventoryModal" class="modal-overlay">
+  <div class="modal inventory-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeInventoryModalBtn" type="button" aria-label="Close modal">&times;</button>
+
+      <div class="edit-order-head">
+        <h3 id="inventoryModalTitle">Inventory Item</h3>
+        <p id="inventoryModalSubtitle">Manage rental stock and reservation-ready item data.</p>
+      </div>
+
+      <form id="inventoryForm" class="edit-order-form">
+        <div class="modal-grid" style="margin-top:15px;">
+          <div class="form-group">
+            <label for="inventoryName">Product Name</label>
+            <input id="inventoryName" name="name" type="text" required />
+          </div>
+
+          <div class="form-group">
+            <label for="inventoryVariant">Variant</label>
+            <input id="inventoryVariant" name="variant" type="text" placeholder="Style, color, or type" />
+          </div>
+
+          <div class="form-group">
+            <label for="inventoryCategory">Category</label>
+            <input id="inventoryCategory" name="category" type="text" placeholder="Tables, Chairs, Custom..." />
+          </div>
+
+          <div class="form-group">
+            <label for="inventorySourceType">Source</label>
+            <select id="inventorySourceType" name="sourceType">
+              <option value="catalog">Catalog</option>
+              <option value="custom">Custom/Internal</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="inventoryProductSelect">Linked Catalog Product</label>
+            <select id="inventoryProductSelect" name="productId"></select>
+          </div>
+
+          <div class="form-group">
+            <label for="inventoryTotalStock">Total Stock</label>
+            <input id="inventoryTotalStock" name="totalStock" type="number" min="0" step="1" value="0" />
+          </div>
+
+          <div class="form-group">
+            <label for="inventoryDamagedStock">Damaged Stock</label>
+            <input id="inventoryDamagedStock" name="damagedStock" type="number" min="0" step="1" value="0" />
+          </div>
+
+          <div class="form-group">
+            <label for="inventoryLowStockThreshold">Low Stock Threshold</label>
+            <input id="inventoryLowStockThreshold" name="lowStockThreshold" type="number" min="0" step="1" value="1" />
+          </div>
+        </div>
+
+        <section class="inventory-damage-tools" aria-labelledby="inventoryDamageToolsTitle">
+          <div>
+            <h4 id="inventoryDamageToolsTitle">Damaged Stock Adjustment</h4>
+            <p>Mark damaged units or move repaired units back into usable stock.</p>
+          </div>
+          <div class="inventory-damage-actions">
+            <input id="inventoryDamagedAdjust" type="number" min="1" step="1" value="1" aria-label="Damaged adjustment quantity" />
+            <button id="inventoryMarkDamagedBtn" class="btn btn-secondary" type="button">Mark Damaged</button>
+            <button id="inventoryRestoreDamagedBtn" class="btn btn-secondary" type="button">Restore Damaged</button>
+          </div>
+        </section>
+
+        <label class="inventory-archive-toggle">
+          <input id="inventoryIsArchived" name="isArchived" type="checkbox" />
+          <span>Archive this inventory item</span>
+        </label>
+
+        <div class="modal-actions" style="margin-top:20px;">
+          <button id="saveInventoryBtn" type="submit" class="btn btn-primary">Save Inventory Item</button>
+          <button id="deleteInventoryBtn" type="button" class="btn btn-dark">Delete Inventory Item</button>
+          <button id="cancelInventoryBtn" type="button" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>

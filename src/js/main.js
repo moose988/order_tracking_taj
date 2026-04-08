@@ -8,6 +8,8 @@ import {
   setDoc,
   updateDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { createLocationFieldBinding, reverseGeocodeCoordinates } from "./location-picker.js";
+import { normalizeGoogleMapsLink } from "./location-utils.js";
 
 async function generateOrderId(){
   const counterRef = doc(db, "counters", "orderCounter");
@@ -45,66 +47,13 @@ function formatTimeTo12Hour(time24){
   return `${h}:${minutes} ${ampm}`;
 }
 
-function normalizeGoogleMapsLink(link){
-  if(!link){
-    return "";
-  }
+function getRentalDaysValue(){
+  const rentalDaysInput = document.getElementById("rentalDays");
+  const rentalDays = Number(rentalDaysInput?.value);
 
-  const query = extractGoogleMapsQuery(link);
-
-  if(!query){
-    return link.trim();
-  }
-
-  return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
-}
-
-function extractGoogleMapsQuery(link){
-  if(!link){
-    return "";
-  }
-
-  try{
-    const normalizedLink = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(link)
-      ? link
-      : `https://${link}`;
-
-    const url = new URL(normalizedLink);
-    const qParam = url.searchParams.get("q") || url.searchParams.get("query");
-
-    if(qParam){
-      return qParam;
-    }
-
-    const atMatch = normalizedLink.match(/@(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
-    if(atMatch){
-      return `${atMatch[1]},${atMatch[3]}`;
-    }
-
-    const coordMatch = normalizedLink.match(/!3d(-?\d+(\.\d+)?)!4d(-?\d+(\.\d+)?)/);
-    if(coordMatch){
-      return `${coordMatch[1]},${coordMatch[3]}`;
-    }
-
-    const placeMatch = url.pathname.match(/\/place\/([^/]+)/);
-    if(placeMatch){
-      return decodeURIComponent(placeMatch[1]).replaceAll("+", " ");
-    }
-
-    const searchPathMatch = url.pathname.match(/\/maps\/search\/([^/]+)/);
-    if(searchPathMatch){
-      return decodeURIComponent(searchPathMatch[1]).replaceAll("+", " ");
-    }
-
-    return "";
-  }catch{
-    const plainQMatch = link.match(/[?&]q=([^&]+)/);
-    if(plainQMatch){
-      return decodeURIComponent(plainQMatch[1]);
-    }
-
-    return "";
-  }
+  return Number.isFinite(rentalDays) && rentalDays >= 1
+    ? Math.floor(rentalDays)
+    : 1;
 }
 
 async function loadHomepageReviews(){
@@ -335,31 +284,56 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   const locationBtn = document.getElementById("useLocationBtn");
+  const pickLocationBtn = document.getElementById("pickEventLocationBtn");
   const mapLinkInput = document.getElementById("mapLink");
+  const eventLocationInput = document.getElementById("eventLocation");
+  const locationSummary = document.getElementById("quoteLocationSummary");
+  const quoteLocationBinding = pickLocationBtn && mapLinkInput && eventLocationInput && locationSummary
+    ? createLocationFieldBinding({
+      triggerButton: pickLocationBtn,
+      summaryContainer: locationSummary,
+      eventLocationInput,
+      mapLinkInput,
+      pickerTitle: "Pick Event Location",
+      pickerSubtitle: "Search for a venue in the UAE or tap directly on the map to place the delivery pin.",
+      summaryTitle: "Selected Location"
+    })
+    : null;
 
   if(locationBtn){
-    locationBtn.addEventListener("click", () => {
+    locationBtn.addEventListener("click", async () => {
       if(!navigator.geolocation){
         alert("Geolocation not supported on this device.");
         return;
       }
 
-      navigator.geolocation.getCurrentPosition((position) => {
+      navigator.geolocation.getCurrentPosition(async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        const mapUrl = `https://maps.google.com/?q=${lat},${lng}`;
+        const reverseResult = await reverseGeocodeCoordinates({ lat, lng });
 
-        document.getElementById("mapLink").value = normalizeGoogleMapsLink(mapUrl);
+        if(quoteLocationBinding){
+          quoteLocationBinding.setSelection({
+            lat,
+            lng,
+            label: reverseResult?.label || reverseResult?.address || eventLocationInput?.value.trim() || "Current location",
+            address: reverseResult?.address || reverseResult?.label || "",
+            source: "map-picker-tap"
+          }, {
+            syncFields: true
+          });
+        }else if(mapLinkInput){
+          mapLinkInput.value = normalizeGoogleMapsLink(`https://maps.google.com/?q=${lat},${lng}`);
+        }
+
         alert("Location captured successfully.");
       }, () => {
         alert("Unable to retrieve your location.");
+      }, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
       });
-    });
-  }
-
-  if(mapLinkInput){
-    mapLinkInput.addEventListener("blur", () => {
-      mapLinkInput.value = normalizeGoogleMapsLink(mapLinkInput.value);
     });
   }
 
@@ -382,6 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const name = document.getElementById("customerName").value;
     const phone = document.getElementById("customerPhone").value;
     const date = document.getElementById("eventDate").value;
+    const rentalDays = getRentalDaysValue();
     const rawTime = document.getElementById("eventTime").value;
     const time = formatTimeTo12Hour(rawTime);
     const rawSetupTime = document.getElementById("setupTime").value;
@@ -389,6 +364,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const location = document.getElementById("eventLocation").value;
     const mapLink = normalizeGoogleMapsLink(document.getElementById("mapLink").value);
     const notes = document.getElementById("eventNotes").value;
+    const destinationLocation = quoteLocationBinding?.getDestinationLocation() || null;
 
     const orderId = await generateOrderId();
 
@@ -397,6 +373,7 @@ document.addEventListener("DOMContentLoaded", () => {
       customerName: name,
       phone,
       eventDate: date,
+      rentalDays,
       eventTime: time,
       setupTime,
       eventLocation: location,
@@ -405,7 +382,8 @@ document.addEventListener("DOMContentLoaded", () => {
       items: order,
       priority: "normal",
       status: "quote-requested",
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      ...(destinationLocation ? { destinationLocation } : {})
     });
 
     const itemsText = order.map(item => `${item.name} x${item.quantity}`).join("\n");
@@ -418,6 +396,7 @@ Name: ${name}
 Phone: ${phone}
 
 Event Date: ${date}
+Rental Days: ${rentalDays}
 Event Time: ${time}
 Setup Time: ${setupTime}
 

@@ -2,6 +2,8 @@ import { auth } from "./firebase.js";
 import { PRODUCTS } from "../data/products.js";
 import { QUOTE_BANK_PRESETS, QUOTE_CURRENCY, VAT_RATE, getQuoteBankPreset } from "./quote-config.js";
 import { buildQuotePdfFileName, calculateQuoteTotals, generateQuotePdfBlob } from "./quote-pdf.js";
+import { createLocationFieldBinding } from "./location-picker.js";
+import { normalizeGoogleMapsLink } from "./location-utils.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* PROTECT ADMIN PAGE */
@@ -59,6 +61,10 @@ const openCreateOrderBtn = document.getElementById("openCreateOrderBtn");
 const closeCreateOrderBtn = document.getElementById("closeCreateOrderBtn");
 const cancelCreateOrderBtn = document.getElementById("cancelCreateOrderBtn");
 const createOrderSubmitBtn = document.getElementById("createOrderSubmitBtn");
+const editPickLocationBtn = document.getElementById("editPickLocationBtn");
+const createPickLocationBtn = document.getElementById("createPickLocationBtn");
+const editLocationSummary = document.getElementById("editLocationSummary");
+const createLocationSummary = document.getElementById("createLocationSummary");
 const driverFilter = document.getElementById("driverFilter");
 const quoteModal = document.getElementById("quoteModal");
 const closeQuoteModalBtn = document.getElementById("closeQuoteModalBtn");
@@ -87,9 +93,39 @@ const quoteHistoryList = document.getElementById("quoteHistoryList");
 const generateQuoteBtn = document.getElementById("generateQuoteBtn");
 const sendQuoteWhatsappBtn = document.getElementById("sendQuoteWhatsappBtn");
 const resetQuoteDraftBtn = document.getElementById("resetQuoteDraftBtn");
+const inventoryTotalSkus = document.getElementById("inventoryTotalSkus");
+const inventoryAvailableUnits = document.getElementById("inventoryAvailableUnits");
+const inventoryReservedUnits = document.getElementById("inventoryReservedUnits");
+const inventoryDamagedUnits = document.getElementById("inventoryDamagedUnits");
+const inventoryLowStockItems = document.getElementById("inventoryLowStockItems");
+const inventoryTableBody = document.getElementById("inventoryTableBody");
+const inventorySearchInput = document.getElementById("inventorySearchInput");
+const inventorySourceFilter = document.getElementById("inventorySourceFilter");
+const inventoryStatusFilter = document.getElementById("inventoryStatusFilter");
+const addInventoryItemBtn = document.getElementById("addInventoryItemBtn");
+const reservationDateFilter = document.getElementById("reservationDateFilter");
+const upcomingReservationsBody = document.getElementById("upcomingReservationsBody");
+const inventoryReservationsSummary = document.getElementById("inventoryReservationsSummary");
+const inventoryModal = document.getElementById("inventoryModal");
+const inventoryForm = document.getElementById("inventoryForm");
+const inventoryModalTitle = document.getElementById("inventoryModalTitle");
+const inventoryModalSubtitle = document.getElementById("inventoryModalSubtitle");
+const closeInventoryModalBtn = document.getElementById("closeInventoryModalBtn");
+const cancelInventoryBtn = document.getElementById("cancelInventoryBtn");
+const saveInventoryBtn = document.getElementById("saveInventoryBtn");
+const deleteInventoryBtn = document.getElementById("deleteInventoryBtn");
+const inventoryProductSelect = document.getElementById("inventoryProductSelect");
+const inventorySourceTypeSelect = document.getElementById("inventorySourceType");
+const inventoryDamagedAdjustInput = document.getElementById("inventoryDamagedAdjust");
+const inventoryMarkDamagedBtn = document.getElementById("inventoryMarkDamagedBtn");
+const inventoryRestoreDamagedBtn = document.getElementById("inventoryRestoreDamagedBtn");
+const createInventoryWarnings = document.getElementById("createInventoryWarnings");
+const editInventoryWarnings = document.getElementById("editInventoryWarnings");
 
 let allOrders = [];
 let driversList = [];
+let allInventoryItems = [];
+let hasLoadedInventorySnapshot = false;
 let currentCalendarDate = new Date();
 let ordersPerDayChart = null;
 let ordersByStatusChart = null;
@@ -104,6 +140,8 @@ let driversUnsubscribe = null;
 let isSavingEditOrder = false;
 let isDeletingOrder = false;
 let isCreatingOrder = false;
+let editLocationBinding = null;
+let createLocationBinding = null;
 let currentQuoteOrder = null;
 let currentQuoteVersions = [];
 let quoteHistoryUnsubscribe = null;
@@ -112,9 +150,28 @@ let lastGeneratedQuoteData = null;
 let isGeneratingQuote = false;
 let isHydratingQuoteForm = false;
 let hasInitializedQuoteDraft = false;
+let isQuoteDraftDirty = false;
+let inventoryUnsubscribe = null;
+let currentInventoryItemId = null;
+let isSavingInventory = false;
+let hasAttemptedCatalogInventorySeed = false;
+let inventoryClockIntervalId = null;
+let currentInventorySort = {
+  key: "name",
+  direction: "asc"
+};
 const PRODUCT_CATEGORIES = getProductCategories();
 const PRODUCTS_BY_CATEGORY = buildProductsByCategory();
 const PRODUCTS_BY_ID = buildProductsById();
+const INVENTORY_RESERVATION_STATUSES = new Set(["confirmed", "preparing", "out-for-delivery"]);
+const DEFAULT_RENTAL_DAYS = 1;
+const DEFAULT_LOW_STOCK_THRESHOLD = 1;
+const CATALOG_INVENTORY_DEMO_STOCK = {
+  "Round Table": { totalStock: 18, damagedStock: 1, lowStockThreshold: 4 },
+  "Rectangular Table": { totalStock: 5, damagedStock: 1, lowStockThreshold: 4 },
+  "White Chair": { totalStock: 72, damagedStock: 6, lowStockThreshold: 14 },
+  "Gold Chair": { totalStock: 12, damagedStock: 3, lowStockThreshold: 9 }
+};
 
 const STATUS_META = {
   "quote-requested": { label: "Quote Requested", className: "is-quote-requested" },
@@ -155,7 +212,7 @@ function initMobileMenu(){
 
 function subscribeToOrders(){
   ordersUnsubscribe?.();
-  ordersUnsubscribe = onSnapshot(collection(db, "orders"), (snapshot) => {
+  ordersUnsubscribe = onSnapshot(collection(db, "orders"), async (snapshot) => {
     allOrders = snapshot.docs.map((orderDoc) => ({
       id: orderDoc.id,
       ...orderDoc.data()
@@ -163,14 +220,50 @@ function subscribeToOrders(){
 
     syncCurrentEditingOrder();
     syncCurrentQuoteOrder();
+    try{
+      await syncMissingInventoryForReservableOrderItems();
+    }catch(error){
+      console.error("Failed to sync order inventory items:", error);
+    }
     renderOpsPanel();
     renderDriverPanel();
+    renderInventoryDashboard();
     applyFilters();
     updateStats(allOrders);
     generateAnalytics();
     renderCalendar();
   }, (error) => {
     console.error("Failed to subscribe to orders:", error);
+  });
+}
+
+function subscribeToInventory(){
+  inventoryUnsubscribe?.();
+  inventoryUnsubscribe = onSnapshot(collection(db, "inventory"), async (snapshot) => {
+    allInventoryItems = snapshot.docs.map((inventoryDoc) => ({
+      id: inventoryDoc.id,
+      ...inventoryDoc.data()
+    }));
+    hasLoadedInventorySnapshot = true;
+
+    try{
+      await seedCatalogInventoryIfNeeded();
+      await syncMissingInventoryForReservableOrderItems();
+    }catch(error){
+      console.error("Failed to prepare inventory data:", error);
+    }
+    renderInventoryDashboard();
+    updateOrderInventoryWarnings("create");
+    updateOrderInventoryWarnings("edit");
+  }, (error) => {
+    console.error("Failed to subscribe to inventory:", error);
+    if(inventoryTableBody){
+      inventoryTableBody.innerHTML = `
+        <tr>
+          <td colspan="11" class="inventory-empty-cell">Could not load inventory.</td>
+        </tr>
+      `;
+    }
   });
 }
 
@@ -188,6 +281,18 @@ function subscribeToDrivers(){
   }, (error) => {
     console.error("Failed to subscribe to drivers:", error);
   });
+}
+
+function startInventoryClockRefresh(){
+  if(inventoryClockIntervalId){
+    return;
+  }
+
+  inventoryClockIntervalId = window.setInterval(() => {
+    renderInventoryDashboard();
+    updateOrderInventoryWarnings("create");
+    updateOrderInventoryWarnings("edit");
+  }, 60000);
 }
 
 /* RENDER TABLE */
@@ -364,6 +469,24 @@ function isTomorrow(dateStr){
   return Boolean(date) && date.toDateString() === tomorrow.toDateString();
 }
 
+function isInCurrentWeek(dateStr){
+  const date = parseEventDate(dateStr);
+
+  if(!date){
+    return false;
+  }
+
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+  return date >= startOfWeek && date < endOfWeek;
+}
+
 function isWithinNextHours(dateStr, timeStr, hours = 3){
   const now = new Date();
   const event = parseEventDateTime(dateStr, timeStr);
@@ -425,10 +548,10 @@ function parseEventDateTime(dateStr, timeStr){
 
 function getOpsBuckets(){
   const todayOrders = allOrders.filter(order => isToday(order.eventDate));
-  const upcomingOrders = allOrders.filter(order => isWithinNextHours(order.eventDate, order.eventTime));
+  const weekOrders = allOrders.filter(order => isInCurrentWeek(order.eventDate));
   const tomorrowOrders = allOrders.filter(order => isTomorrow(order.eventDate));
 
-  return { todayOrders, upcomingOrders, tomorrowOrders };
+  return { todayOrders, weekOrders, tomorrowOrders };
 }
 
 function renderOpsPanel(){
@@ -436,11 +559,11 @@ function renderOpsPanel(){
     return;
   }
 
-  const { todayOrders, upcomingOrders, tomorrowOrders } = getOpsBuckets();
+  const { todayOrders, weekOrders, tomorrowOrders } = getOpsBuckets();
   const cards = [
     { key: "today", eyebrow: "Today", label: "Orders happening today", count: todayOrders.length },
-    { key: "upcoming", eyebrow: "Next 3h", label: "Starting within 3 hours", count: upcomingOrders.length },
-    { key: "tomorrow", eyebrow: "Tomorrow", label: "Orders scheduled tomorrow", count: tomorrowOrders.length }
+    { key: "tomorrow", eyebrow: "Tomorrow", label: "Orders scheduled tomorrow", count: tomorrowOrders.length },
+    { key: "week", eyebrow: "This Week", label: "Orders in the current week", count: weekOrders.length }
   ];
 
   opsPanel.innerHTML = cards.map(card => `
@@ -458,7 +581,7 @@ function renderOpsPanel(){
 
   if(opsPanelSummary){
     opsPanelSummary.textContent = activeOpsFilter === "all"
-      ? `${todayOrders.length} today, ${upcomingOrders.length} in the next 3 hours, ${tomorrowOrders.length} tomorrow.`
+      ? `${todayOrders.length} today, ${tomorrowOrders.length} tomorrow, ${weekOrders.length} in this week.`
       : `${formatOpsFilterLabel(activeOpsFilter)} filter is active. Click the same card again to clear it.`;
   }
 
@@ -479,7 +602,7 @@ function attachOpsPanelEvents(){
 function formatOpsFilterLabel(filter){
   const labels = {
     today: "Today",
-    upcoming: "Next 3h",
+    week: "This Week",
     tomorrow: "Tomorrow",
     all: "All orders"
   };
@@ -589,9 +712,17 @@ function getProductsForCategory(category){
 }
 
 function getCategoryOptionsMarkup(selectedCategory = ""){
+  const normalizedSelectedCategory = String(selectedCategory || "").trim();
+  const baseCategories = PRODUCT_CATEGORIES.includes("Custom")
+    ? PRODUCT_CATEGORIES
+    : [...PRODUCT_CATEGORIES, "Custom"];
+  const categories = normalizedSelectedCategory && !baseCategories.includes(normalizedSelectedCategory)
+    ? [normalizedSelectedCategory, ...baseCategories]
+    : baseCategories;
+
   return [
     '<option value="">Select category</option>',
-    ...PRODUCT_CATEGORIES.map((category) => `
+    ...categories.map((category) => `
       <option value="${escapeAttribute(category)}" ${category === selectedCategory ? "selected" : ""}>
         ${escapeHtml(category)}
       </option>
@@ -614,13 +745,125 @@ function getSelectedProduct(productId){
   return PRODUCTS_BY_ID.get(String(productId)) || null;
 }
 
+function getCatalogInventoryDocId(product){
+  return `catalog-${String(product.id).replace(/[^\w-]/g, "-")}`;
+}
+
+function getCatalogInventoryDemoStock(product){
+  const explicitStock = CATALOG_INVENTORY_DEMO_STOCK[product.name];
+
+  if(explicitStock){
+    return explicitStock;
+  }
+
+  const isChair = normalizeInventoryText(product.category).includes("chair");
+  return {
+    totalStock: isChair ? 40 : 10,
+    damagedStock: isChair ? 2 : 0,
+    lowStockThreshold: isChair ? 8 : 2
+  };
+}
+
+function hasInventoryForCatalogProduct(product){
+  const productId = String(product.id);
+  const productNameKey = getInventoryItemKey(product.name, "");
+
+  return allInventoryItems.some((inventoryItem) => {
+    if(inventoryItem.isArchived === true || inventoryItem.active === false){
+      return false;
+    }
+
+    if(inventoryItem.productId && String(inventoryItem.productId) === productId){
+      return true;
+    }
+
+    return getInventoryItemKey(inventoryItem.name, inventoryItem.variant) === productNameKey;
+  });
+}
+
+async function seedCatalogInventoryIfNeeded(){
+  if(hasAttemptedCatalogInventorySeed || !PRODUCTS.length){
+    return;
+  }
+
+  hasAttemptedCatalogInventorySeed = true;
+
+  const missingProducts = PRODUCTS.filter((product) => product?.name && !hasInventoryForCatalogProduct(product));
+
+  if(!missingProducts.length){
+    return;
+  }
+
+  try{
+    await Promise.all(missingProducts.map(async (product) => {
+      const stock = getCatalogInventoryDemoStock(product);
+      const inventoryRef = doc(db, "inventory", getCatalogInventoryDocId(product));
+      const inventorySnapshot = await getDoc(inventoryRef);
+
+      if(inventorySnapshot.exists()){
+        return;
+      }
+
+      await setDoc(inventoryRef, {
+        id: inventoryRef.id,
+        name: product.name,
+        category: product.category || "Catalog",
+        variant: "",
+        productId: product.id,
+        sourceType: "catalog",
+        totalStock: stock.totalStock,
+        damagedStock: stock.damagedStock,
+        lowStockThreshold: stock.lowStockThreshold,
+        isArchived: false,
+        active: true,
+        demoSeeded: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }));
+  }catch(error){
+    console.error("Failed to seed catalog inventory:", error);
+  }
+}
+
+function getCatalogProductByName(name){
+  const normalizedName = normalizeInventoryText(name);
+  return PRODUCTS.find((product) => normalizeInventoryText(product.name) === normalizedName) || null;
+}
+
+function getInventoryProductOptionsMarkup(selectedProductId = ""){
+  return [
+    '<option value="">No catalog link</option>',
+    ...PRODUCTS.map((product) => `
+      <option value="${escapeAttribute(product.id)}" ${String(product.id) === String(selectedProductId || "") ? "selected" : ""}>
+        ${escapeHtml(product.name)}
+      </option>
+    `)
+  ].join("");
+}
+
+function getCreateItemProductOptionsMarkup(category, selectedProductId = "", isCustom = false){
+  return [
+    '<option value="">Select product</option>',
+    ...getProductsForCategory(category).map((product) => `
+      <option value="${escapeAttribute(product.id)}" ${String(product.id) === String(selectedProductId) ? "selected" : ""}>
+        ${escapeHtml(product.name)}
+      </option>
+    `),
+    `<option value="__custom" ${isCustom ? "selected" : ""}>Custom / internal item</option>`
+  ].join("");
+}
+
 function getCreateItemRowMarkup(item = {}, index = 0){
   const selectedCategory = String(item.category || "").trim();
-  const selectedProductId = item.productId ? String(item.productId) : item.id ? String(item.id) : "";
+  const isCustom = item.sourceType === "custom" || item.isCustom || (!item.productId && item.name);
+  const selectedProductId = isCustom ? "__custom" : item.productId ? String(item.productId) : item.id ? String(item.id) : "";
   const selectedProduct = getSelectedProduct(selectedProductId);
   const detailsText = selectedProduct
     ? [selectedProduct.measurements, selectedProduct.shortDescription].filter(Boolean).join(" - ")
-    : "Select a category and product";
+    : isCustom
+      ? "Custom inventory item will be matched or created automatically."
+      : "Select a category and product";
 
   return `
     <div class="edit-item-row create-item-row" data-index="${index}">
@@ -628,8 +871,16 @@ function getCreateItemRowMarkup(item = {}, index = 0){
         ${getCategoryOptionsMarkup(selectedCategory)}
       </select>
       <select class="create-item-product" aria-label="Create item product ${index + 1}" ${selectedCategory ? "" : "disabled"}>
-        ${getProductOptionsMarkup(selectedCategory, selectedProductId)}
+        ${getCreateItemProductOptionsMarkup(selectedCategory, selectedProductId, isCustom)}
       </select>
+      <input
+        type="text"
+        class="create-item-custom-name"
+        value="${escapeAttribute(isCustom ? item.name || "" : "")}"
+        placeholder="Custom item name"
+        aria-label="Create custom item name ${index + 1}"
+        ${isCustom ? "" : "hidden disabled"}
+      />
       <input
         type="number"
         min="1"
@@ -651,10 +902,12 @@ function refreshCreateItemRow(row, nextState = {}){
 
   const categorySelect = row.querySelector(".create-item-category");
   const productSelect = row.querySelector(".create-item-product");
+  const customNameInput = row.querySelector(".create-item-custom-name");
   const quantityInput = row.querySelector(".create-item-quantity");
   const details = row.querySelector(".create-item-details");
   const nextCategory = nextState.category ?? categorySelect?.value ?? "";
   const nextProductId = nextState.productId ?? productSelect?.value ?? "";
+  const isCustom = nextProductId === "__custom";
   const selectedProduct = getSelectedProduct(nextProductId);
 
   if(categorySelect){
@@ -663,13 +916,23 @@ function refreshCreateItemRow(row, nextState = {}){
   }
 
   if(productSelect){
-    productSelect.innerHTML = getProductOptionsMarkup(nextCategory, nextProductId);
+    productSelect.innerHTML = getCreateItemProductOptionsMarkup(nextCategory, nextProductId, isCustom);
     productSelect.disabled = !nextCategory;
 
-    if(nextCategory && selectedProduct && selectedProduct.category === nextCategory){
+    if(isCustom){
+      productSelect.value = "__custom";
+    }else if(nextCategory && selectedProduct && selectedProduct.category === nextCategory){
       productSelect.value = String(selectedProduct.id);
     }else{
       productSelect.value = "";
+    }
+  }
+
+  if(customNameInput){
+    customNameInput.hidden = !isCustom;
+    customNameInput.disabled = !isCustom;
+    if(isCustom && nextState.name !== undefined){
+      customNameInput.value = nextState.name;
     }
   }
 
@@ -681,7 +944,9 @@ function refreshCreateItemRow(row, nextState = {}){
   if(details){
     details.textContent = selectedProduct
       ? [selectedProduct.measurements, selectedProduct.shortDescription].filter(Boolean).join(" - ")
-      : "Select a category and product";
+      : isCustom
+        ? "Custom inventory item will be matched or created automatically."
+        : "Select a category and product";
   }
 }
 
@@ -708,67 +973,6 @@ async function generateOrderId(){
     Math.floor(Math.random() * 10);
 
   return `TAJ-${newNumber}-${randomCode}`;
-}
-
-function normalizeGoogleMapsLink(link){
-  if(!link){
-    return "";
-  }
-
-  const query = extractGoogleMapsQuery(link);
-
-  if(!query){
-    return String(link).trim();
-  }
-
-  return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
-}
-
-function extractGoogleMapsQuery(link){
-  if(!link){
-    return "";
-  }
-
-  try{
-    const normalizedLink = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(link)
-      ? link
-      : `https://${link}`;
-    const url = new URL(normalizedLink);
-    const qParam = url.searchParams.get("q") || url.searchParams.get("query");
-
-    if(qParam){
-      return qParam;
-    }
-
-    const atMatch = normalizedLink.match(/@(-?\d+(\.\d+)?),(-?\d+(\.\d+)?)/);
-    if(atMatch){
-      return `${atMatch[1]},${atMatch[3]}`;
-    }
-
-    const coordMatch = normalizedLink.match(/!3d(-?\d+(\.\d+)?)!4d(-?\d+(\.\d+)?)/);
-    if(coordMatch){
-      return `${coordMatch[1]},${coordMatch[3]}`;
-    }
-
-    const placeMatch = url.pathname.match(/\/place\/([^/]+)/);
-    if(placeMatch){
-      return decodeURIComponent(placeMatch[1]).replaceAll("+", " ");
-    }
-
-    const searchPathMatch = url.pathname.match(/\/maps\/search\/([^/]+)/);
-    if(searchPathMatch){
-      return decodeURIComponent(searchPathMatch[1]).replaceAll("+", " ");
-    }
-
-    return "";
-  }catch{
-    const plainQMatch = String(link).match(/[?&]q=([^&]+)/);
-    if(plainQMatch){
-      return decodeURIComponent(plainQMatch[1]);
-    }
-
-    return "";
-  }
 }
 
 function getPriorityOptions(currentPriority){
@@ -960,6 +1164,26 @@ function attachEvents(){
 
       const orderId = e.target.dataset.id;
       const newStatus = e.target.value;
+      const order = allOrders.find((item) => item.id === orderId);
+
+      if(order){
+        const draft = {
+          ...order,
+          status: newStatus
+        };
+
+        if(!confirmInventoryWarningsIfNeeded(draft)){
+          e.target.value = order.status || "quote-requested";
+          return;
+        }
+      }
+
+      if(isOrderReservableForInventory({
+        ...order,
+        status: newStatus
+      })){
+        await ensureInventoryItemsForOrderItems(order?.items || []);
+      }
 
       await updateDoc(doc(db, "orders", orderId), {
         status: newStatus
@@ -1165,11 +1389,17 @@ function openEditOrderModal(order){
     editOrderForm.eventDate.value = order.eventDate || "";
     editOrderForm.eventTime.value = convertTimeToInputValue(order.eventTime);
     editOrderForm.setupTime.value = convertTimeToInputValue(order.setupTime);
+    if(editOrderForm.rentalDays){
+      editOrderForm.rentalDays.value = String(getOrderRentalDays(order));
+    }
     editOrderForm.eventLocation.value = order.eventLocation || "";
     editOrderForm.mapLink.value = order.mapLink || "";
   }
 
+  editLocationBinding?.preloadFromOrder(order);
+
   renderEditableItems(order.items || []);
+  updateOrderInventoryWarnings("edit");
   setEditSaveState(false);
   setEditDeleteState(false);
   editOrderModal?.classList.add("active");
@@ -1187,6 +1417,8 @@ function closeEditOrderModal(force = false){
   if(editItemsContainer){
     editItemsContainer.innerHTML = "";
   }
+  renderInventoryWarnings(editInventoryWarnings, []);
+  editLocationBinding?.clear();
   isSavingEditOrder = false;
   isDeletingOrder = false;
   syncEditModalActionState();
@@ -1210,6 +1442,7 @@ function closeCreateOrderModal(force = false){
 
   createOrderModal?.classList.remove("active");
   resetCreateOrderForm();
+  renderInventoryWarnings(createInventoryWarnings, []);
   document.body.style.overflow = "auto";
 }
 
@@ -1219,9 +1452,14 @@ function resetCreateOrderForm(){
   if(createOrderForm){
     createOrderForm.priority.value = "normal";
     createOrderForm.status.value = "confirmed";
+    if(createOrderForm.rentalDays){
+      createOrderForm.rentalDays.value = String(DEFAULT_RENTAL_DAYS);
+    }
   }
 
+  createLocationBinding?.clear();
   renderCreateItems();
+  updateOrderInventoryWarnings("create");
   setCreateSubmitState(false);
 }
 
@@ -1276,6 +1514,73 @@ function formatQuoteHistoryDate(value){
 
 function getQuoteVersionLanguageLabel(language){
   return language === "ar" ? "Arabic" : "English";
+}
+
+async function getLatestOrderData(orderOrId){
+  const orderId = typeof orderOrId === "string" ? orderOrId : orderOrId?.id;
+
+  if(!orderId){
+    return null;
+  }
+
+  const fallbackOrder = allOrders.find((order) => order.id === orderId) || (typeof orderOrId === "object" ? orderOrId : null);
+
+  try{
+    const orderSnapshot = await getDoc(doc(db, "orders", orderId));
+
+    if(orderSnapshot.exists()){
+      const latestOrder = {
+        id: orderSnapshot.id,
+        ...orderSnapshot.data()
+      };
+      upsertOrderInAdminState(latestOrder);
+      return latestOrder;
+    }
+  }catch(error){
+    console.error("Failed to load the latest order data:", error);
+  }
+
+  return fallbackOrder;
+}
+
+function wrapInputWithCurrency(input, currency = QUOTE_CURRENCY){
+  if(!input || input.closest(".currency-input-wrap")){
+    return;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "currency-input-wrap";
+  input.parentNode?.insertBefore(wrapper, input);
+  wrapper.appendChild(input);
+
+  const suffix = document.createElement("span");
+  suffix.className = "currency-input-suffix";
+  suffix.textContent = currency;
+  wrapper.appendChild(suffix);
+}
+
+function upsertOrderInAdminState(order){
+  if(!order?.id){
+    return;
+  }
+
+  const nextOrder = {
+    ...order
+  };
+  const existingIndex = allOrders.findIndex((item) => item.id === nextOrder.id);
+
+  if(existingIndex >= 0){
+    allOrders = [
+      ...allOrders.slice(0, existingIndex),
+      {
+        ...allOrders[existingIndex],
+        ...nextOrder
+      },
+      ...allOrders.slice(existingIndex + 1)
+    ];
+  }else{
+    allOrders = [...allOrders, nextOrder];
+  }
 }
 
 function populateQuoteBankPresetOptions(selectedId = "", language = quoteLanguageSelect?.value || "en"){
@@ -1345,6 +1650,47 @@ function getQuoteItemRows(){
   return Array.from(quoteItemsContainer?.querySelectorAll(".quote-item-card") || []);
 }
 
+function autoResizeQuoteItemName(field){
+  if(!field){
+    return;
+  }
+
+  field.style.height = "54px";
+  field.style.height = `${Math.max(54, field.scrollHeight)}px`;
+}
+
+function syncQuoteItemNameHeights(){
+  getQuoteItemRows().forEach((row) => {
+    autoResizeQuoteItemName(row.querySelector(".quote-item-name"));
+  });
+}
+
+function initAdminLocationBindings(){
+  if(!editLocationBinding && editOrderForm?.eventLocation && editOrderForm?.mapLink && editPickLocationBtn && editLocationSummary){
+    editLocationBinding = createLocationFieldBinding({
+      triggerButton: editPickLocationBtn,
+      summaryContainer: editLocationSummary,
+      eventLocationInput: editOrderForm.eventLocation,
+      mapLinkInput: editOrderForm.mapLink,
+      pickerTitle: "Update Event Location",
+      pickerSubtitle: "Search for the venue in the UAE or tap directly on the map to place the exact delivery destination.",
+      summaryTitle: "Selected Tracking Location"
+    });
+  }
+
+  if(!createLocationBinding && createOrderForm?.eventLocation && createOrderForm?.mapLink && createPickLocationBtn && createLocationSummary){
+    createLocationBinding = createLocationFieldBinding({
+      triggerButton: createPickLocationBtn,
+      summaryContainer: createLocationSummary,
+      eventLocationInput: createOrderForm.eventLocation,
+      mapLinkInput: createOrderForm.mapLink,
+      pickerTitle: "Pick Event Location",
+      pickerSubtitle: "Search for the venue in the UAE or tap directly on the map to place the exact delivery destination.",
+      summaryTitle: "Selected Tracking Location"
+    });
+  }
+}
+
 function syncQuoteModalActionState(){
   if(generateQuoteBtn){
     generateQuoteBtn.disabled = isGeneratingQuote;
@@ -1376,7 +1722,7 @@ function syncQuoteModalActionState(){
   });
 
   getQuoteItemRows().forEach((row) => {
-    row.querySelectorAll("input, button").forEach((control) => {
+    row.querySelectorAll("input, textarea, button").forEach((control) => {
       if(control.classList.contains("quote-item-amount")){
         return;
       }
@@ -1410,26 +1756,29 @@ function renderQuoteItems(items = []){
         <div class="quote-item-card-head">
           <div>
             <strong>Item ${index + 1}</strong>
-            <span>Inherited from the order</span>
+            <span>${isEditing ? "Edited in the quote draft" : "Inherited from the latest saved order"}</span>
           </div>
           <button class="btn btn-secondary btn-small quote-item-edit-btn" data-index="${index}" type="button">
             ${isEditing ? "Lock Item" : "Edit Item"}
           </button>
         </div>
         <div class="quote-item-card-grid">
-          <div class="form-group">
+          <div class="form-group quote-item-name-group">
             <label>Item Name</label>
-            <input class="quote-item-name" type="text" value="${escapeAttribute(item.name || "")}" ${isEditing ? "" : "readonly"} />
+            <textarea class="quote-item-name" rows="1" ${isEditing ? "" : "readonly"}>${escapeHtml(item.name || "")}</textarea>
           </div>
-          <div class="form-group">
+          <div class="form-group quote-item-quantity-group">
             <label>Quantity</label>
             <input class="quote-item-quantity" type="number" min="1" step="1" value="${quantity}" ${isEditing ? "" : "readonly"} />
           </div>
-          <div class="form-group">
+          <div class="form-group quote-item-unit-price-group">
             <label>Unit Price</label>
-            <input class="quote-item-unit-price" type="number" min="0" step="0.01" placeholder="0.00" value="${hasUnitPrice ? unitPrice : ""}" />
+            <div class="currency-input-wrap">
+              <input class="quote-item-unit-price" type="number" min="0" step="0.01" placeholder="0.00" value="${hasUnitPrice ? unitPrice : ""}" />
+              <span class="currency-input-suffix">${QUOTE_CURRENCY}</span>
+            </div>
           </div>
-          <div class="form-group">
+          <div class="form-group quote-item-amount-group">
             <label>Amount</label>
             <input class="quote-item-amount" type="text" value="${formatCurrencyDisplay(amount)}" readonly />
           </div>
@@ -1439,6 +1788,7 @@ function renderQuoteItems(items = []){
   }).join("");
 
   updateQuoteTotals();
+  syncQuoteItemNameHeights();
   syncQuoteModalActionState();
 }
 
@@ -1507,6 +1857,7 @@ function loadOrderDraftIntoQuoteForm(order){
   }
 
   isHydratingQuoteForm = true;
+  isQuoteDraftDirty = false;
   activeQuoteVersion = null;
   setQuoteOrderFields(order);
 
@@ -1517,7 +1868,7 @@ function loadOrderDraftIntoQuoteForm(order){
   populateQuoteBankPresetOptions(QUOTE_BANK_PRESETS[0]?.id || "", "en");
 
   if(quoteRentalDaysInput){
-    quoteRentalDaysInput.value = "1";
+    quoteRentalDaysInput.value = String(getOrderRentalDays(order));
   }
 
   if(quoteDeliveryChargeInput){
@@ -1545,6 +1896,7 @@ function loadQuoteVersionIntoForm(quoteVersion){
   }
 
   isHydratingQuoteForm = true;
+  isQuoteDraftDirty = false;
   activeQuoteVersion = quoteVersion;
   setQuoteOrderFields(quoteVersion);
 
@@ -1619,13 +1971,13 @@ function subscribeToQuoteHistory(order){
       renderQuoteHistory();
 
       if(!hasInitializedQuoteDraft){
-        if(currentQuoteVersions.length){
-          loadQuoteVersionIntoForm(currentQuoteVersions[0]);
-          setQuoteBuilderStatus(`Loaded version ${currentQuoteVersions[0].version}.`, "success");
-        }else{
-          loadOrderDraftIntoQuoteForm(currentQuoteOrder);
-          setQuoteBuilderStatus("Draft ready. Add prices and generate the quotation.", "warning");
-        }
+        loadOrderDraftIntoQuoteForm(currentQuoteOrder);
+        setQuoteBuilderStatus(
+          currentQuoteVersions.length
+            ? "Draft ready from the latest saved order. Open history to reuse an older version."
+            : "Draft ready. Add prices and generate the quotation.",
+          "warning"
+        );
 
         hasInitializedQuoteDraft = true;
       }else if(lastGeneratedQuoteData){
@@ -1645,25 +1997,32 @@ function subscribeToQuoteHistory(order){
   );
 }
 
-function openQuoteModal(order){
+async function openQuoteModal(order){
   if(!quoteModal){
     return;
   }
 
-  currentQuoteOrder = order;
+  const latestOrder = await getLatestOrderData(order);
+
+  if(!latestOrder){
+    showToast("Could not load the latest order", "error");
+    return;
+  }
+
+  currentQuoteOrder = latestOrder;
   currentQuoteVersions = [];
   activeQuoteVersion = null;
   lastGeneratedQuoteData = null;
   hasInitializedQuoteDraft = false;
 
-  loadOrderDraftIntoQuoteForm(order);
+  loadOrderDraftIntoQuoteForm(latestOrder);
   renderQuoteHistory();
   setQuoteBuilderStatus("Loading quote history...", "loading");
   syncQuoteModalActionState();
 
   quoteModal.classList.add("active");
   document.body.style.overflow = "hidden";
-  subscribeToQuoteHistory(order);
+  subscribeToQuoteHistory(latestOrder);
 }
 
 function closeQuoteModal(force = false){
@@ -1678,6 +2037,7 @@ function closeQuoteModal(force = false){
   activeQuoteVersion = null;
   lastGeneratedQuoteData = null;
   hasInitializedQuoteDraft = false;
+  isQuoteDraftDirty = false;
   isHydratingQuoteForm = false;
   quoteModal?.classList.remove("active");
   document.body.style.overflow = "auto";
@@ -1699,6 +2059,10 @@ function syncCurrentQuoteOrder(){
 
   if(!activeQuoteVersion){
     setQuoteOrderFields(nextOrder);
+
+    if(quoteRentalDaysInput && !isGeneratingQuote && !isHydratingQuoteForm && !isQuoteDraftDirty){
+      quoteRentalDaysInput.value = String(getOrderRentalDays(nextOrder));
+    }
   }
 }
 
@@ -1708,6 +2072,7 @@ function markQuoteDraftDirty(){
   }
 
   activeQuoteVersion = null;
+  isQuoteDraftDirty = true;
   setQuoteWhatsappState(null);
   renderQuoteHistory();
   setQuoteBuilderStatus("Draft updated. Generate to save a new version.", "warning");
@@ -1935,9 +2300,11 @@ async function handleGenerateQuote(){
       }),
       updateDoc(doc(db, "orders", currentQuoteOrder.id), {
         status: "quote-sent",
+        rentalDays: quotePayload.rentalDays,
         quoteVersionCounter: version,
         latestQuoteVersion: version,
         latestQuoteLanguage: quotePayload.language,
+        latestQuoteRentalDays: quotePayload.rentalDays,
         latestQuoteGeneratedAt: serverTimestamp(),
         latestQuoteGeneratedAtMs: quotePayload.generatedAtMs,
         latestQuoteGrandTotal: quotePayload.grandTotal,
@@ -1947,6 +2314,7 @@ async function handleGenerateQuote(){
 
     downloadBlob(pdfBlob, quotePayload.pdfFileName);
     activeQuoteVersion = quotePayload;
+    isQuoteDraftDirty = false;
     setQuoteWhatsappState(quotePayload);
     renderQuoteHistory();
     setQuoteBuilderStatus(`Version ${version} saved. PDF downloaded and ready for WhatsApp.`, "success");
@@ -2004,13 +2372,12 @@ function renderEditableItems(items){
         placeholder="Item name"
         aria-label="Item name ${index + 1}"
       />
-      <input
-        type="text"
+      <select
         class="edit-item-category"
-        value="${escapeAttribute(item.category || "")}"
-        placeholder="Category"
         aria-label="Item category ${index + 1}"
-      />
+      >
+        ${getCategoryOptionsMarkup(item.category || "")}
+      </select>
       <input
         type="number"
         min="1"
@@ -2038,7 +2405,18 @@ function attachEditableItemEvents(){
       }
 
       button.closest(".edit-item-row")?.remove();
+      updateOrderInventoryWarnings("edit");
     });
+  });
+
+  document.querySelectorAll(".edit-item-name, .edit-item-category, .edit-item-quantity").forEach((input) => {
+    if(input.dataset.bound === "true"){
+      return;
+    }
+
+    input.dataset.bound = "true";
+    input.addEventListener("input", () => updateOrderInventoryWarnings("edit"));
+    input.addEventListener("change", () => updateOrderInventoryWarnings("edit"));
   });
 }
 
@@ -2051,14 +2429,17 @@ function addEditableItem(){
   itemRow.className = "edit-item-row";
   itemRow.innerHTML = `
     <input type="text" class="edit-item-name" value="" placeholder="Item name" aria-label="Item name" />
-    <input type="text" class="edit-item-category" value="" placeholder="Category" aria-label="Item category" />
+    <select class="edit-item-category" aria-label="Item category">
+      ${getCategoryOptionsMarkup("")}
+    </select>
     <input type="number" min="1" step="1" class="edit-item-quantity" value="1" aria-label="Item quantity" />
     <button type="button" class="btn btn-dark remove-edit-item-btn">Remove</button>
   `;
 
   editItemsContainer.appendChild(itemRow);
   attachEditableItemEvents();
-  itemRow.querySelector(".edit-item-name")?.focus();
+  itemRow.querySelector(".edit-item-category")?.focus();
+  updateOrderInventoryWarnings("edit");
 }
 
 function getUpdatedItemsFromUI(){
@@ -2100,6 +2481,7 @@ function attachCreateItemEvents(){
         category: select.value,
         productId: ""
       });
+      updateOrderInventoryWarnings("create");
     });
   });
 
@@ -2115,7 +2497,17 @@ function attachCreateItemEvents(){
         category: row?.querySelector(".create-item-category")?.value || "",
         productId: select.value
       });
+      updateOrderInventoryWarnings("create");
     });
+  });
+
+  document.querySelectorAll(".create-item-custom-name, .create-item-quantity").forEach((input) => {
+    if(input.dataset.bound === "true"){
+      return;
+    }
+
+    input.dataset.bound = "true";
+    input.addEventListener("input", () => updateOrderInventoryWarnings("create"));
   });
 
   document.querySelectorAll(".remove-create-item-btn").forEach((button) => {
@@ -2134,6 +2526,7 @@ function attachCreateItemEvents(){
       }
 
       button.closest(".create-item-row")?.remove();
+      updateOrderInventoryWarnings("create");
     });
   });
 }
@@ -2143,17 +2536,15 @@ function addCreateItem(){
     return;
   }
 
-  const itemRow = document.createElement("div");
-  itemRow.className = "edit-item-row create-item-row";
-  itemRow.innerHTML = getCreateItemRowMarkup({
+  createItemsContainer.insertAdjacentHTML("beforeend", getCreateItemRowMarkup({
     productId: "",
     category: "",
     quantity: 1
-  }, createItemsContainer.querySelectorAll(".create-item-row").length);
-
-  createItemsContainer.appendChild(itemRow);
+  }, createItemsContainer.querySelectorAll(".create-item-row").length));
+  const itemRow = createItemsContainer.querySelector(".create-item-row:last-child");
   attachCreateItemEvents();
-  itemRow.querySelector(".create-item-category")?.focus();
+  itemRow?.querySelector(".create-item-category")?.focus();
+  updateOrderInventoryWarnings("create");
 }
 
 function getCreateItemsFromUI(){
@@ -2161,10 +2552,29 @@ function getCreateItemsFromUI(){
     .map((row) => {
       const category = row.querySelector(".create-item-category")?.value.trim() || "";
       const productId = row.querySelector(".create-item-product")?.value || "";
+      const customName = row.querySelector(".create-item-custom-name")?.value.trim() || "";
       const quantity = Number(row.querySelector(".create-item-quantity")?.value) || 0;
       const product = getSelectedProduct(productId);
 
-      if(!category || !product || product.category !== category || quantity < 1){
+      if(!category || quantity < 1){
+        return null;
+      }
+
+      if(productId === "__custom"){
+        if(!customName){
+          return null;
+        }
+
+        return {
+          name: customName,
+          category,
+          variant: "",
+          sourceType: "custom",
+          quantity
+        };
+      }
+
+      if(!product || product.category !== category){
         return null;
       }
 
@@ -2180,6 +2590,859 @@ function getCreateItemsFromUI(){
       };
     })
     .filter(Boolean);
+}
+
+function normalizeInventoryText(value){
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getInventoryItemKey(name, variant = ""){
+  return `${normalizeInventoryText(name)}::${normalizeInventoryText(variant)}`;
+}
+
+function normalizeStockNumber(value){
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
+}
+
+function getOrderRentalDays(order){
+  const rentalDays = Number(order?.rentalDays ?? order?.latestQuoteRentalDays ?? order?.quoteRentalDays ?? DEFAULT_RENTAL_DAYS);
+  return Number.isFinite(rentalDays) && rentalDays >= 1 ? Math.floor(rentalDays) : DEFAULT_RENTAL_DAYS;
+}
+
+function getRentalWindow(eventDate, rentalDays = DEFAULT_RENTAL_DAYS){
+  const start = parseEventDate(eventDate);
+
+  if(!start){
+    return null;
+  }
+
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + Math.max(1, Number(rentalDays) || DEFAULT_RENTAL_DAYS));
+
+  return { start, end };
+}
+
+function getTodayWindow(){
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
+function doDateRangesOverlap(firstWindow, secondWindow){
+  return Boolean(firstWindow && secondWindow && firstWindow.start < secondWindow.end && firstWindow.end > secondWindow.start);
+}
+
+function isOrderReservableForInventory(order, targetWindow = null){
+  if(!order || order.status === "cancelled"){
+    return false;
+  }
+
+  if(INVENTORY_RESERVATION_STATUSES.has(order.status)){
+    return true;
+  }
+
+  if(order.status === "delivered"){
+    const rentalWindow = getRentalWindow(order.eventDate, getOrderRentalDays(order));
+
+    if(targetWindow){
+      return doDateRangesOverlap(rentalWindow, targetWindow);
+    }
+
+    return Boolean(rentalWindow && rentalWindow.end > getTodayWindow().start);
+  }
+
+  return false;
+}
+
+function getInventoryItemUsableStock(item){
+  return Math.max(0, normalizeStockNumber(item?.totalStock) - normalizeStockNumber(item?.damagedStock));
+}
+
+function doesInventoryItemMatchOrderItem(inventoryItem, orderItem){
+  if(!inventoryItem || !orderItem || inventoryItem.isArchived === true || inventoryItem.active === false){
+    return false;
+  }
+
+  const orderProductId = orderItem.productId ?? orderItem.id ?? "";
+  if(orderProductId && inventoryItem.productId && String(inventoryItem.productId) === String(orderProductId)){
+    const inventoryVariant = normalizeInventoryText(inventoryItem.variant);
+    const orderVariant = normalizeInventoryText(orderItem.variant);
+    return !inventoryVariant || inventoryVariant === orderVariant;
+  }
+
+  const inventoryName = normalizeInventoryText(inventoryItem.name);
+  const orderName = normalizeInventoryText(orderItem.name);
+
+  if(!inventoryName || inventoryName !== orderName){
+    return false;
+  }
+
+  const inventoryCategory = normalizeInventoryText(inventoryItem.category);
+  const orderCategory = normalizeInventoryText(orderItem.category);
+
+  if(inventoryCategory && orderCategory && inventoryCategory !== orderCategory){
+    return false;
+  }
+
+  const inventoryVariant = normalizeInventoryText(inventoryItem.variant);
+  const orderVariant = normalizeInventoryText(orderItem.variant);
+
+  return !inventoryVariant || !orderVariant || inventoryVariant === orderVariant;
+}
+
+function findInventoryItemForOrderItem(orderItem){
+  return allInventoryItems.find((inventoryItem) => doesInventoryItemMatchOrderItem(inventoryItem, orderItem)) || null;
+}
+
+function getReservationsForInventoryItem(inventoryItem, options = {}){
+  const reservations = [];
+  const excludeOrderId = options.excludeOrderId || "";
+  const targetWindow = options.targetWindow || null;
+
+  allOrders.forEach((order) => {
+    if(excludeOrderId && order.id === excludeOrderId){
+      return;
+    }
+
+    if(!isOrderReservableForInventory(order, targetWindow)){
+      return;
+    }
+
+    const rentalWindow = getRentalWindow(order.eventDate, getOrderRentalDays(order));
+
+    if(!rentalWindow || (!targetWindow && rentalWindow.end <= getTodayWindow().start)){
+      return;
+    }
+
+    if(targetWindow && !doDateRangesOverlap(rentalWindow, targetWindow)){
+      return;
+    }
+
+    const quantity = (order.items || []).reduce((sum, orderItem) => {
+      if(!doesInventoryItemMatchOrderItem(inventoryItem, orderItem)){
+        return sum;
+      }
+
+      return sum + normalizeStockNumber(orderItem.quantity);
+    }, 0);
+
+    if(quantity > 0){
+      reservations.push({
+        order,
+        item: inventoryItem,
+        quantity,
+        start: rentalWindow.start,
+        end: rentalWindow.end
+      });
+    }
+  });
+
+  return reservations;
+}
+
+function getReservedQuantityForWindow(inventoryItem, rentalWindow, options = {}){
+  return getReservationsForInventoryItem(inventoryItem, {
+    ...options,
+    targetWindow: rentalWindow
+  }).reduce((sum, reservation) => sum + reservation.quantity, 0);
+}
+
+function getPeakReservedQuantity(inventoryItem, options = {}){
+  const reservations = getReservationsForInventoryItem(inventoryItem, options);
+
+  if(!reservations.length){
+    return 0;
+  }
+
+  const todayWindow = getTodayWindow();
+  const checkpoints = [
+    todayWindow.start.getTime(),
+    ...reservations.map((reservation) => reservation.start.getTime()),
+    ...reservations.map((reservation) => reservation.end.getTime() - 1)
+  ];
+
+  return checkpoints.reduce((peak, checkpointMs) => {
+    const quantity = reservations.reduce((sum, reservation) => {
+      return checkpointMs >= reservation.start.getTime() && checkpointMs < reservation.end.getTime()
+        ? sum + reservation.quantity
+        : sum;
+    }, 0);
+
+    return Math.max(peak, quantity);
+  }, 0);
+}
+
+function getInventoryComputedState(item){
+  const totalStock = normalizeStockNumber(item.totalStock);
+  const damagedStock = normalizeStockNumber(item.damagedStock);
+  const usableStock = Math.max(0, totalStock - damagedStock);
+  const reservedStock = getInventoryReservedQuantityForSelectedDate(item);
+  const rawAvailable = usableStock - reservedStock;
+  const lowStockThreshold = normalizeStockNumber(item.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD);
+  const isOverbooked = rawAvailable < 0;
+  const isLowStock = !isOverbooked && rawAvailable <= lowStockThreshold;
+
+  return {
+    totalStock,
+    damagedStock,
+    usableStock,
+    reservedStock,
+    availableStock: rawAvailable,
+    rawAvailable,
+    lowStockThreshold,
+    isOverbooked,
+    isLowStock
+  };
+}
+
+function getInventoryStatusCopy(item, state = getInventoryComputedState(item)){
+  if(item.isArchived === true || item.active === false){
+    return { label: "Archived", className: "is-muted" };
+  }
+
+  if(state.isOverbooked){
+    return { label: `Overbooked by ${Math.abs(state.rawAvailable)}`, className: "is-danger" };
+  }
+
+  if(state.isLowStock){
+    return { label: "Low stock", className: "is-warning" };
+  }
+
+  return { label: "Healthy", className: "is-success" };
+}
+
+function getFilteredInventoryItems(){
+  const search = normalizeInventoryText(inventorySearchInput?.value || "");
+  const source = inventorySourceFilter?.value || "all";
+  const status = inventoryStatusFilter?.value || "all";
+
+  return allInventoryItems
+    .filter((item) => {
+      if(search){
+        const haystack = normalizeInventoryText([item.name, item.variant, item.category, item.productId].filter(Boolean).join(" "));
+        if(!haystack.includes(search)){
+          return false;
+        }
+      }
+
+      if(source !== "all" && (item.sourceType || "custom") !== source){
+        return false;
+      }
+
+      if(status !== "all"){
+        const state = getInventoryComputedState(item);
+        if(status === "low" && !state.isLowStock){
+          return false;
+        }
+        if(status === "overbooked" && !state.isOverbooked){
+          return false;
+        }
+        if(status === "damaged" && state.damagedStock <= 0){
+          return false;
+        }
+        if(status === "archived" && !(item.isArchived === true || item.active === false)){
+          return false;
+        }
+        if(status === "healthy" && (state.isLowStock || state.isOverbooked || item.isArchived === true || item.active === false)){
+          return false;
+        }
+      }
+
+      return true;
+    })
+    .sort((first, second) => {
+      const direction = currentInventorySort.direction === "desc" ? -1 : 1;
+      const getValue = (item) => {
+        const state = getInventoryComputedState(item);
+        const values = {
+          name: item.name || "",
+          category: item.category || "",
+          sourceType: item.sourceType || "",
+          totalStock: state.totalStock,
+          availableStock: state.availableStock,
+          reservedStock: state.reservedStock,
+          damagedStock: state.damagedStock,
+          lowStockThreshold: state.lowStockThreshold
+        };
+        return values[currentInventorySort.key] ?? "";
+      };
+      const firstValue = getValue(first);
+      const secondValue = getValue(second);
+
+      if(typeof firstValue === "number" || typeof secondValue === "number"){
+        return (Number(firstValue) - Number(secondValue)) * direction;
+      }
+
+      return String(firstValue).localeCompare(String(secondValue)) * direction;
+    });
+}
+
+function renderInventoryDashboard(){
+  renderInventorySummary();
+  renderInventoryTable();
+  renderUpcomingReservations();
+}
+
+function renderInventorySummary(){
+  const activeItems = allInventoryItems.filter((item) => item.isArchived !== true && item.active !== false);
+  const states = activeItems.map((item) => getInventoryComputedState(item));
+
+  if(inventoryTotalSkus){
+    inventoryTotalSkus.textContent = String(activeItems.length);
+  }
+
+  if(inventoryAvailableUnits){
+    inventoryAvailableUnits.textContent = String(states.reduce((sum, state) => sum + state.availableStock, 0));
+  }
+
+  if(inventoryReservedUnits){
+    inventoryReservedUnits.textContent = String(states.reduce((sum, state) => sum + state.reservedStock, 0));
+  }
+
+  if(inventoryDamagedUnits){
+    inventoryDamagedUnits.textContent = String(states.reduce((sum, state) => sum + state.damagedStock, 0));
+  }
+
+  if(inventoryLowStockItems){
+    inventoryLowStockItems.textContent = String(states.filter((state) => state.isLowStock || state.isOverbooked).length);
+  }
+}
+
+function renderInventoryTable(){
+  if(!inventoryTableBody){
+    return;
+  }
+
+  const items = getFilteredInventoryItems();
+
+  if(!items.length){
+    inventoryTableBody.innerHTML = `
+      <tr>
+        <td colspan="11" class="inventory-empty-cell">No inventory items found.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  inventoryTableBody.innerHTML = items.map((item) => {
+    const state = getInventoryComputedState(item);
+    const status = getInventoryStatusCopy(item, state);
+
+    return `
+      <tr>
+        <td>
+          <strong>${escapeHtml(item.name || "Unnamed item")}</strong>
+          ${item.productId ? `<span class="inventory-subtext">Product ID: ${escapeHtml(item.productId)}</span>` : ""}
+        </td>
+        <td>${escapeHtml(item.variant || "-")}</td>
+        <td>${escapeHtml(item.category || "Uncategorized")}</td>
+        <td><span class="inventory-source-pill">${escapeHtml(item.sourceType || "custom")}</span></td>
+        <td>${state.totalStock}</td>
+        <td>${state.availableStock}</td>
+        <td>${state.reservedStock}</td>
+        <td>${state.damagedStock}</td>
+        <td>${state.lowStockThreshold}</td>
+        <td><span class="inventory-status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
+        <td>
+          <div class="inventory-row-actions">
+            <button class="btn btn-secondary btn-small inventory-edit-btn" type="button" data-id="${escapeAttribute(item.id)}">Edit</button>
+            <button class="btn btn-dark btn-small inventory-delete-btn" type="button" data-id="${escapeAttribute(item.id)}">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  attachInventoryTableEvents();
+}
+
+function attachInventoryTableEvents(){
+  document.querySelectorAll(".inventory-edit-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === button.dataset.id);
+      if(item){
+        openInventoryModal(item);
+      }
+    });
+  });
+
+  document.querySelectorAll(".inventory-delete-btn").forEach((button) => {
+    button.addEventListener("click", () => handleDeleteInventoryItem(button.dataset.id));
+  });
+}
+
+function getUpcomingReservationsForDate(dateString){
+  const windowForDate = getRentalWindow(dateString, 1) || getTodayWindow();
+  const rows = [];
+
+  allOrders.forEach((order) => {
+    if(!isOrderReservableForInventory(order, windowForDate)){
+      return;
+    }
+
+    const orderWindow = getRentalWindow(order.eventDate, getOrderRentalDays(order));
+
+    if(!doDateRangesOverlap(orderWindow, windowForDate)){
+      return;
+    }
+
+    (order.items || []).forEach((orderItem) => {
+      const quantity = normalizeStockNumber(orderItem.quantity);
+
+      if(quantity <= 0){
+        return;
+      }
+
+      const inventoryItem = findInventoryItemForOrderItem(orderItem);
+
+      rows.push({
+        order,
+        inventoryItem,
+        orderItem,
+        quantity,
+        start: orderWindow.start,
+        end: orderWindow.end
+      });
+    });
+  });
+
+  return rows.sort((first, second) => {
+    const dateCompare = String(first.order.eventDate || "").localeCompare(String(second.order.eventDate || ""));
+    return dateCompare || String(first.order.orderId || "").localeCompare(String(second.order.orderId || ""));
+  });
+}
+
+function getInventoryReservedQuantityForSelectedDate(inventoryItem){
+  const selectedDate = reservationDateFilter?.value || formatLocalDate(new Date());
+  const selectedWindow = getRentalWindow(selectedDate, 1);
+
+  if(!selectedWindow){
+    return getPeakReservedQuantity(inventoryItem);
+  }
+
+  return getReservedQuantityForWindow(inventoryItem, selectedWindow);
+}
+
+function renderUpcomingReservations(){
+  if(!upcomingReservationsBody){
+    return;
+  }
+
+  if(reservationDateFilter && !reservationDateFilter.value){
+    reservationDateFilter.value = formatLocalDate(new Date());
+  }
+
+  const selectedDate = reservationDateFilter?.value || formatLocalDate(new Date());
+  const rows = getUpcomingReservationsForDate(selectedDate);
+
+  if(inventoryReservationsSummary){
+    const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0);
+    inventoryReservationsSummary.textContent = rows.length
+      ? `${rows.length} reservation line${rows.length === 1 ? "" : "s"} and ${totalQuantity} unit${totalQuantity === 1 ? "" : "s"} reserved for ${selectedDate}.`
+      : `No active reservations found for ${selectedDate}.`;
+  }
+
+  if(!rows.length){
+    upcomingReservationsBody.innerHTML = `
+      <tr>
+        <td colspan="6" class="inventory-empty-cell">No reservations for this date.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  upcomingReservationsBody.innerHTML = rows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.order.eventDate || "-")}</td>
+      <td>${escapeHtml(row.order.orderId || row.order.id || "-")}</td>
+      <td>${escapeHtml(row.order.customerName || "Unknown customer")}</td>
+      <td>${escapeHtml(row.inventoryItem?.name || row.orderItem.name || "Unlinked item")}</td>
+      <td>${row.quantity}</td>
+      <td>${escapeHtml(formatStatusLabel(row.order.status))}</td>
+    </tr>
+  `).join("");
+}
+
+function openInventoryModal(item = null){
+  currentInventoryItemId = item?.id || null;
+
+  if(inventoryModalTitle){
+    inventoryModalTitle.textContent = item ? "Edit Inventory Item" : "Add Inventory Item";
+  }
+
+  if(inventoryModalSubtitle){
+    inventoryModalSubtitle.textContent = item
+      ? "Update stock, damaged units, and catalog linking."
+      : "Create a catalog-linked or internal inventory row.";
+  }
+
+  if(inventoryProductSelect){
+    inventoryProductSelect.innerHTML = getInventoryProductOptionsMarkup(item?.productId || "");
+  }
+
+  if(inventoryForm){
+    inventoryForm.name.value = item?.name || "";
+    inventoryForm.category.value = item?.category || "";
+    inventoryForm.variant.value = item?.variant || "";
+    inventoryForm.productId.value = item?.productId || "";
+    inventoryForm.sourceType.value = item?.sourceType || (item?.productId ? "catalog" : "custom");
+    inventoryForm.totalStock.value = String(normalizeStockNumber(item?.totalStock));
+    inventoryForm.damagedStock.value = String(normalizeStockNumber(item?.damagedStock));
+    inventoryForm.lowStockThreshold.value = String(normalizeStockNumber(item?.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD));
+    inventoryForm.isArchived.checked = item?.isArchived === true || item?.active === false;
+  }
+
+  if(deleteInventoryBtn){
+    deleteInventoryBtn.hidden = !item;
+  }
+
+  if(inventoryDamagedAdjustInput){
+    inventoryDamagedAdjustInput.value = "1";
+  }
+
+  syncInventoryModalState(false);
+  inventoryModal?.classList.add("active");
+  document.body.style.overflow = "hidden";
+}
+
+function closeInventoryModal(){
+  inventoryModal?.classList.remove("active");
+  currentInventoryItemId = null;
+  inventoryForm?.reset();
+  syncInventoryModalState(false);
+  document.body.style.overflow = "auto";
+}
+
+function syncInventoryModalState(isSaving){
+  isSavingInventory = isSaving;
+
+  if(saveInventoryBtn){
+    saveInventoryBtn.disabled = isSaving;
+    saveInventoryBtn.textContent = isSaving ? "Saving..." : "Save Inventory Item";
+  }
+
+  if(deleteInventoryBtn){
+    deleteInventoryBtn.disabled = isSaving;
+  }
+
+  if(closeInventoryModalBtn){
+    closeInventoryModalBtn.disabled = isSaving;
+  }
+
+  if(cancelInventoryBtn){
+    cancelInventoryBtn.disabled = isSaving;
+  }
+}
+
+function getInventoryPayloadFromForm(){
+  if(!inventoryForm){
+    return null;
+  }
+
+  const name = inventoryForm.name.value.trim();
+  const category = inventoryForm.category.value.trim() || "Custom";
+  const productId = inventoryForm.productId.value || "";
+  const sourceType = inventoryForm.sourceType.value === "catalog" ? "catalog" : "custom";
+
+  if(!name){
+    inventoryForm.name.focus();
+    showToast("Inventory name is required", "warning");
+    return null;
+  }
+
+  return {
+    name,
+    category,
+    variant: inventoryForm.variant.value.trim(),
+    productId,
+    sourceType: productId ? "catalog" : sourceType,
+    totalStock: normalizeStockNumber(inventoryForm.totalStock.value),
+    damagedStock: normalizeStockNumber(inventoryForm.damagedStock.value),
+    lowStockThreshold: normalizeStockNumber(inventoryForm.lowStockThreshold.value || DEFAULT_LOW_STOCK_THRESHOLD),
+    isArchived: Boolean(inventoryForm.isArchived.checked)
+  };
+}
+
+async function handleInventoryFormSubmit(event){
+  event.preventDefault();
+
+  if(isSavingInventory){
+    return;
+  }
+
+  const payload = getInventoryPayloadFromForm();
+
+  if(!payload){
+    return;
+  }
+
+  syncInventoryModalState(true);
+
+  try{
+    if(currentInventoryItemId){
+      await updateDoc(doc(db, "inventory", currentInventoryItemId), {
+        ...payload,
+        active: !payload.isArchived,
+        updatedAt: serverTimestamp()
+      });
+    }else{
+      const inventoryRef = doc(collection(db, "inventory"));
+      await setDoc(inventoryRef, {
+        id: inventoryRef.id,
+        ...payload,
+        active: !payload.isArchived,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    closeInventoryModal();
+    showToast("Inventory item saved");
+  }catch(error){
+    console.error("Failed to save inventory item:", error);
+    showToast("Could not save inventory item", "error");
+    syncInventoryModalState(false);
+  }
+}
+
+async function handleDeleteInventoryItem(itemId = currentInventoryItemId){
+  const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === itemId);
+
+  if(!item){
+    return;
+  }
+
+  const activeReservations = getReservationsForInventoryItem(item);
+
+  if(activeReservations.length > 0){
+    showToast("Cannot delete inventory with active or future reservations", "warning");
+    return;
+  }
+
+  const shouldDelete = window.confirm(`Delete inventory item "${item.name}"? This cannot be undone.`);
+
+  if(!shouldDelete){
+    return;
+  }
+
+  try{
+    await deleteDoc(doc(db, "inventory", item.id));
+    closeInventoryModal();
+    showToast("Inventory item deleted");
+  }catch(error){
+    console.error("Failed to delete inventory item:", error);
+    showToast("Could not delete inventory item", "error");
+  }
+}
+
+async function adjustInventoryDamage(direction){
+  if(!currentInventoryItemId || !inventoryForm || isSavingInventory){
+    return;
+  }
+
+  const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === currentInventoryItemId);
+  const adjustment = normalizeStockNumber(inventoryDamagedAdjustInput?.value || 0);
+
+  if(!item || adjustment <= 0){
+    showToast("Enter a damaged quantity to adjust", "warning");
+    return;
+  }
+
+  const currentDamaged = normalizeStockNumber(item.damagedStock);
+  const totalStock = normalizeStockNumber(item.totalStock);
+  const nextDamaged = direction === "restore"
+    ? Math.max(0, currentDamaged - adjustment)
+    : Math.min(totalStock, currentDamaged + adjustment);
+
+  try{
+    await updateDoc(doc(db, "inventory", currentInventoryItemId), {
+      damagedStock: nextDamaged,
+      updatedAt: serverTimestamp()
+    });
+    inventoryForm.damagedStock.value = String(nextDamaged);
+    showToast(direction === "restore" ? "Damaged stock restored" : "Damaged stock updated");
+  }catch(error){
+    console.error("Failed to adjust damaged stock:", error);
+    showToast("Could not adjust damaged stock", "error");
+  }
+}
+
+async function ensureInventoryItemsForOrderItems(items){
+  const createdItems = [];
+
+  for(const item of items){
+    if(findInventoryItemForOrderItem(item)){
+      continue;
+    }
+
+    const catalogProduct = item.productId ? getSelectedProduct(item.productId) : getCatalogProductByName(item.name);
+    const inventoryRef = catalogProduct
+      ? doc(db, "inventory", getCatalogInventoryDocId(catalogProduct))
+      : doc(collection(db, "inventory"));
+    const sourceType = catalogProduct ? "catalog" : "custom";
+    const inventorySnapshot = await getDoc(inventoryRef);
+
+    if(inventorySnapshot.exists()){
+      const existingInventoryItem = {
+        id: inventorySnapshot.id,
+        ...inventorySnapshot.data()
+      };
+
+      if(!allInventoryItems.some((inventoryItem) => inventoryItem.id === existingInventoryItem.id)){
+        allInventoryItems.push(existingInventoryItem);
+      }
+
+      continue;
+    }
+
+    const payload = {
+      id: inventoryRef.id,
+      name: item.name || catalogProduct?.name || "Custom item",
+      category: item.category || catalogProduct?.category || "Custom",
+      variant: item.variant || "",
+      productId: catalogProduct?.id || item.productId || "",
+      sourceType,
+      totalStock: Math.max(1, normalizeStockNumber(item.quantity)),
+      damagedStock: 0,
+      lowStockThreshold: DEFAULT_LOW_STOCK_THRESHOLD,
+      isArchived: false,
+      active: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    await setDoc(inventoryRef, payload);
+    allInventoryItems.push({
+      ...payload,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    createdItems.push(payload);
+  }
+
+  return createdItems;
+}
+
+async function syncMissingInventoryForReservableOrderItems(){
+  if(!hasLoadedInventorySnapshot || !allOrders.length){
+    return;
+  }
+
+  const itemsToSync = allOrders
+    .filter((order) => isOrderReservableForInventory(order))
+    .flatMap((order) => order.items || [])
+    .filter((item) => item?.name && normalizeStockNumber(item.quantity) > 0);
+
+  if(itemsToSync.length){
+    await ensureInventoryItemsForOrderItems(itemsToSync);
+  }
+}
+
+function getOrderInventoryWarnings(orderDraft){
+  if(!orderDraft?.items?.length || !orderDraft.eventDate || !isOrderReservableForInventory(orderDraft)){
+    return [];
+  }
+
+  const rentalWindow = getRentalWindow(orderDraft.eventDate, getOrderRentalDays(orderDraft));
+
+  if(!rentalWindow){
+    return [];
+  }
+
+  return orderDraft.items.flatMap((orderItem) => {
+    const inventoryItem = findInventoryItemForOrderItem(orderItem);
+    const quantity = normalizeStockNumber(orderItem.quantity);
+
+    if(!inventoryItem){
+      return [`${orderItem.name} is not in inventory yet. An inventory row will be created when saved.`];
+    }
+
+    const existingReserved = getReservedQuantityForWindow(inventoryItem, rentalWindow, {
+      excludeOrderId: orderDraft.id
+    });
+    const usableStock = getInventoryItemUsableStock(inventoryItem);
+    const availableBefore = usableStock - existingReserved;
+    const availableAfter = availableBefore - quantity;
+    const lowStockThreshold = normalizeStockNumber(inventoryItem.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD);
+    const warnings = [];
+
+    if(availableAfter < 0){
+      warnings.push(`${inventoryItem.name} may be overbooked by ${Math.abs(availableAfter)} unit${Math.abs(availableAfter) === 1 ? "" : "s"} for this rental period.`);
+    }else if(availableAfter <= lowStockThreshold){
+      warnings.push(`${inventoryItem.name} will be low after this order: ${Math.max(0, availableAfter)} unit${availableAfter === 1 ? "" : "s"} remaining.`);
+    }
+
+    return warnings;
+  });
+}
+
+function renderInventoryWarnings(container, warnings){
+  if(!container){
+    return;
+  }
+
+  if(!warnings.length){
+    container.innerHTML = "";
+    container.hidden = true;
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = `
+    <strong>Inventory warning</strong>
+    <ul>
+      ${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function getCreateOrderInventoryDraft(){
+  if(!createOrderForm){
+    return null;
+  }
+
+  return {
+    id: "",
+    status: createOrderForm.status.value || "confirmed",
+    eventDate: createOrderForm.eventDate.value,
+    rentalDays: normalizeStockNumber(createOrderForm.rentalDays?.value || DEFAULT_RENTAL_DAYS) || DEFAULT_RENTAL_DAYS,
+    items: getCreateItemsFromUI()
+  };
+}
+
+function getEditOrderInventoryDraft(){
+  if(!currentEditingOrder || !editOrderForm){
+    return null;
+  }
+
+  return {
+    ...currentEditingOrder,
+    eventDate: editOrderForm.eventDate.value,
+    rentalDays: normalizeStockNumber(editOrderForm.rentalDays?.value || currentEditingOrder.rentalDays || DEFAULT_RENTAL_DAYS) || DEFAULT_RENTAL_DAYS,
+    items: getUpdatedItemsFromUI()
+  };
+}
+
+function updateOrderInventoryWarnings(scope){
+  if(scope === "create"){
+    renderInventoryWarnings(createInventoryWarnings, getOrderInventoryWarnings(getCreateOrderInventoryDraft()));
+  }else if(scope === "edit"){
+    renderInventoryWarnings(editInventoryWarnings, getOrderInventoryWarnings(getEditOrderInventoryDraft()));
+  }
+}
+
+function confirmInventoryWarningsIfNeeded(orderDraft){
+  const warnings = getOrderInventoryWarnings(orderDraft);
+
+  if(!warnings.length){
+    return true;
+  }
+
+  return window.confirm(`${warnings.join("\n")}\n\nContinue anyway?`);
 }
 
 function convertTimeToInputValue(timeString){
@@ -2263,6 +3526,20 @@ function syncCurrentEditingOrder(){
   currentEditingOrder = nextOrder;
 }
 
+function resolveEditedDestinationLocation(order, nextEventLocation, nextMapLink){
+  const normalizedPreviousLocation = String(order?.eventLocation || "").trim();
+  const normalizedPreviousMapLink = normalizeGoogleMapsLink(order?.mapLink || "");
+  const locationFieldsChanged =
+    normalizedPreviousLocation !== nextEventLocation ||
+    normalizedPreviousMapLink !== nextMapLink;
+
+  if(locationFieldsChanged){
+    return editLocationBinding?.getDestinationLocation() || null;
+  }
+
+  return editLocationBinding?.getDestinationLocation(order?.destinationLocation) || null;
+}
+
 function setEditSaveState(isSaving){
   isSavingEditOrder = isSaving;
   syncEditModalActionState();
@@ -2342,17 +3619,46 @@ async function handleEditOrderSubmit(event){
     customerName: editOrderForm.customerName.value.trim(),
     phone: editOrderForm.phone.value.trim(),
     eventDate: editOrderForm.eventDate.value,
+    rentalDays: normalizeStockNumber(editOrderForm.rentalDays?.value || DEFAULT_RENTAL_DAYS) || DEFAULT_RENTAL_DAYS,
     eventTime: formatTimeTo12Hour(editOrderForm.eventTime.value),
     setupTime: formatTimeTo12Hour(editOrderForm.setupTime.value),
     eventLocation: editOrderForm.eventLocation.value.trim(),
-    mapLink: editOrderForm.mapLink.value.trim(),
+    mapLink: normalizeGoogleMapsLink(editOrderForm.mapLink.value.trim()),
     items
   };
+  updatedData.destinationLocation = resolveEditedDestinationLocation(
+    currentEditingOrder,
+    updatedData.eventLocation,
+    updatedData.mapLink
+  );
+
+  if(!confirmInventoryWarningsIfNeeded({
+    ...currentEditingOrder,
+    ...updatedData,
+    id: currentEditingOrder.id
+  })){
+    updateOrderInventoryWarnings("edit");
+    return;
+  }
 
   setEditSaveState(true);
 
   try{
+    await ensureInventoryItemsForOrderItems(items);
     await updateDoc(doc(db, "orders", currentEditingOrder.id), updatedData);
+    upsertOrderInAdminState({
+      ...currentEditingOrder,
+      ...updatedData
+    });
+    syncCurrentEditingOrder();
+    syncCurrentQuoteOrder();
+    renderOpsPanel();
+    renderDriverPanel();
+    renderInventoryDashboard();
+    applyFilters();
+    updateStats(allOrders);
+    generateAnalytics();
+    renderCalendar();
     closeEditOrderModal();
     showToast("Order updated successfully");
   }catch(error){
@@ -2374,12 +3680,14 @@ async function handleCreateOrderSubmit(event){
   const phone = createOrderForm.phone.value.trim();
   const eventDate = createOrderForm.eventDate.value;
   const eventLocation = createOrderForm.eventLocation.value.trim();
+  const rentalDays = normalizeStockNumber(createOrderForm.rentalDays?.value || DEFAULT_RENTAL_DAYS) || DEFAULT_RENTAL_DAYS;
   const eventTime = formatTimeTo12Hour(createOrderForm.eventTime.value);
   const setupTime = formatTimeTo12Hour(createOrderForm.setupTime.value);
   const priority = getPriorityValue(createOrderForm.priority.value);
   const status = createOrderForm.status.value || "confirmed";
   const mapLink = normalizeGoogleMapsLink(createOrderForm.mapLink.value.trim());
   const notes = createOrderForm.notes.value.trim();
+  const destinationLocation = createLocationBinding?.getDestinationLocation() || null;
   const items = getCreateItemsFromUI();
 
   if(!customerName){
@@ -2412,19 +3720,33 @@ async function handleCreateOrderSubmit(event){
     return;
   }
 
+  if(!confirmInventoryWarningsIfNeeded({
+    id: "",
+    status,
+    eventDate,
+    rentalDays,
+    items
+  })){
+    updateOrderInventoryWarnings("create");
+    return;
+  }
+
   setCreateSubmitState(true);
 
   try{
+    await ensureInventoryItemsForOrderItems(items);
     const orderId = await generateOrderId();
     const orderPayload = {
       orderId,
       customerName,
       phone,
       eventDate,
+      rentalDays,
       eventTime,
       setupTime,
       eventLocation,
       mapLink: mapLink || "",
+      ...(destinationLocation ? { destinationLocation } : {}),
       notes: notes || "",
       items,
       priority,
@@ -2870,8 +4192,8 @@ function getFilteredOrders(){
 
   if(activeOpsFilter === "today"){
     filtered = filtered.filter(o => isToday(o.eventDate));
-  }else if(activeOpsFilter === "upcoming"){
-    filtered = filtered.filter(o => isWithinNextHours(o.eventDate, o.eventTime));
+  }else if(activeOpsFilter === "week"){
+    filtered = filtered.filter(o => isInCurrentWeek(o.eventDate));
   }else if(activeOpsFilter === "tomorrow"){
     filtered = filtered.filter(o => isTomorrow(o.eventDate));
   }
@@ -2923,10 +4245,56 @@ function updateStats(orders){
     `${delivered} delivered orders`;
 }
 
+function syncAdminSummaryCardState(){
+  const currentStatusFilter = document.getElementById("statusFilter")?.value || "all";
+
+  document.querySelectorAll(".admin-summary-card").forEach((card) => {
+    const isActive = card.dataset.statusFilter === currentStatusFilter;
+    card.classList.toggle("is-active", isActive);
+    card.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function attachAdminSummaryCardEvents(){
+  document.querySelectorAll(".admin-summary-card").forEach((card) => {
+    if(card.dataset.bound === "true"){
+      return;
+    }
+
+    const handleActivate = () => {
+      const statusFilterElement = document.getElementById("statusFilter");
+
+      if(!statusFilterElement){
+        return;
+      }
+
+      const nextValue = statusFilterElement.value === card.dataset.statusFilter
+        ? "all"
+        : card.dataset.statusFilter;
+
+      statusFilterElement.value = nextValue;
+      syncAdminSummaryCardState();
+      applyFilters(true);
+    };
+
+    card.dataset.bound = "true";
+    card.addEventListener("click", handleActivate);
+    card.addEventListener("keydown", (event) => {
+      if(event.key === "Enter" || event.key === " "){
+        event.preventDefault();
+        handleActivate();
+      }
+    });
+  });
+
+  syncAdminSummaryCardState();
+}
+
 /* INIT */
 
 document.addEventListener("DOMContentLoaded", async ()=>{
   initMobileMenu();
+  initAdminLocationBindings();
   document.getElementById("closeModalBtn").addEventListener("click", closeOrderModal);
   closeEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
   cancelEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
@@ -2934,6 +4302,13 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   closeCreateOrderBtn?.addEventListener("click", () => closeCreateOrderModal());
   cancelCreateOrderBtn?.addEventListener("click", () => closeCreateOrderModal());
   closeQuoteModalBtn?.addEventListener("click", () => closeQuoteModal());
+  addInventoryItemBtn?.addEventListener("click", () => openInventoryModal());
+  closeInventoryModalBtn?.addEventListener("click", () => closeInventoryModal());
+  cancelInventoryBtn?.addEventListener("click", () => closeInventoryModal());
+  inventoryForm?.addEventListener("submit", handleInventoryFormSubmit);
+  deleteInventoryBtn?.addEventListener("click", () => handleDeleteInventoryItem());
+  inventoryMarkDamagedBtn?.addEventListener("click", () => adjustInventoryDamage("damage"));
+  inventoryRestoreDamagedBtn?.addEventListener("click", () => adjustInventoryDamage("restore"));
   document.getElementById("addEditItemBtn")?.addEventListener("click", addEditableItem);
   document.getElementById("addCreateItemBtn")?.addEventListener("click", addCreateItem);
   editOrderForm?.addEventListener("submit", handleEditOrderSubmit);
@@ -2941,9 +4316,18 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   editDeleteBtn?.addEventListener("click", handleDeleteOrder);
   generateQuoteBtn?.addEventListener("click", handleGenerateQuote);
   sendQuoteWhatsappBtn?.addEventListener("click", () => openQuoteWhatsApp());
-  resetQuoteDraftBtn?.addEventListener("click", () => {
+  resetQuoteDraftBtn?.addEventListener("click", async () => {
     if(currentQuoteOrder){
-      loadOrderDraftIntoQuoteForm(currentQuoteOrder);
+      const latestOrder = await getLatestOrderData(currentQuoteOrder);
+
+      if(!latestOrder){
+        setQuoteBuilderStatus("Could not reload the latest order items.", "warning");
+        showToast("Could not reload the latest order", "error");
+        return;
+      }
+
+      currentQuoteOrder = latestOrder;
+      loadOrderDraftIntoQuoteForm(latestOrder);
       renderQuoteHistory();
       setQuoteBuilderStatus("Draft reset to the latest order items.", "warning");
     }
@@ -2954,12 +4338,54 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   prevMonthBtn?.addEventListener("click", ()=> changeMonth(-1));
   nextMonthBtn?.addEventListener("click", ()=> changeMonth(1));
   subscribeToDrivers();
+  subscribeToInventory();
   subscribeToOrders();
+  startInventoryClockRefresh();
+  attachAdminSummaryCardEvents();
 
   document.getElementById("searchInput").addEventListener("input", () => applyFilters(true));
-  document.getElementById("statusFilter").addEventListener("change", () => applyFilters(true));
+  document.getElementById("statusFilter").addEventListener("change", () => {
+    syncAdminSummaryCardState();
+    applyFilters(true);
+  });
   document.getElementById("priorityFilter").addEventListener("change", () => applyFilters(true));
   driverFilter?.addEventListener("change", () => applyFilters(true));
+  inventorySearchInput?.addEventListener("input", renderInventoryTable);
+  inventorySourceFilter?.addEventListener("change", renderInventoryTable);
+  inventoryStatusFilter?.addEventListener("change", renderInventoryTable);
+  reservationDateFilter?.addEventListener("change", renderInventoryDashboard);
+  document.querySelectorAll(".inventory-sort-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.sortKey || "name";
+      currentInventorySort = {
+        key,
+        direction: currentInventorySort.key === key && currentInventorySort.direction === "asc" ? "desc" : "asc"
+      };
+      renderInventoryTable();
+    });
+  });
+  inventoryProductSelect?.addEventListener("change", () => {
+    const product = getSelectedProduct(inventoryProductSelect.value);
+
+    if(product && inventoryForm){
+      inventoryForm.name.value = product.name || inventoryForm.name.value;
+      inventoryForm.category.value = product.category || inventoryForm.category.value;
+      inventoryForm.sourceType.value = "catalog";
+    }
+  });
+  inventorySourceTypeSelect?.addEventListener("change", () => {
+    if(inventoryForm && inventorySourceTypeSelect.value === "custom"){
+      inventoryForm.productId.value = "";
+    }
+  });
+  [createOrderForm?.eventDate, createOrderForm?.rentalDays, createOrderForm?.status].forEach((field) => {
+    field?.addEventListener("input", () => updateOrderInventoryWarnings("create"));
+    field?.addEventListener("change", () => updateOrderInventoryWarnings("create"));
+  });
+  [editOrderForm?.eventDate, editOrderForm?.rentalDays].forEach((field) => {
+    field?.addEventListener("input", () => updateOrderInventoryWarnings("edit"));
+    field?.addEventListener("change", () => updateOrderInventoryWarnings("edit"));
+  });
   editOrderModal?.addEventListener("click", (event) => {
     if(event.target === editOrderModal){
       closeEditOrderModal();
@@ -2973,6 +4399,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   quoteModal?.addEventListener("click", (event) => {
     if(event.target === quoteModal){
       closeQuoteModal();
+    }
+  });
+  inventoryModal?.addEventListener("click", (event) => {
+    if(event.target === inventoryModal){
+      closeInventoryModal();
     }
   });
   quoteLanguageSelect?.addEventListener("change", () => {
@@ -3030,12 +4461,18 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       return;
     }
 
+    if(event.target.classList.contains("quote-item-name")){
+      autoResizeQuoteItemName(event.target);
+    }
+
     updateQuoteTotals();
     markQuoteDraftDirty();
   });
   quoteHistoryList?.addEventListener("click", handleQuoteHistoryAction);
   renderCreateItems();
   populateQuoteBankPresetOptions();
+  wrapInputWithCurrency(quoteDeliveryChargeInput);
+  wrapInputWithCurrency(quoteDiscountInput);
   syncQuoteModalActionState();
 });
 
