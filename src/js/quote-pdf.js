@@ -45,6 +45,73 @@ function formatMoney(value){
   });
 }
 
+function formatPercentage(value){
+  const percentage = Number(value) || 0;
+  return `${percentage.toLocaleString("en-US", {
+    minimumFractionDigits: percentage % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2
+  })}%`;
+}
+
+function roundCurrency(value){
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function clampDiscountPercentage(value){
+  const percentage = Number(value);
+
+  if(!Number.isFinite(percentage)){
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, percentage));
+}
+
+function resolveQuoteDiscountValues(source = {}){
+  const itemsTotal = Number(source.itemsTotal) || 0;
+  const deliveryCharge = Number(source.deliveryCharge) || 0;
+  const fallbackPreDiscountSubtotal = Math.max(0, itemsTotal + deliveryCharge);
+  const preDiscountSubtotal = Math.max(
+    0,
+    Number(source.preDiscountSubtotal) || fallbackPreDiscountSubtotal
+  );
+  const explicitDiscountPercentage = Number(source.discountPercentage);
+
+  if(Number.isFinite(explicitDiscountPercentage)){
+    const discountPercentage = clampDiscountPercentage(explicitDiscountPercentage);
+    return {
+      preDiscountSubtotal,
+      discountPercentage,
+      discountAmount: roundCurrency(preDiscountSubtotal * (discountPercentage / 100))
+    };
+  }
+
+  if(source.discountType === "percentage"){
+    const discountPercentage = clampDiscountPercentage(source.discount);
+    return {
+      preDiscountSubtotal,
+      discountPercentage,
+      discountAmount: roundCurrency(preDiscountSubtotal * (discountPercentage / 100))
+    };
+  }
+
+  const explicitDiscountAmount = Number(source.discountAmount);
+  const legacyDiscountAmount = Number(source.discount);
+  const resolvedDiscountAmount = Number.isFinite(explicitDiscountAmount)
+    ? explicitDiscountAmount
+    : legacyDiscountAmount;
+  const discountAmount = Math.max(0, Math.min(preDiscountSubtotal, roundCurrency(resolvedDiscountAmount)));
+  const discountPercentage = preDiscountSubtotal > 0
+    ? roundCurrency((discountAmount / preDiscountSubtotal) * 100)
+    : 0;
+
+  return {
+    preDiscountSubtotal,
+    discountPercentage,
+    discountAmount
+  };
+}
+
 function formatDate(value, language = "en"){
   if(!value){
     return "";
@@ -160,10 +227,12 @@ function buildEventRows(quote, labels, language){
 }
 
 function buildTotalsRows(quote, labels){
+  const discountState = resolveQuoteDiscountValues(quote);
+
   return [
     { label: labels.itemsTotal, value: `${formatMoney(quote.itemsTotal)} ${QUOTE_CURRENCY}` },
     { label: labels.deliveryCharge, value: `${formatMoney(quote.deliveryCharge)} ${QUOTE_CURRENCY}` },
-    { label: labels.discount, value: `${formatMoney(quote.discount)} ${QUOTE_CURRENCY}` },
+    { label: `${labels.discount} (${formatPercentage(discountState.discountPercentage)})`, value: `- ${formatMoney(discountState.discountAmount)} ${QUOTE_CURRENCY}` },
     { label: labels.subtotal, value: `${formatMoney(quote.subtotal)} ${QUOTE_CURRENCY}` },
     { label: `${labels.vat} (${Math.round(VAT_RATE * 100)}%)`, value: `${formatMoney(quote.vatAmount)} ${QUOTE_CURRENCY}` },
     { label: labels.grandTotal, value: `${formatMoney(quote.grandTotal)} ${QUOTE_CURRENCY}`, isGrand: true }
@@ -173,6 +242,7 @@ function buildTotalsRows(quote, labels){
 function buildPreparedQuote(quote){
   const language = quote.language === "ar" ? "ar" : "en";
   const labels = getQuoteLabels(language);
+  const discountState = resolveQuoteDiscountValues(quote);
   const items = (quote.items || []).map((item, index) => ({
     index: index + 1,
     name: toDisplayText(item.name),
@@ -185,6 +255,9 @@ function buildPreparedQuote(quote){
     ...quote,
     language,
     direction: getDirection(language),
+    discountPercentage: discountState.discountPercentage,
+    discountAmount: discountState.discountAmount,
+    preDiscountSubtotal: discountState.preDiscountSubtotal,
     labels,
     items,
     metaRows: buildMetaRows(quote, labels, language),
@@ -1241,7 +1314,7 @@ export function buildQuotePdfFileName(orderId, version, language = "en"){
   return `${safeOrderId}-quotation-v${version}-${language}.pdf`;
 }
 
-export function calculateQuoteTotals(items, deliveryCharge = 0, discount = 0){
+export function calculateQuoteTotals(items, deliveryCharge = 0, discountPercentage = 0){
   const normalizedItems = (items || []).map((item) => {
     const quantity = Math.max(1, Number(item.quantity) || 0);
     const unitPrice = Number(item.unitPrice) || 0;
@@ -1254,14 +1327,22 @@ export function calculateQuoteTotals(items, deliveryCharge = 0, discount = 0){
     };
   });
 
-  const itemsTotal = normalizedItems.reduce((sum, item) => sum + item.amount, 0);
-  const subtotal = Math.max(0, itemsTotal + (Number(deliveryCharge) || 0) - (Number(discount) || 0));
-  const vatAmount = subtotal * VAT_RATE;
-  const grandTotal = subtotal + vatAmount;
+  const itemsTotal = roundCurrency(normalizedItems.reduce((sum, item) => sum + item.amount, 0));
+  const safeDeliveryCharge = Math.max(0, Number(deliveryCharge) || 0);
+  const safeDiscountPercentage = clampDiscountPercentage(discountPercentage);
+  const preDiscountSubtotal = roundCurrency(itemsTotal + safeDeliveryCharge);
+  const discountAmount = roundCurrency(preDiscountSubtotal * (safeDiscountPercentage / 100));
+  const subtotal = roundCurrency(Math.max(0, preDiscountSubtotal - discountAmount));
+  const vatAmount = roundCurrency(subtotal * VAT_RATE);
+  const grandTotal = roundCurrency(subtotal + vatAmount);
 
   return {
     items: normalizedItems,
     itemsTotal,
+    deliveryCharge: safeDeliveryCharge,
+    preDiscountSubtotal,
+    discountPercentage: safeDiscountPercentage,
+    discountAmount,
     subtotal,
     vatAmount,
     grandTotal

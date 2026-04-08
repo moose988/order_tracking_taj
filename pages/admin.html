@@ -121,6 +121,7 @@
               <th>Order ID</th>
               <th>Customer</th>
               <th>Date</th>
+              <th>Rental Days</th>
               <th>Event Time</th>
               <th>Location</th>
               <th>Status</th>
@@ -130,7 +131,7 @@
           </thead>
           <tbody id="ordersTableBody">
             <tr>
-              <td colspan="8" style="text-align:center;padding:20px;">
+              <td colspan="9" style="text-align:center;padding:20px;">
                 Loading orders...
               </td>
             </tr>
@@ -423,14 +424,26 @@
 
       <button class="modal-close" id="closeModalBtn" type="button" aria-label="Close modal">&times;</button>
 
-      <h3 id="modalOrderTitle"></h3>
+      <div class="admin-order-modal-head">
+        <div>
+          <span class="section-kicker">Order Details</span>
+          <h3 id="modalOrderTitle"></h3>
+        </div>
+        <div class="admin-order-id-chip">
+          <span id="modalOrderIdValue"></span>
+          <button id="modalCopyOrderIdBtn" class="btn btn-secondary btn-small" type="button">Copy Order ID</button>
+        </div>
+      </div>
 
       <div class="modal-grid" style="margin-top:15px;">
 
         <div>
           <p><strong>Phone:</strong> <span id="modalPhone"></span></p>
+          <p><strong>Rental Days:</strong> <span id="modalRentalDays"></span></p>
           <p><strong>Event Time:</strong> <span id="modalEventTime"></span></p>
           <p><strong>Setup Time:</strong> <span id="modalSetupTime"></span></p>
+          <p><strong>Location:</strong> <span id="modalEventLocation"></span></p>
+          <p class="admin-order-modal-map-row"><strong>Map Link:</strong> <a id="modalMapLink" href="#" target="_blank" rel="noreferrer">Open Location</a></p>
           <p><strong>Notes:</strong> <span id="modalNotes"></span></p>
         </div>
 
@@ -769,7 +782,7 @@
             <div class="quote-builder-section-head">
               <div>
                 <h4>Charges</h4>
-                <p>Subtotal is based on item amounts plus delivery charge minus discount. VAT stays fixed at 5%.</p>
+                <p>Subtotal is based on item amounts plus delivery charge minus the discount percentage. VAT stays fixed at 5% after discount.</p>
               </div>
             </div>
 
@@ -780,8 +793,9 @@
               </div>
 
               <div class="form-group">
-                <label for="quoteDiscountInput">Discount</label>
-                <input id="quoteDiscountInput" type="number" min="0" step="0.01" value="0" />
+                <label for="quoteDiscountInput">Discount Percentage</label>
+                <input id="quoteDiscountInput" type="number" min="0" max="100" step="0.01" value="0" />
+                <p class="help-text">Enter a percentage. Example: 10 means 10%.</p>
               </div>
 
               <div class="form-group">
@@ -794,6 +808,14 @@
               <div class="quote-total-row">
                 <span>Items Total</span>
                 <strong id="quoteItemsTotalValue">AED 0.00</strong>
+              </div>
+              <div class="quote-total-row">
+                <span>Delivery Charge</span>
+                <strong id="quoteDeliveryChargeValue">AED 0.00</strong>
+              </div>
+              <div class="quote-total-row">
+                <span id="quoteDiscountSummaryLabel">Discount (0%)</span>
+                <strong id="quoteDiscountValue">- AED 0.00</strong>
               </div>
               <div class="quote-total-row">
                 <span>Subtotal</span>
@@ -929,6 +951,10 @@
 </div>
 
 <div id="adminToast" class="admin-toast" role="status" aria-live="polite"></div>
+
+<button class="scroll-top-btn" type="button" data-scroll-top aria-label="Scroll back to top" title="Back to top">
+  Top
+</button>
 
 </body>
 </html>

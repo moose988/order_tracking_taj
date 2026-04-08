@@ -25,6 +25,7 @@ const reviewThanksMessage = `Thank you for your feedback ${String.fromCodePoint(
 const DEFAULT_MAP_CENTER = [25.2048, 55.2708];
 const APPROX_CITY_SPEED_KMH = 32;
 const MAX_REASONABLE_DELIVERY_DISTANCE_KM = 120;
+const DEFAULT_RENTAL_DAYS = 1;
 const DRIVER_MARKER_ICON_CANDIDATES = [
   "../images/icons/drivericon.png",
   "../images/icons/drivericon.svg",
@@ -265,6 +266,11 @@ function getOpenLocationUrl(order, destinationCoordinates = null){
   }
 
   return "#";
+}
+
+function getOrderRentalDays(order){
+  const rentalDays = Number(order?.rentalDays ?? order?.latestQuoteRentalDays ?? DEFAULT_RENTAL_DAYS);
+  return Number.isFinite(rentalDays) && rentalDays >= 1 ? Math.floor(rentalDays) : DEFAULT_RENTAL_DAYS;
 }
 
 function getPhoneForWhatsApp(phone){
@@ -815,18 +821,16 @@ async function renderOrder(order){
   const fallbackEmbedLink = convertToEmbedLink(order.mapLink, order.eventLocation);
 
   info.innerHTML = `
-<p><strong>Order ID:</strong> ${order.orderId}</p>
-<p><strong>Customer:</strong> ${order.customerName}</p>
-<p><strong>Event Date:</strong> ${order.eventDate}</p>
-<p><strong>Event Time:</strong> ${order.eventTime || "N/A"}</p>
-<p><strong>Setup Time:</strong> ${order.setupTime || "N/A"}</p>
-<p><strong>Location:</strong> ${order.eventLocation}</p>
-<p>
-<strong>Map:</strong>
-<a href="${openLocationUrl}" target="_blank" style="color:#caa45d;font-weight:600;">
-Open Location
-</a>
-</p>
+<div class="track-info-grid">
+  <p><strong>Order ID:</strong> ${order.orderId}</p>
+  <p><strong>Customer:</strong> ${order.customerName}</p>
+  <p><strong>Event Date:</strong> ${order.eventDate}</p>
+  <p><strong>Rental Days:</strong> ${getOrderRentalDays(order)}</p>
+  <p><strong>Event Time:</strong> ${order.eventTime || "N/A"}</p>
+  <p><strong>Setup Time:</strong> ${order.setupTime || "N/A"}</p>
+  <p><strong>Location:</strong> ${order.eventLocation}</p>
+  <p><strong>Map:</strong> <a href="${openLocationUrl}" target="_blank" rel="noreferrer" class="track-inline-link">Open Location</a></p>
+</div>
 `;
 
   bindSupportButton(order);
@@ -835,9 +839,9 @@ Open Location
 
   const itemsBox = document.getElementById("orderItems");
   itemsBox.innerHTML = `
-<h4 style="margin-top:10px;">Items in this Order</h4>
-<ul>
-${(order.items || []).map(item => `<li>${item.name} × ${item.quantity}</li>`).join("")}
+<h4>Items in this Order</h4>
+<ul class="track-order-items-list">
+${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.max(1, Number(item.quantity) || 1)}</strong></li>`).join("")}
 </ul>
   `;
 
@@ -864,25 +868,13 @@ ${(order.items || []).map(item => `<li>${item.name} × ${item.quantity}</li>`).j
   <div class="track-location-copy">
     <span class="track-status-eyebrow">Delivery Location</span>
     <strong>${order.eventLocation || "Location pending"}</strong>
+    <p>Rental days: ${getOrderRentalDays(order)}</p>
   </div>
   <a href="${openLocationUrl}" target="_blank" class="track-open-location-link">
     Open Location
   </a>
 </div>
 <div class="track-status-grid">
-  ${destinationMarkerCoordinates ? `
-  <article class="track-status-card is-destination">
-    <span class="track-status-card-label">Destination</span>
-    <strong>Destination ready</strong>
-    <p>The delivery destination is marked on the map.</p>
-  </article>
-  ` : `
-  <article class="track-status-card is-muted">
-    <span class="track-status-card-label">Destination</span>
-    <strong>Location text available</strong>
-    <p>Exact destination marker is unavailable for this order.</p>
-  </article>
-  `}
   ${driverCoordinates ? `
   <article class="track-status-card is-live">
     <span class="track-status-card-label">Driver Update</span>
@@ -952,16 +944,22 @@ function renderStatusSummary(status){
 
   if(normalizedStatus === "cancelled"){
     summary.innerHTML = `
-      <div class="track-status-message is-cancelled">
+      <article class="track-status-summary-card is-cancelled">
+        <span class="track-status-summary-label">Current Status</span>
         <strong>Order Cancelled</strong>
         <p>This order is marked as cancelled. Please contact support if you need help.</p>
-      </div>
+      </article>
     `;
     return;
   }
 
-  summary.className = "";
-  summary.innerHTML = `Current Status: ${formatStatusLabel(normalizedStatus || status)}`;
+  summary.innerHTML = `
+    <article class="track-status-summary-card is-${normalizedStatus || "unknown"}">
+      <span class="track-status-summary-label">Current Status</span>
+      <strong>${formatStatusLabel(normalizedStatus || status)}</strong>
+      <p>Your latest order progress is shown here in real time.</p>
+    </article>
+  `;
 }
 
 function bindSupportButton(order){

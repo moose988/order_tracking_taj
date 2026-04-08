@@ -6,6 +6,7 @@ import {
   getValidatedUaeCoordinates,
   normalizeMapUrl
 } from "./location-utils.js";
+import { initScrollTopButton } from "./scroll-top.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -52,6 +53,7 @@ const TIMEOUT_MESSAGE_COOLDOWN_MS = 45000;
 const LOCATION_WATCH_HEALTHCHECK_MS = 30000;
 const LOCATION_WATCH_STALE_MS = 120000;
 const COMPLETED_ORDERS_PER_PAGE = 6;
+const DEFAULT_RENTAL_DAYS = 1;
 
 const storedUid = localStorage.getItem("driverUid");
 
@@ -123,6 +125,26 @@ function getPriorityValue(priority){
   }
 
   return "normal";
+}
+
+function getOrderRentalDays(order){
+  const rentalDays = Number(order?.rentalDays ?? order?.latestQuoteRentalDays ?? DEFAULT_RENTAL_DAYS);
+  return Number.isFinite(rentalDays) && rentalDays >= 1 ? Math.floor(rentalDays) : DEFAULT_RENTAL_DAYS;
+}
+
+function getOrderItemsMarkup(order){
+  const items = Array.isArray(order?.items) ? order.items : [];
+
+  if(!items.length){
+    return '<li class="driver-order-items-empty">No items listed</li>';
+  }
+
+  return items.map((item) => `
+    <li>
+      <span>${item.name || "Unnamed item"}</span>
+      <strong>x${Math.max(1, Number(item.quantity) || 1)}</strong>
+    </li>
+  `).join("");
 }
 
 function formatPriorityLabel(priority){
@@ -633,6 +655,10 @@ function renderOrderCard(order, options = {}){
           <strong>${order.eventDate || "Date TBC"}${order.eventTime ? ` - ${order.eventTime}` : ""}</strong>
         </div>
         <div>
+          <span>Rental Days</span>
+          <strong>${getOrderRentalDays(order)}</strong>
+        </div>
+        <div>
           <span>Setup Time</span>
           <strong>${order.setupTime || "N/A"}</strong>
         </div>
@@ -640,6 +666,13 @@ function renderOrderCard(order, options = {}){
           <span>Location</span>
           <strong>${order.eventLocation || "No location yet"}</strong>
         </div>
+      </div>
+
+      <div class="driver-order-items">
+        <span>Order Items</span>
+        <ul class="driver-order-items-list">
+          ${getOrderItemsMarkup(order)}
+        </ul>
       </div>
 
       ${getActionBlock(order, options)}
@@ -1157,6 +1190,7 @@ driverLogoutBtn?.addEventListener("click", async () => {
 
 document.addEventListener("DOMContentLoaded", () => {
   initMobileMenu();
+  initScrollTopButton();
   attachCompletedOrderFilters();
   hydrateLocationSharingPreference();
 

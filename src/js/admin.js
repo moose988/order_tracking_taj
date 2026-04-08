@@ -4,6 +4,7 @@ import { QUOTE_BANK_PRESETS, QUOTE_CURRENCY, VAT_RATE, getQuoteBankPreset } from
 import { buildQuotePdfFileName, calculateQuoteTotals, generateQuotePdfBlob } from "./quote-pdf.js";
 import { createLocationFieldBinding } from "./location-picker.js";
 import { normalizeGoogleMapsLink } from "./location-utils.js";
+import { initScrollTopButton } from "./scroll-top.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* PROTECT ADMIN PAGE */
@@ -86,6 +87,9 @@ const quoteItemsContainer = document.getElementById("quoteItemsContainer");
 const quoteDeliveryChargeInput = document.getElementById("quoteDeliveryChargeInput");
 const quoteDiscountInput = document.getElementById("quoteDiscountInput");
 const quoteItemsTotalValue = document.getElementById("quoteItemsTotalValue");
+const quoteDeliveryChargeValue = document.getElementById("quoteDeliveryChargeValue");
+const quoteDiscountSummaryLabel = document.getElementById("quoteDiscountSummaryLabel");
+const quoteDiscountValue = document.getElementById("quoteDiscountValue");
 const quoteSubtotalValue = document.getElementById("quoteSubtotalValue");
 const quoteVatValue = document.getElementById("quoteVatValue");
 const quoteGrandTotalValue = document.getElementById("quoteGrandTotalValue");
@@ -156,6 +160,7 @@ let currentInventoryItemId = null;
 let isSavingInventory = false;
 let hasAttemptedCatalogInventorySeed = false;
 let inventoryClockIntervalId = null;
+let currentOpenOrderId = null;
 let currentInventorySort = {
   key: "name",
   direction: "asc"
@@ -220,6 +225,7 @@ function subscribeToOrders(){
 
     syncCurrentEditingOrder();
     syncCurrentQuoteOrder();
+    syncOpenOrderModal();
     try{
       await syncMissingInventoryForReservableOrderItems();
     }catch(error){
@@ -304,7 +310,7 @@ function renderOrders(orders){
   if(orders.length === 0){
     tableBody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center;padding:20px;">
+        <td colspan="9" style="text-align:center;padding:20px;">
           No orders found
         </td>
       </tr>
@@ -326,6 +332,7 @@ function renderOrders(orders){
     <td>${order.orderId}</td>
     <td>${order.customerName}</td>
     <td>${order.eventDate}</td>
+    <td>${getOrderRentalDays(order)}</td>
     <td>${order.eventTime || "N/A"}</td>
     <td>${order.eventLocation}</td>
   
@@ -1240,6 +1247,7 @@ Update regarding your order ${order.orderId}
 Status: ${formatStatusLabel(order.status)}
 
 Event Date: ${order.eventDate}
+Rental Days: ${getOrderRentalDays(order)}
 Location: ${order.eventLocation}
 
 Items:
@@ -1311,64 +1319,148 @@ ${reviewLink}
 
 /* MODAL FUNCTIONS */
 
-function openOrderModal(order){
+function openOrderModal(order, options = {}){
+  const orderModal = document.getElementById("orderModal");
 
-  document.getElementById("modalOrderTitle").textContent =
-    `${order.orderId} — ${order.customerName}`;
+  if(!orderModal || !order){
+    return;
+  }
 
-  document.getElementById("modalPhone").textContent =
-    order.phone || "N/A";
+  const mapUrl = getOrderMapUrl(order);
+  const modalOrderTitle = document.getElementById("modalOrderTitle");
+  const modalOrderIdValue = document.getElementById("modalOrderIdValue");
+  const modalCopyOrderIdBtn = document.getElementById("modalCopyOrderIdBtn");
+  const modalPhone = document.getElementById("modalPhone");
+  const modalRentalDays = document.getElementById("modalRentalDays");
+  const modalEventTime = document.getElementById("modalEventTime");
+  const modalSetupTime = document.getElementById("modalSetupTime");
+  const modalEventLocation = document.getElementById("modalEventLocation");
+  const modalMapLink = document.getElementById("modalMapLink");
+  const modalNotes = document.getElementById("modalNotes");
+  const modalItems = document.getElementById("modalItems");
+  const modalMapBtn = document.getElementById("modalMapBtn");
+  const modalCopyBtn = document.getElementById("modalCopyBtn");
 
-  document.getElementById("modalEventTime").textContent =
-    order.eventTime || "N/A";
+  currentOpenOrderId = order.id;
+  orderModal.dataset.orderId = order.id;
 
-  document.getElementById("modalSetupTime").textContent =
-    order.setupTime || "N/A";
+  if(modalOrderTitle){
+    modalOrderTitle.textContent = order.customerName || "Unknown customer";
+  }
 
-  document.getElementById("modalNotes").textContent =
-    order.notes || "None";
+  if(modalOrderIdValue){
+    modalOrderIdValue.textContent = order.orderId || order.id || "";
+  }
 
-  document.getElementById("modalItems").innerHTML =
-    order.items.map(i=>`<li>${i.name} x${i.quantity}</li>`).join("");
+  if(modalPhone){
+    modalPhone.textContent = order.phone || "N/A";
+  }
 
-  /* MAP */
-  document.getElementById("modalMapBtn").onclick = ()=>{
-    if(order.mapLink){
-      window.open(order.mapLink, "_blank");
+  if(modalRentalDays){
+    modalRentalDays.textContent = String(getOrderRentalDays(order));
+  }
+
+  if(modalEventTime){
+    modalEventTime.textContent = order.eventTime || "N/A";
+  }
+
+  if(modalSetupTime){
+    modalSetupTime.textContent = order.setupTime || "N/A";
+  }
+
+  if(modalEventLocation){
+    modalEventLocation.textContent = order.eventLocation || "N/A";
+  }
+
+  if(modalMapLink){
+    if(mapUrl){
+      modalMapLink.href = mapUrl;
+      modalMapLink.textContent = order.mapLink ? "Open saved map pin" : "Open event location";
+      modalMapLink.removeAttribute("aria-disabled");
+    }else{
+      modalMapLink.href = "#";
+      modalMapLink.textContent = "No map link available";
+      modalMapLink.setAttribute("aria-disabled", "true");
     }
-  };
+  }
 
-  /* COPY FULL DETAILS */
-  document.getElementById("modalCopyBtn").onclick = ()=>{
-    const text = `
+  if(modalNotes){
+    modalNotes.textContent = order.notes || "None";
+  }
+
+  if(modalItems){
+    modalItems.innerHTML = getOrderItemsListMarkup(order.items || []);
+  }
+
+  if(modalMapBtn){
+    modalMapBtn.disabled = !mapUrl;
+    modalMapBtn.onclick = () => {
+      if(mapUrl){
+        window.open(mapUrl, "_blank");
+      }
+    };
+  }
+
+  if(modalCopyOrderIdBtn){
+    modalCopyOrderIdBtn.onclick = async () => {
+      try{
+        await navigator.clipboard.writeText(order.orderId || "");
+        showToast("Order ID copied");
+      }catch(error){
+        console.error("Failed to copy order ID:", error);
+        showToast("Could not copy order ID", "error");
+      }
+    };
+  }
+
+  if(modalCopyBtn){
+    modalCopyBtn.onclick = async () => {
+      const text = `
 Order ID: ${order.orderId}
 Customer: ${order.customerName}
 Phone: ${order.phone}
 
 Event Date: ${order.eventDate}
-Event Time: ${order.eventTime}
-Setup Time: ${order.setupTime}
+Rental Days: ${getOrderRentalDays(order)}
+Event Time: ${order.eventTime || "N/A"}
+Setup Time: ${order.setupTime || "N/A"}
 
 Location: ${order.eventLocation}
-Map: ${order.mapLink}
+Map: ${mapUrl || "N/A"}
 
 Items:
-${order.items.map(i=>`${i.name} x${i.quantity}`).join("\n")}
+${getOrderItemsText(order.items || [])}
 
 Notes:
 ${order.notes || "None"}
-    `;
+      `;
 
-    navigator.clipboard.writeText(text);
-    alert("Copied!");
-  };
+      try{
+        await navigator.clipboard.writeText(text.trim());
+        showToast("Order details copied");
+      }catch(error){
+        console.error("Failed to copy order details:", error);
+        showToast("Could not copy order details", "error");
+      }
+    };
+  }
 
-  document.getElementById("orderModal").classList.add("active");
-  document.body.style.overflow = "hidden";
+  orderModal.classList.add("active");
+
+  if(!options.preserveOpenState){
+    document.body.style.overflow = "hidden";
+  }
 }
 
 function closeOrderModal(){
-  document.getElementById("orderModal").classList.remove("active");
+  const orderModal = document.getElementById("orderModal");
+  currentOpenOrderId = null;
+
+  if(orderModal){
+    orderModal.classList.remove("active");
+    delete orderModal.dataset.orderId;
+  }
+
   document.body.style.overflow = "auto";
 }
 
@@ -1479,6 +1571,80 @@ function formatCurrencyDisplay(value){
   })}`;
 }
 
+function formatPercentageDisplay(value){
+  const percentage = Number(value) || 0;
+  return `${percentage.toLocaleString("en-US", {
+    minimumFractionDigits: percentage % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2
+  })}%`;
+}
+
+function clampDiscountPercentage(value){
+  const percentage = Number(value);
+
+  if(!Number.isFinite(percentage)){
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, percentage));
+}
+
+function getQuoteDiscountPercentage(source = {}){
+  const explicitDiscountPercentage = Number(source.discountPercentage);
+
+  if(Number.isFinite(explicitDiscountPercentage)){
+    return clampDiscountPercentage(explicitDiscountPercentage);
+  }
+
+  if(source.discountType === "percentage"){
+    return clampDiscountPercentage(source.discount);
+  }
+
+  const itemsTotal = Number(source.itemsTotal) || 0;
+  const deliveryCharge = Number(source.deliveryCharge) || 0;
+  const preDiscountSubtotal = Math.max(
+    0,
+    Number(source.preDiscountSubtotal) || (itemsTotal + deliveryCharge)
+  );
+  const explicitDiscountAmount = Number(source.discountAmount);
+  const legacyDiscountAmount = Number(source.discount);
+  const discountAmount = Number.isFinite(explicitDiscountAmount)
+    ? explicitDiscountAmount
+    : legacyDiscountAmount;
+
+  if(!Number.isFinite(discountAmount) || discountAmount <= 0 || preDiscountSubtotal <= 0){
+    return 0;
+  }
+
+  return clampDiscountPercentage((discountAmount / preDiscountSubtotal) * 100);
+}
+
+function getOrderMapUrl(order){
+  const normalizedMapLink = normalizeGoogleMapsLink(order?.mapLink || "");
+
+  if(normalizedMapLink){
+    return normalizedMapLink;
+  }
+
+  const eventLocation = String(order?.eventLocation || "").trim();
+
+  return eventLocation
+    ? `https://www.google.com/maps?q=${encodeURIComponent(eventLocation)}`
+    : "";
+}
+
+function getOrderItemsListMarkup(items = []){
+  return items.length
+    ? items.map((item) => `<li>${escapeHtml(item.name || "Unnamed item")} x${Math.max(1, Number(item.quantity) || 1)}</li>`).join("")
+    : "<li>No items added</li>";
+}
+
+function getOrderItemsText(items = []){
+  return items.length
+    ? items.map((item) => `- ${item.name || "Unnamed item"} x${Math.max(1, Number(item.quantity) || 1)}`).join("\n")
+    : "- No items added";
+}
+
 function getTimestampValue(value){
   if(!value){
     return 0;
@@ -1543,20 +1709,24 @@ async function getLatestOrderData(orderOrId){
   return fallbackOrder;
 }
 
-function wrapInputWithCurrency(input, currency = QUOTE_CURRENCY){
+function wrapInputWithSuffix(input, suffixText, wrapperClass = "currency-input-wrap", suffixClass = "currency-input-suffix"){
   if(!input || input.closest(".currency-input-wrap")){
     return;
   }
 
   const wrapper = document.createElement("div");
-  wrapper.className = "currency-input-wrap";
+  wrapper.className = wrapperClass;
   input.parentNode?.insertBefore(wrapper, input);
   wrapper.appendChild(input);
 
   const suffix = document.createElement("span");
-  suffix.className = "currency-input-suffix";
-  suffix.textContent = currency;
+  suffix.className = suffixClass;
+  suffix.textContent = suffixText;
   wrapper.appendChild(suffix);
+}
+
+function wrapInputWithCurrency(input, currency = QUOTE_CURRENCY){
+  wrapInputWithSuffix(input, currency);
 }
 
 function upsertOrderInAdminState(order){
@@ -1818,8 +1988,8 @@ function updateQuoteTotals(){
     unitPrice: Number.isFinite(item.unitPrice) && item.unitPrice >= 0 ? item.unitPrice : 0
   }));
   const deliveryCharge = Math.max(0, Number(quoteDeliveryChargeInput?.value) || 0);
-  const discount = Math.max(0, Number(quoteDiscountInput?.value) || 0);
-  const totals = calculateQuoteTotals(safeItems, deliveryCharge, discount);
+  const discountPercentage = clampDiscountPercentage(quoteDiscountInput?.value);
+  const totals = calculateQuoteTotals(safeItems, deliveryCharge, discountPercentage);
 
   totals.items.forEach((item, index) => {
     const amountInput = getQuoteItemRows()[index]?.querySelector(".quote-item-amount");
@@ -1831,6 +2001,18 @@ function updateQuoteTotals(){
 
   if(quoteItemsTotalValue){
     quoteItemsTotalValue.textContent = formatCurrencyDisplay(totals.itemsTotal);
+  }
+
+  if(quoteDeliveryChargeValue){
+    quoteDeliveryChargeValue.textContent = formatCurrencyDisplay(totals.deliveryCharge);
+  }
+
+  if(quoteDiscountSummaryLabel){
+    quoteDiscountSummaryLabel.textContent = `Discount (${formatPercentageDisplay(totals.discountPercentage)})`;
+  }
+
+  if(quoteDiscountValue){
+    quoteDiscountValue.textContent = `- ${formatCurrencyDisplay(totals.discountAmount)}`;
   }
 
   if(quoteSubtotalValue){
@@ -1915,7 +2097,7 @@ function loadQuoteVersionIntoForm(quoteVersion){
   }
 
   if(quoteDiscountInput){
-    quoteDiscountInput.value = String(Number(quoteVersion.discount) || 0);
+    quoteDiscountInput.value = String(getQuoteDiscountPercentage(quoteVersion));
   }
 
   renderQuoteItems((quoteVersion.items || []).map((item) => ({
@@ -2066,6 +2248,23 @@ function syncCurrentQuoteOrder(){
   }
 }
 
+function syncOpenOrderModal(){
+  const orderModal = document.getElementById("orderModal");
+
+  if(!orderModal?.classList.contains("active") || !currentOpenOrderId){
+    return;
+  }
+
+  const latestOrder = allOrders.find((order) => order.id === currentOpenOrderId);
+
+  if(!latestOrder){
+    closeOrderModal();
+    return;
+  }
+
+  openOrderModal(latestOrder, { preserveOpenState: true });
+}
+
 function markQuoteDraftDirty(){
   if(isHydratingQuoteForm || isGeneratingQuote){
     return;
@@ -2129,7 +2328,7 @@ function validateQuoteDraft(){
 
   const rentalDays = Number(quoteRentalDaysInput?.value);
   const deliveryCharge = Number(quoteDeliveryChargeInput?.value);
-  const discount = Number(quoteDiscountInput?.value);
+  const discountPercentage = Number(quoteDiscountInput?.value);
 
   if(!Number.isFinite(rentalDays) || rentalDays < 1){
     setQuoteBuilderStatus("Rental days must be 1 or more.", "warning");
@@ -2143,9 +2342,9 @@ function validateQuoteDraft(){
     return null;
   }
 
-  if(!Number.isFinite(discount) || discount < 0){
-    setQuoteBuilderStatus("Discount must be 0 or more.", "warning");
-    showToast("Discount must be 0 or more", "warning");
+  if(!Number.isFinite(discountPercentage) || discountPercentage < 0 || discountPercentage > 100){
+    setQuoteBuilderStatus("Discount percentage must be between 0 and 100.", "warning");
+    showToast("Discount percentage must be between 0 and 100", "warning");
     return null;
   }
 
@@ -2155,14 +2354,14 @@ function validateQuoteDraft(){
     unitPrice: Number(item.unitPrice) || 0,
     isEdited: Boolean(item.isEdited)
   }));
-  const totals = calculateQuoteTotals(normalizedItems, deliveryCharge, discount);
+  const totals = calculateQuoteTotals(normalizedItems, deliveryCharge, discountPercentage);
 
   return {
     language: quoteLanguageSelect?.value === "ar" ? "ar" : "en",
     bankPreset: getQuoteBankPreset(quoteBankPresetSelect?.value),
     rentalDays: Math.max(1, Number(rentalDays) || 1),
     deliveryCharge,
-    discount,
+    discountPercentage: clampDiscountPercentage(discountPercentage),
     totals
   };
 }
@@ -2193,7 +2392,11 @@ function buildQuoteRecord(draft, version){
     items: draft.totals.items,
     itemsTotal: draft.totals.itemsTotal,
     deliveryCharge: draft.deliveryCharge,
-    discount: draft.discount,
+    preDiscountSubtotal: draft.totals.preDiscountSubtotal,
+    discountType: "percentage",
+    discount: draft.discountPercentage,
+    discountPercentage: draft.discountPercentage,
+    discountAmount: draft.totals.discountAmount,
     subtotal: draft.totals.subtotal,
     vat: draft.totals.vatAmount,
     vatAmount: draft.totals.vatAmount,
@@ -2308,7 +2511,9 @@ async function handleGenerateQuote(){
         latestQuoteGeneratedAt: serverTimestamp(),
         latestQuoteGeneratedAtMs: quotePayload.generatedAtMs,
         latestQuoteGrandTotal: quotePayload.grandTotal,
-        latestQuoteBankPresetId: quotePayload.bankPresetId
+        latestQuoteBankPresetId: quotePayload.bankPresetId,
+        latestQuoteDiscountPercentage: quotePayload.discountPercentage,
+        latestQuoteDiscountAmount: quotePayload.discountAmount
       })
     ]);
 
@@ -2365,6 +2570,12 @@ function renderEditableItems(items){
 
   editItemsContainer.innerHTML = normalizedItems.map((item, index) => `
     <div class="edit-item-row" data-index="${index}">
+      <select
+        class="edit-item-category"
+        aria-label="Item category ${index + 1}"
+      >
+        ${getCategoryOptionsMarkup(item.category || "")}
+      </select>
       <input
         type="text"
         class="edit-item-name"
@@ -2372,12 +2583,6 @@ function renderEditableItems(items){
         placeholder="Item name"
         aria-label="Item name ${index + 1}"
       />
-      <select
-        class="edit-item-category"
-        aria-label="Item category ${index + 1}"
-      >
-        ${getCategoryOptionsMarkup(item.category || "")}
-      </select>
       <input
         type="number"
         min="1"
@@ -2428,10 +2633,10 @@ function addEditableItem(){
   const itemRow = document.createElement("div");
   itemRow.className = "edit-item-row";
   itemRow.innerHTML = `
-    <input type="text" class="edit-item-name" value="" placeholder="Item name" aria-label="Item name" />
     <select class="edit-item-category" aria-label="Item category">
       ${getCategoryOptionsMarkup("")}
     </select>
+    <input type="text" class="edit-item-name" value="" placeholder="Item name" aria-label="Item name" />
     <input type="number" min="1" step="1" class="edit-item-quantity" value="1" aria-label="Item quantity" />
     <button type="button" class="btn btn-dark remove-edit-item-btn">Remove</button>
   `;
@@ -3652,6 +3857,7 @@ async function handleEditOrderSubmit(event){
     });
     syncCurrentEditingOrder();
     syncCurrentQuoteOrder();
+    syncOpenOrderModal();
     renderOpsPanel();
     renderDriverPanel();
     renderInventoryDashboard();
@@ -4294,6 +4500,7 @@ function attachAdminSummaryCardEvents(){
 
 document.addEventListener("DOMContentLoaded", async ()=>{
   initMobileMenu();
+  initScrollTopButton();
   initAdminLocationBindings();
   document.getElementById("closeModalBtn").addEventListener("click", closeOrderModal);
   closeEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
@@ -4421,6 +4628,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     markQuoteDraftDirty();
   });
   quoteDiscountInput?.addEventListener("input", () => {
+    const nextValue = clampDiscountPercentage(quoteDiscountInput.value);
+    if(String(nextValue) !== quoteDiscountInput.value){
+      quoteDiscountInput.value = String(nextValue);
+    }
     updateQuoteTotals();
     markQuoteDraftDirty();
   });
@@ -4472,7 +4683,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   renderCreateItems();
   populateQuoteBankPresetOptions();
   wrapInputWithCurrency(quoteDeliveryChargeInput);
-  wrapInputWithCurrency(quoteDiscountInput);
+  wrapInputWithSuffix(quoteDiscountInput, "%");
   syncQuoteModalActionState();
 });
 

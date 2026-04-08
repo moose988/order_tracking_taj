@@ -1485,6 +1485,131 @@
     margin-bottom: 18px;
   }
 
+.track-status-summary{
+  margin: 18px 0 20px;
+}
+
+.track-status-summary-card{
+  display:grid;
+  gap:10px;
+  padding:20px 22px;
+  border-radius:22px;
+  border:1px solid rgba(201, 169, 106, 0.32);
+  background:
+    radial-gradient(circle at top right, rgba(201, 169, 106, 0.18), transparent 46%),
+    linear-gradient(135deg, #fffaf1 0%, #fff 100%);
+  box-shadow:0 18px 30px rgba(31, 26, 23, 0.08);
+}
+
+.track-status-summary-label{
+  font-size:0.78rem;
+  font-weight:800;
+  letter-spacing:0.16em;
+  text-transform:uppercase;
+  color:var(--gold-dark);
+}
+
+.track-status-summary-card strong{
+  font-size:clamp(1.8rem, 4vw, 2.6rem);
+  line-height:1.05;
+  color:#8f661e;
+}
+
+.track-status-summary-card p{
+  margin:0;
+  color:var(--text-soft);
+  font-size:1rem;
+  line-height:1.5;
+}
+
+.track-status-summary-card.is-quote-requested strong,
+.track-status-summary-card.is-quote-sent strong,
+.track-status-summary-card.is-confirmed strong,
+.track-status-summary-card.is-preparing strong{
+  color:#8f661e;
+}
+
+.track-status-summary-card.is-out-for-delivery{
+  border-color:rgba(87, 67, 204, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(87, 67, 204, 0.14), transparent 44%),
+    linear-gradient(135deg, #f5f2ff 0%, #fff 100%);
+}
+
+.track-status-summary-card.is-out-for-delivery strong{
+  color:#5743cc;
+}
+
+.track-status-summary-card.is-delivered{
+  border-color:rgba(47, 139, 87, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(47, 139, 87, 0.14), transparent 44%),
+    linear-gradient(135deg, #eef9f1 0%, #fff 100%);
+}
+
+.track-status-summary-card.is-delivered strong{
+  color:#2f8b57;
+}
+
+.track-status-summary-card.is-cancelled{
+  border-color:rgba(192, 67, 67, 0.2);
+  background:
+    radial-gradient(circle at top right, rgba(192, 67, 67, 0.12), transparent 44%),
+    linear-gradient(135deg, #fff2f2 0%, #fff 100%);
+}
+
+.track-status-summary-card.is-cancelled strong{
+  color:#c04343;
+}
+
+.track-order-info,
+.track-order-items{
+  margin-bottom:20px;
+}
+
+.track-info-grid{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px 18px;
+}
+
+.track-info-grid p{
+  margin:0;
+  padding:12px 14px;
+  border-radius:16px;
+  background:#fbf8f3;
+  border:1px solid rgba(232, 223, 210, 0.9);
+}
+
+.track-inline-link{
+  color:var(--gold-dark);
+  font-weight:700;
+}
+
+.track-order-items h4{
+  margin:0 0 12px;
+}
+
+.track-order-items-list{
+  display:grid;
+  gap:10px;
+}
+
+.track-order-items-list li{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  border-radius:16px;
+  background:#fbf8f3;
+  border:1px solid rgba(232, 223, 210, 0.9);
+}
+
+.track-order-items-list strong{
+  color:var(--gold-dark);
+}
+
 .track-map-status-shell {
   display: grid;
   gap: 14px;
@@ -1582,6 +1707,11 @@
   color: var(--text);
   font-size: 1.02rem;
   line-height: 1.45;
+}
+
+.track-location-copy p {
+  margin: 8px 0 0;
+  color: var(--text-soft);
 }
 
 .track-open-location-link {
@@ -3350,6 +3480,54 @@
 
 #orderModal .modal-content{
   padding:30px;
+  display:grid;
+  gap:18px;
+}
+
+.admin-order-modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+}
+
+.admin-order-id-chip{
+  display:grid;
+  gap:10px;
+  justify-items:end;
+  padding:14px 16px;
+  border-radius:18px;
+  background:#fbf8f3;
+  border:1px solid var(--border);
+}
+
+#modalOrderIdValue{
+  font-weight:800;
+  color:var(--text);
+  font-size:1rem;
+  word-break:break-word;
+}
+
+.admin-order-modal-map-row{
+  word-break:break-word;
+}
+
+.admin-order-modal-map-row a{
+  color:var(--gold-dark);
+  font-weight:700;
+}
+
+.admin-order-modal-map-row a[aria-disabled="true"]{
+  color:var(--text-soft);
+  pointer-events:none;
+  text-decoration:none;
+  cursor:default;
+}
+
+#modalItems{
+  margin-left:18px;
+  display:grid;
+  gap:8px;
 }
 
 #driverModal .modal{
@@ -3421,7 +3599,7 @@
 
 .edit-item-row{
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) 120px auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 120px auto;
   gap: 12px;
   align-items: center;
 }
@@ -3915,6 +4093,42 @@
   background: #b87817;
 }
 
+.scroll-top-btn{
+  position: fixed;
+  left: clamp(16px, calc((100vw - var(--container)) / 2 + 16px), 32px);
+  bottom: 104px;
+  z-index: 90;
+  min-width: 58px;
+  padding: 12px 16px;
+  border: 1px solid rgba(201, 169, 106, 0.35);
+  border-radius: 999px;
+  background: rgba(31, 26, 23, 0.92);
+  color: #fff;
+  box-shadow: 0 16px 30px rgba(31, 26, 23, 0.22);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.scroll-top-btn:hover,
+.scroll-top-btn:focus-visible{
+  background: var(--gold-dark);
+  transform: translateY(0);
+}
+
+.scroll-top-btn:focus-visible{
+  outline: 2px solid rgba(201, 169, 106, 0.4);
+  outline-offset: 3px;
+}
+
+.scroll-top-btn.is-visible{
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .driver-dashboard-page {
   background:
     radial-gradient(circle at top right, rgba(201, 169, 106, 0.14), transparent 28%),
@@ -4195,6 +4409,46 @@
   line-height: 1.4;
 }
 
+.driver-order-items {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(167, 134, 72, 0.14);
+  background: #fbf8f3;
+}
+
+.driver-order-items > span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.driver-order-items-list {
+  display: grid;
+  gap: 8px;
+}
+
+.driver-order-items-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(232, 223, 210, 0.8);
+}
+
+.driver-order-items-list strong {
+  color: var(--gold-dark);
+}
+
+.driver-order-items-empty {
+  color: var(--text-soft);
+}
+
 .driver-order-actions {
   display: grid;
   gap: 12px;
@@ -4434,6 +4688,26 @@
     right: 16px;
     bottom: 16px;
     max-width: none;
+  }
+
+  .scroll-top-btn{
+    left: 16px;
+    bottom: 88px;
+  }
+
+  .admin-order-modal-head,
+  .track-location-overview{
+    flex-direction: column;
+  }
+
+  .admin-order-id-chip{
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .track-info-grid,
+  .track-status-grid{
+    grid-template-columns: 1fr;
   }
 
   .driver-hero {
