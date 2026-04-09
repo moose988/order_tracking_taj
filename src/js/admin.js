@@ -3,7 +3,13 @@ import { PRODUCTS } from "../data/products.js";
 import { QUOTE_BANK_PRESETS, QUOTE_CURRENCY, VAT_RATE, getQuoteBankPreset } from "./quote-config.js";
 import { buildQuotePdfFileName, calculateQuoteTotals, generateQuotePdfBlob } from "./quote-pdf.js";
 import { createLocationFieldBinding } from "./location-picker.js";
-import { normalizeGoogleMapsLink } from "./location-utils.js";
+import {
+  buildGoogleMapsCoordinateLink,
+  formatCoordinatePair,
+  getLocationCoordinates,
+  getValidatedUaeCoordinates,
+  normalizeGoogleMapsLink
+} from "./location-utils.js";
 import { initScrollTopButton } from "./scroll-top.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -45,6 +51,20 @@ const opsPanel = document.getElementById("opsPanel");
 const opsPanelSummary = document.getElementById("opsPanelSummary");
 const driverPanel = document.getElementById("driverPanel");
 const driverPanelSummary = document.getElementById("driverPanelSummary");
+const operationsMapSummary = document.getElementById("operationsMapSummary");
+const operationsMapContainer = document.getElementById("operationsMap");
+const operationsMapEmptyState = document.getElementById("operationsMapEmptyState");
+const operationsMapDriverList = document.getElementById("operationsMapDriverList");
+const operationsMapActiveDrivers = document.getElementById("operationsMapActiveDrivers");
+const operationsMapLiveDrivers = document.getElementById("operationsMapLiveDrivers");
+const operationsMapDriversWithoutLocation = document.getElementById("operationsMapDriversWithoutLocation");
+const operationsMapActiveDeliveries = document.getElementById("operationsMapActiveDeliveries");
+const collectionPanelSummary = document.getElementById("collectionPanelSummary");
+const collectionOrderSelect = document.getElementById("collectionOrderSelect");
+const collectionDriverSelect = document.getElementById("collectionDriverSelect");
+const collectionRequestNote = document.getElementById("collectionRequestNote");
+const collectionRequestPreview = document.getElementById("collectionRequestPreview");
+const sendCollectionRequestBtn = document.getElementById("sendCollectionRequestBtn");
 const editOrderModal = document.getElementById("editOrderModal");
 const editOrderForm = document.getElementById("editOrderForm");
 const editItemsContainer = document.getElementById("editItemsContainer");
@@ -66,6 +86,8 @@ const editPickLocationBtn = document.getElementById("editPickLocationBtn");
 const createPickLocationBtn = document.getElementById("createPickLocationBtn");
 const editLocationSummary = document.getElementById("editLocationSummary");
 const createLocationSummary = document.getElementById("createLocationSummary");
+const searchInput = document.getElementById("searchInput");
+const clearSearchBtn = document.getElementById("clearSearchBtn");
 const driverFilter = document.getElementById("driverFilter");
 const quoteModal = document.getElementById("quoteModal");
 const closeQuoteModalBtn = document.getElementById("closeQuoteModalBtn");
@@ -138,6 +160,22 @@ let selectedOrderId = null;
 let currentEditingOrder = null;
 let currentPage = 1;
 let activeOpsFilter = "all";
+let selectedCollectionOrderId = "";
+let selectedCollectionDriverId = "";
+let isSendingCollectionRequest = false;
+let liveOperationsMap = null;
+let liveOperationsMapLayer = null;
+let operationsMapDriverMarkers = new Map();
+let operationsMapHasUserMoved = false;
+let operationsMapLastBoundsSignature = "";
+
+function syncSearchClearButton(){
+  if(!clearSearchBtn){
+    return;
+  }
+
+  clearSearchBtn.hidden = !(searchInput?.value || "").trim();
+}
 const ordersPerPage = 6;
 let ordersUnsubscribe = null;
 let driversUnsubscribe = null;
@@ -168,7 +206,18 @@ let currentInventorySort = {
 const PRODUCT_CATEGORIES = getProductCategories();
 const PRODUCTS_BY_CATEGORY = buildProductsByCategory();
 const PRODUCTS_BY_ID = buildProductsById();
-const INVENTORY_RESERVATION_STATUSES = new Set(["confirmed", "preparing", "out-for-delivery"]);
+// Rental inventory stays reserved until items are physically collected back.
+const INVENTORY_RESERVATION_STATUSES = new Set(["confirmed", "preparing", "out-for-delivery", "delivered"]);
+// Keep the warehouse location centralized so operations can update it in one place later.
+const OPERATIONS_WAREHOUSE = {
+  name: "Al Taj Al Malaky Warehouse",
+  label: "Main Store / Warehouse",
+  coordinates: {
+    lat: 25.2048,
+    lng: 55.2708
+  }
+};
+const DRIVER_LOCATION_LIVE_THRESHOLD_MS = 5 * 60 * 1000;
 const DEFAULT_RENTAL_DAYS = 1;
 const DEFAULT_LOW_STOCK_THRESHOLD = 1;
 const CATALOG_INVENTORY_DEMO_STOCK = {
@@ -185,6 +234,7 @@ const STATUS_META = {
   preparing: { label: "Preparing", className: "is-preparing" },
   "out-for-delivery": { label: "Out For Delivery", className: "is-out-for-delivery" },
   delivered: { label: "Delivered", className: "is-delivered" },
+  collected: { label: "Collected", className: "is-collected" },
   cancelled: { label: "Cancelled", className: "is-cancelled" }
 };
 
@@ -233,6 +283,8 @@ function subscribeToOrders(){
     }
     renderOpsPanel();
     renderDriverPanel();
+    renderOperationsMapSection();
+    renderCollectionAssignmentSection();
     renderInventoryDashboard();
     applyFilters();
     updateStats(allOrders);
@@ -283,6 +335,8 @@ function subscribeToDrivers(){
 
     populateDriverFilter();
     renderDriverPanel();
+    renderOperationsMapSection();
+    renderCollectionAssignmentSection();
     applyFilters();
   }, (error) => {
     console.error("Failed to subscribe to drivers:", error);
@@ -367,8 +421,8 @@ function renderOrders(orders){
             WhatsApp
           </button>
 
-          ${order.status === "delivered"
-            ? `<span class="admin-badge no-modal completed-badge">Delivered</span>`
+          ${order.status === "delivered" || order.status === "collected"
+            ? `<span class="admin-badge no-modal completed-badge">${formatStatusLabel(order.status)}</span>`
             : order.driver
             ? `<button class="btn btn-secondary driver-btn no-modal" data-id="${order.id}" type="button">
                 Driver: ${order.driver.name}
@@ -379,7 +433,7 @@ function renderOrders(orders){
                 </button>`
               : ""}
 
-          ${order.status === "delivered" ? `
+          ${order.status === "delivered" || order.status === "collected" ? `
             <button class="btn btn-dark review-request-btn no-modal" data-id="${order.id}">
               Send Review Request
             </button>
@@ -1124,6 +1178,1027 @@ function renderDriverPanel(){
   `).join("");
 }
 
+function getDriverOperationIdentityKeys(entity = {}){
+  const keys = [];
+  const uid = String(entity?.uid || "").trim().toLowerCase();
+  const id = String(entity?.id || "").trim().toLowerCase();
+  const email = normalizeEmail(entity?.email);
+  const phone = normalizePhoneForSearch(entity?.phone);
+  const name = normalizeInventoryText(entity?.name);
+
+  if(uid){
+    keys.push(`uid:${uid}`);
+  }
+
+  if(id){
+    keys.push(`id:${id}`);
+  }
+
+  if(email){
+    keys.push(`email:${email}`);
+  }
+
+  if(phone){
+    keys.push(`phone:${phone}`);
+  }
+
+  if(name){
+    keys.push(`name:${name}`);
+  }
+
+  return [...new Set(keys)];
+}
+
+function createDriverOperationEntry(source = {}, fallbackKey = "driver:unknown"){
+  return {
+    key: fallbackKey,
+    id: String(source?.id || "").trim(),
+    uid: String(source?.uid || "").trim(),
+    name: String(source?.name || "").trim() || "Unnamed Driver",
+    email: normalizeEmail(source?.email),
+    phone: String(source?.phone || "").trim(),
+    activeOrders: [],
+    activeDeliveryCount: 0,
+    latestLocation: null,
+    lastUpdatedAtMs: 0,
+    hasLocation: false,
+    isLive: false,
+    isStale: false,
+    isOperationallyActive: false,
+    state: "idle",
+    modeLabel: "Idle"
+  };
+}
+
+function mergeDriverOperationMeta(entry, source = {}){
+  if(!entry){
+    return;
+  }
+
+  const nextName = String(source?.name || "").trim();
+  const nextEmail = normalizeEmail(source?.email);
+  const nextPhone = String(source?.phone || "").trim();
+  const nextId = String(source?.id || "").trim();
+  const nextUid = String(source?.uid || "").trim();
+
+  if(nextId && !entry.id){
+    entry.id = nextId;
+  }
+
+  if(nextUid && !entry.uid){
+    entry.uid = nextUid;
+  }
+
+  if(nextEmail && !entry.email){
+    entry.email = nextEmail;
+  }
+
+  if(nextPhone && !entry.phone){
+    entry.phone = nextPhone;
+  }
+
+  if(nextName && (!entry.name || entry.name === "Unnamed Driver" || entry.name === "Driver")){
+    entry.name = nextName;
+  }
+}
+
+function ensureDriverOperationEntry(registry, aliases, source = {}, fallbackKey = "driver:unknown"){
+  const identityKeys = getDriverOperationIdentityKeys(source);
+  const matchedKey = identityKeys.find((identityKey) => aliases.has(identityKey));
+  const operationKey = matchedKey ? aliases.get(matchedKey) : (identityKeys[0] || fallbackKey);
+  let entry = registry.get(operationKey);
+
+  if(!entry){
+    entry = createDriverOperationEntry(source, operationKey);
+    registry.set(operationKey, entry);
+  }else{
+    mergeDriverOperationMeta(entry, source);
+  }
+
+  getDriverOperationIdentityKeys({
+    ...entry,
+    ...source
+  }).forEach((identityKey) => {
+    aliases.set(identityKey, operationKey);
+  });
+
+  return entry;
+}
+
+function getDriverDocumentLocationCandidate(driver = {}){
+  const locationSources = [
+    driver?.liveLocation,
+    driver?.currentLocation,
+    driver?.driverLocation,
+    driver?.location,
+    driver?.lastLocation
+  ];
+
+  for(const source of locationSources){
+    const coordinates = getValidatedUaeCoordinates(getLocationCoordinates(source) || source);
+
+    if(coordinates){
+      return {
+        coordinates,
+        updatedAtMs: getTimestampValue(
+          source?.updatedAt ||
+          source?.lastUpdatedAt ||
+          source?.timestamp ||
+          driver?.locationUpdatedAt ||
+          driver?.updatedAt
+        )
+      };
+    }
+  }
+
+  return null;
+}
+
+function getOrderDriverLocationCandidate(order = {}){
+  const coordinates = getValidatedUaeCoordinates(getLocationCoordinates(order?.driverLocation) || order?.driverLocation);
+
+  if(!coordinates){
+    return null;
+  }
+
+  return {
+    coordinates,
+    updatedAtMs: getTimestampValue(
+      order?.driverLocation?.updatedAt ||
+      order?.driverLocation?.lastUpdatedAt ||
+      order?.driverLocation?.timestamp ||
+      order?.updatedAt
+    )
+  };
+}
+
+function upsertDriverOperationLocation(entry, locationCandidate){
+  if(!entry || !locationCandidate?.coordinates){
+    return;
+  }
+
+  if(!entry.latestLocation || locationCandidate.updatedAtMs >= entry.lastUpdatedAtMs){
+    entry.latestLocation = {
+      lat: Number(locationCandidate.coordinates.lat),
+      lng: Number(locationCandidate.coordinates.lng)
+    };
+    entry.lastUpdatedAtMs = locationCandidate.updatedAtMs || entry.lastUpdatedAtMs || 0;
+  }
+}
+
+function getOperationsDriverState(entry){
+  if(entry.activeDeliveryCount > 0){
+    if(entry.hasLocation){
+      return entry.isLive ? "live" : "stale";
+    }
+
+    return "no-location";
+  }
+
+  if(entry.hasLocation){
+    return entry.isLive ? "live" : "stale";
+  }
+
+  return "idle";
+}
+
+function finalizeDriverOperationEntry(entry){
+  const hasLocation = Boolean(entry.latestLocation);
+  const locationAgeMs = hasLocation && entry.lastUpdatedAtMs
+    ? Math.max(0, Date.now() - entry.lastUpdatedAtMs)
+    : Number.POSITIVE_INFINITY;
+  const isLive = hasLocation && locationAgeMs <= DRIVER_LOCATION_LIVE_THRESHOLD_MS;
+  const isStale = hasLocation && !isLive;
+  const activeOrders = [...entry.activeOrders].sort((first, second) => {
+    const firstDate = String(first.eventDate || "");
+    const secondDate = String(second.eventDate || "");
+
+    if(firstDate !== secondDate){
+      return firstDate.localeCompare(secondDate);
+    }
+
+    return String(first.orderId || first.id || "").localeCompare(String(second.orderId || second.id || ""));
+  });
+  const finalized = {
+    ...entry,
+    activeOrders,
+    activeDeliveryCount: activeOrders.length,
+    hasLocation,
+    isLive,
+    isStale,
+    isOperationallyActive: activeOrders.length > 0 || hasLocation,
+    modeLabel: activeOrders.length > 0 ? "On delivery" : hasLocation ? "Location active" : "Idle"
+  };
+
+  finalized.state = getOperationsDriverState(finalized);
+  return finalized;
+}
+
+function getOperationsDriverStatusLabel(entry){
+  if(entry.state === "live"){
+    return entry.activeDeliveryCount > 0 ? "Live" : "Location Active";
+  }
+
+  if(entry.state === "stale"){
+    return "Stale";
+  }
+
+  if(entry.state === "no-location"){
+    return "No Location";
+  }
+
+  return "Idle";
+}
+
+function formatOperationsLocationAge(timestampMs){
+  if(!timestampMs){
+    return "No recent update";
+  }
+
+  const differenceMs = Math.max(0, Date.now() - timestampMs);
+  const differenceMinutes = Math.round(differenceMs / 60000);
+
+  if(differenceMinutes <= 1){
+    return "Updated just now";
+  }
+
+  if(differenceMinutes < 60){
+    return `Updated ${differenceMinutes} min ago`;
+  }
+
+  const differenceHours = Math.round(differenceMinutes / 60);
+
+  if(differenceHours < 24){
+    return `Updated ${differenceHours} hr ago`;
+  }
+
+  const differenceDays = Math.round(differenceHours / 24);
+  return `Updated ${differenceDays} day${differenceDays === 1 ? "" : "s"} ago`;
+}
+
+function getOperationsMapData(){
+  const registry = new Map();
+  const aliases = new Map();
+
+  driversList.forEach((driver, index) => {
+    const entry = ensureDriverOperationEntry(
+      registry,
+      aliases,
+      driver,
+      `driver:${driver?.id || driver?.uid || index + 1}`
+    );
+
+    upsertDriverOperationLocation(entry, getDriverDocumentLocationCandidate(driver));
+  });
+
+  const activeOrders = allOrders.filter((order) => normalizeOrderStatusValue(order.status) === "out-for-delivery");
+
+  activeOrders.forEach((order, index) => {
+    const orderDriver = order.driver || {};
+    const entry = ensureDriverOperationEntry(
+      registry,
+      aliases,
+      orderDriver,
+      `active-order-driver:${order.id || index + 1}`
+    );
+
+    mergeDriverOperationMeta(entry, orderDriver);
+
+    if(!entry.activeOrders.some((activeOrder) => activeOrder.id === order.id)){
+      entry.activeOrders.push({
+        id: order.id,
+        orderId: order.orderId || order.id || "N/A",
+        customerName: order.customerName || "Unknown customer",
+        eventDate: order.eventDate || "",
+        eventLocation: order.eventLocation || "",
+        status: order.status || ""
+      });
+    }
+
+    upsertDriverOperationLocation(entry, getOrderDriverLocationCandidate(order));
+  });
+
+  const statePriority = {
+    live: 0,
+    stale: 1,
+    "no-location": 2,
+    idle: 3
+  };
+  const entries = [...registry.values()]
+    .map(finalizeDriverOperationEntry)
+    .sort((first, second) => {
+      if(statePriority[first.state] !== statePriority[second.state]){
+        return statePriority[first.state] - statePriority[second.state];
+      }
+
+      if(second.activeDeliveryCount !== first.activeDeliveryCount){
+        return second.activeDeliveryCount - first.activeDeliveryCount;
+      }
+
+      return String(first.name || "").localeCompare(String(second.name || ""));
+    });
+  const activeEntries = entries.filter((entry) => entry.isOperationallyActive);
+  const driversWithVisibleLocation = activeEntries.filter((entry) => entry.hasLocation);
+  const liveEntries = activeEntries.filter((entry) => entry.isLive);
+  const staleEntries = activeEntries.filter((entry) => entry.isStale);
+  const noLocationEntries = activeEntries.filter((entry) => entry.activeDeliveryCount > 0 && !entry.hasLocation);
+
+  return {
+    entries,
+    activeEntries,
+    activeDriversCount: activeEntries.length,
+    liveDriversCount: liveEntries.length,
+    staleDriversCount: staleEntries.length,
+    driversWithoutLocationCount: noLocationEntries.length,
+    activeDeliveriesCount: activeOrders.length,
+    visibleDriverEntries: driversWithVisibleLocation
+  };
+}
+
+function renderOperationsMapMetrics(data){
+  if(operationsMapActiveDrivers){
+    operationsMapActiveDrivers.textContent = String(data.activeDriversCount);
+  }
+
+  if(operationsMapLiveDrivers){
+    operationsMapLiveDrivers.textContent = String(data.liveDriversCount);
+  }
+
+  if(operationsMapDriversWithoutLocation){
+    operationsMapDriversWithoutLocation.textContent = String(data.driversWithoutLocationCount);
+  }
+
+  if(operationsMapActiveDeliveries){
+    operationsMapActiveDeliveries.textContent = String(data.activeDeliveriesCount);
+  }
+
+  if(!operationsMapSummary){
+    return;
+  }
+
+  if(!data.activeDriversCount){
+    operationsMapSummary.textContent = "No active deliveries or live driver locations right now. The map stays centered on the warehouse.";
+    return;
+  }
+
+  operationsMapSummary.textContent = `${data.activeDriversCount} active driver${data.activeDriversCount === 1 ? "" : "s"}, ${data.activeDeliveriesCount} active deliver${data.activeDeliveriesCount === 1 ? "y" : "ies"}, ${data.liveDriversCount} live, ${data.staleDriversCount} stale, ${data.driversWithoutLocationCount} without location.`;
+}
+
+function getOperationsDriverListMarkup(entry){
+  const orderIds = entry.activeOrders.map((order) => order.orderId || order.id).filter(Boolean);
+  const stateLabel = getOperationsDriverStatusLabel(entry);
+  const canFocusMap = entry.hasLocation;
+
+  return `
+    <button
+      type="button"
+      class="operations-driver-item is-${entry.state} ${canFocusMap ? "is-focusable" : "is-static"}"
+      data-driver-key="${escapeAttribute(entry.key)}"
+      aria-label="${escapeAttribute(`${entry.name || "Driver"} - ${stateLabel}`)}"
+    >
+      <div class="operations-driver-item-head">
+        <div>
+          <strong>${escapeHtml(entry.name || "Unnamed Driver")}</strong>
+          <p>${escapeHtml(entry.phone || entry.email || entry.modeLabel)}</p>
+        </div>
+        <span class="operations-driver-state is-${entry.state}">${escapeHtml(stateLabel)}</span>
+      </div>
+
+      <div class="operations-driver-item-meta">
+        <span>${entry.activeDeliveryCount} active order${entry.activeDeliveryCount === 1 ? "" : "s"}</span>
+        <span>${escapeHtml(entry.hasLocation ? formatOperationsLocationAge(entry.lastUpdatedAtMs) : "Location unavailable")}</span>
+      </div>
+
+      ${orderIds.length ? `
+        <div class="operations-driver-orders">
+          ${orderIds.map((orderId) => `<span>${escapeHtml(orderId)}</span>`).join("")}
+        </div>
+      ` : `
+        <div class="operations-driver-orders is-empty">
+          <span>No active order assigned</span>
+        </div>
+      `}
+    </button>
+  `;
+}
+
+function renderOperationsMapDriverList(data){
+  if(!operationsMapDriverList){
+    return;
+  }
+
+  if(!data.entries.length){
+    operationsMapDriverList.innerHTML = `
+      <article class="operations-driver-empty">
+        <strong>No drivers available yet</strong>
+        <p>Add or load drivers to start monitoring live delivery activity here.</p>
+      </article>
+    `;
+    return;
+  }
+
+  operationsMapDriverList.innerHTML = data.entries.map(getOperationsDriverListMarkup).join("");
+}
+
+function attachOperationsMapDriverEvents(){
+  if(!operationsMapDriverList){
+    return;
+  }
+
+  operationsMapDriverList.querySelectorAll(".operations-driver-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      focusOperationsMapDriver(button.dataset.driverKey || "");
+    });
+  });
+}
+
+function createOperationsMapIcon(type, state = "live"){
+  if(typeof window === "undefined" || !window.L){
+    return null;
+  }
+
+  const markerClass = type === "warehouse"
+    ? "operations-map-marker is-warehouse"
+    : `operations-map-marker is-driver is-${state}`;
+  const markerLabel = type === "warehouse" ? "W" : "D";
+
+  return window.L.divIcon({
+    className: "operations-map-marker-wrapper",
+    html: `<div class="${markerClass}"><span>${markerLabel}</span></div>`,
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+    popupAnchor: [0, -18]
+  });
+}
+
+function ensureOperationsMap(){
+  if(!operationsMapContainer || typeof window === "undefined" || !window.L){
+    return null;
+  }
+
+  if(liveOperationsMap){
+    window.setTimeout(() => {
+      liveOperationsMap?.invalidateSize();
+    }, 0);
+    return liveOperationsMap;
+  }
+
+  operationsMapContainer.innerHTML = "";
+  liveOperationsMap = window.L.map(operationsMapContainer, {
+    zoomControl: true,
+    scrollWheelZoom: true
+  });
+
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(liveOperationsMap);
+
+  liveOperationsMapLayer = window.L.layerGroup().addTo(liveOperationsMap);
+  liveOperationsMap.setView(
+    [OPERATIONS_WAREHOUSE.coordinates.lat, OPERATIONS_WAREHOUSE.coordinates.lng],
+    11
+  );
+
+  liveOperationsMap.on("dragstart zoomstart", () => {
+    operationsMapHasUserMoved = true;
+  });
+
+  window.setTimeout(() => {
+    liveOperationsMap?.invalidateSize();
+  }, 0);
+
+  return liveOperationsMap;
+}
+
+function getWarehousePopupMarkup(data){
+  return `
+    <div class="operations-map-popup is-warehouse">
+      <div class="operations-map-popup-head">
+        <strong>${escapeHtml(OPERATIONS_WAREHOUSE.name)}</strong>
+        <span class="operations-driver-state is-live">Warehouse</span>
+      </div>
+      <p>${escapeHtml(OPERATIONS_WAREHOUSE.label)}</p>
+      <div class="operations-map-popup-grid">
+        <div>
+          <span>Active Drivers</span>
+          <strong>${data.activeDriversCount}</strong>
+        </div>
+        <div>
+          <span>Active Deliveries</span>
+          <strong>${data.activeDeliveriesCount}</strong>
+        </div>
+      </div>
+      <p>${escapeHtml(formatCoordinatePair(OPERATIONS_WAREHOUSE.coordinates))}</p>
+    </div>
+  `;
+}
+
+function getOperationsDriverPopupMarkup(entry){
+  const orderIds = entry.activeOrders.map((order) => order.orderId || order.id).filter(Boolean);
+  const lastUpdatedLabel = entry.hasLocation
+    ? `${formatOperationsLocationAge(entry.lastUpdatedAtMs)} (${formatQuoteHistoryDate(entry.lastUpdatedAtMs)})`
+    : "No live location shared yet";
+  const modeLabel = entry.activeDeliveryCount > 0 ? "On delivery" : "Location active";
+  const coordinateLink = entry.hasLocation ? buildGoogleMapsCoordinateLink(entry.latestLocation) : "";
+
+  return `
+    <div class="operations-map-popup">
+      <div class="operations-map-popup-head">
+        <strong>${escapeHtml(entry.name || "Unnamed Driver")}</strong>
+        <span class="operations-driver-state is-${entry.state}">${escapeHtml(getOperationsDriverStatusLabel(entry))}</span>
+      </div>
+      <p>${escapeHtml(entry.phone || entry.email || "No direct contact saved")}</p>
+      <div class="operations-map-popup-grid">
+        <div>
+          <span>Mode</span>
+          <strong>${escapeHtml(modeLabel)}</strong>
+        </div>
+        <div>
+          <span>Active Orders</span>
+          <strong>${entry.activeDeliveryCount}</strong>
+        </div>
+      </div>
+      <p>${escapeHtml(`Order IDs: ${orderIds.length ? orderIds.join(", ") : "None"}`)}</p>
+      <p>${escapeHtml(`Last location update: ${lastUpdatedLabel}`)}</p>
+      ${coordinateLink ? `
+        <a class="operations-map-popup-link" href="${coordinateLink}" target="_blank" rel="noreferrer">
+          Open latest location
+        </a>
+      ` : ""}
+    </div>
+  `;
+}
+
+function getOperationsMapEmptyState(data){
+  if(!data.activeDriversCount){
+    return {
+      title: "No active drivers right now",
+      copy: "The warehouse remains visible until the next delivery or collection run starts."
+    };
+  }
+
+  if(!data.liveDriversCount && data.visibleDriverEntries.length){
+    return {
+      title: "No fresh live locations right now",
+      copy: "Showing the latest known driver positions while live sharing is stale."
+    };
+  }
+
+  if(!data.liveDriversCount){
+    return {
+      title: "No live driver locations available yet",
+      copy: "Drivers have active orders, but no valid live coordinates have been shared yet."
+    };
+  }
+
+  return null;
+}
+
+function renderOperationsMapCanvas(data){
+  if(!operationsMapContainer){
+    return;
+  }
+
+  const emptyState = getOperationsMapEmptyState(data);
+
+  if(operationsMapEmptyState){
+    operationsMapEmptyState.hidden = !emptyState;
+
+    if(emptyState){
+      operationsMapEmptyState.innerHTML = `
+        <strong>${escapeHtml(emptyState.title)}</strong>
+        <p>${escapeHtml(emptyState.copy)}</p>
+      `;
+    }
+  }
+
+  const map = ensureOperationsMap();
+
+  if(!map || !liveOperationsMapLayer){
+    return;
+  }
+
+  liveOperationsMapLayer.clearLayers();
+  operationsMapDriverMarkers = new Map();
+
+  const visibleLatLngs = [];
+  const warehouseLatLng = [OPERATIONS_WAREHOUSE.coordinates.lat, OPERATIONS_WAREHOUSE.coordinates.lng];
+  const warehouseMarker = window.L.marker(warehouseLatLng, {
+    icon: createOperationsMapIcon("warehouse")
+  }).bindPopup(getWarehousePopupMarkup(data));
+
+  liveOperationsMapLayer.addLayer(warehouseMarker);
+  visibleLatLngs.push(warehouseLatLng);
+
+  data.visibleDriverEntries.forEach((entry) => {
+    const marker = window.L.marker([entry.latestLocation.lat, entry.latestLocation.lng], {
+      icon: createOperationsMapIcon("driver", entry.isLive ? "live" : "stale")
+    })
+      .bindPopup(getOperationsDriverPopupMarkup(entry))
+      .bindTooltip(entry.name || "Driver", {
+        direction: "top",
+        offset: [0, -18]
+      });
+
+    liveOperationsMapLayer.addLayer(marker);
+    operationsMapDriverMarkers.set(entry.key, marker);
+    visibleLatLngs.push([entry.latestLocation.lat, entry.latestLocation.lng]);
+  });
+
+  const boundsSignature = [
+    "warehouse",
+    ...data.visibleDriverEntries.map((entry) => entry.key).sort()
+  ].join("|");
+  const shouldAutoFrame = !operationsMapHasUserMoved || boundsSignature !== operationsMapLastBoundsSignature;
+
+  if(shouldAutoFrame){
+    if(visibleLatLngs.length > 1){
+      map.fitBounds(visibleLatLngs, {
+        padding: [40, 40],
+        maxZoom: 13
+      });
+    }else{
+      map.setView(warehouseLatLng, 11);
+    }
+  }
+
+  operationsMapLastBoundsSignature = boundsSignature;
+
+  window.setTimeout(() => {
+    map.invalidateSize();
+  }, 0);
+}
+
+function focusOperationsMapDriver(driverKey){
+  if(!driverKey || !liveOperationsMap){
+    return;
+  }
+
+  const marker = operationsMapDriverMarkers.get(driverKey);
+
+  if(!marker){
+    return;
+  }
+
+  operationsMapHasUserMoved = true;
+  liveOperationsMap.flyTo(marker.getLatLng(), 14, {
+    duration: 0.45
+  });
+  marker.openPopup();
+}
+
+function renderOperationsMapSection(){
+  if(!operationsMapContainer && !operationsMapDriverList){
+    return;
+  }
+
+  const operationsData = getOperationsMapData();
+  renderOperationsMapMetrics(operationsData);
+  renderOperationsMapDriverList(operationsData);
+  renderOperationsMapCanvas(operationsData);
+  attachOperationsMapDriverEvents();
+}
+
+function getOrdersAwaitingCollection(){
+  return [...allOrders]
+    .filter((order) => normalizeOrderStatusValue(order.status) === "delivered")
+    .sort((first, second) => {
+      const secondDeliveredTime = getTimestampValue(second.deliveredAt);
+      const firstDeliveredTime = getTimestampValue(first.deliveredAt);
+
+      if(secondDeliveredTime !== firstDeliveredTime){
+        return secondDeliveredTime - firstDeliveredTime;
+      }
+
+      return String(second.eventDate || "").localeCompare(String(first.eventDate || ""));
+    });
+}
+
+function getDriverAssignmentOptionValue(driver){
+  return driver?.id || driver?.uid || normalizeEmail(driver?.email) || normalizePhoneForSearch(driver?.phone) || "";
+}
+
+function getDriverAssignmentMeta(driver){
+  return {
+    id: driver?.id || "",
+    uid: driver?.uid || "",
+    name: driver?.name || "Driver",
+    phone: driver?.phone || "",
+    email: driver?.email || ""
+  };
+}
+
+function getCurrentAdminMeta(){
+  const currentUser = auth.currentUser;
+  const fallbackName = currentUser?.email ? String(currentUser.email).split("@")[0] : "Admin";
+
+  return {
+    uid: currentUser?.uid || "",
+    name: currentUser?.displayName || fallbackName || "Admin",
+    email: currentUser?.email || "",
+    phone: currentUser?.phoneNumber || ""
+  };
+}
+
+function getSelectedCollectionOrder(){
+  return allOrders.find((order) => order.id === selectedCollectionOrderId) || null;
+}
+
+function getSelectedCollectionDriver(){
+  return driversList.find((driver) => getDriverAssignmentOptionValue(driver) === selectedCollectionDriverId) || null;
+}
+
+function syncCollectionRequestActionState(){
+  if(!sendCollectionRequestBtn){
+    return;
+  }
+
+  const hasValidOrder = Boolean(getSelectedCollectionOrder());
+  const hasValidDriver = Boolean(getSelectedCollectionDriver());
+  sendCollectionRequestBtn.disabled = isSendingCollectionRequest || !hasValidOrder || !hasValidDriver;
+  sendCollectionRequestBtn.textContent = isSendingCollectionRequest ? "Sending Collection Request..." : "Send Collection Request";
+}
+
+function renderCollectionRequestPreview(){
+  if(!collectionRequestPreview){
+    return;
+  }
+
+  const selectedOrder = getSelectedCollectionOrder();
+  const selectedDriver = getSelectedCollectionDriver();
+  const pendingNote = collectionRequestNote?.value.trim() || "";
+
+  if(!selectedOrder){
+    collectionRequestPreview.innerHTML = `
+      <article class="collection-preview-state is-empty">
+        <strong>No delivered order selected yet</strong>
+        <p>Select a delivered order and driver to preview the collection request before sending it on WhatsApp.</p>
+      </article>
+    `;
+    syncCollectionRequestActionState();
+    return;
+  }
+
+  const assignedDriver = selectedOrder.collectionRequest?.assignedDriver || null;
+  const assignedAt = formatQuoteHistoryDate(selectedOrder.collectionRequest?.assignedAt);
+  const note = selectedOrder.collectionRequest?.note || "";
+
+  collectionRequestPreview.innerHTML = `
+    <article class="collection-preview-state is-ready">
+      <div class="collection-preview-head">
+        <div>
+          <span class="section-kicker">Collection Preview</span>
+          <h3>${escapeHtml(selectedOrder.orderId || selectedOrder.id || "Order")}</h3>
+          <p>${escapeHtml(selectedOrder.customerName || "Unknown customer")}</p>
+        </div>
+        <span class="inventory-status-pill is-warning">Delivered</span>
+      </div>
+
+      <div class="collection-preview-grid">
+        <div>
+          <span>Order ID</span>
+          <strong>${escapeHtml(selectedOrder.orderId || selectedOrder.id || "N/A")}</strong>
+        </div>
+        <div>
+          <span>Customer</span>
+          <strong>${escapeHtml(selectedOrder.customerName || "Unknown customer")}</strong>
+        </div>
+        <div class="is-wide">
+          <span>Location</span>
+          <strong>${escapeHtml(selectedOrder.eventLocation || "No location recorded")}</strong>
+        </div>
+        <div>
+          <span>Rental Days</span>
+          <strong>${getOrderRentalDays(selectedOrder)}</strong>
+        </div>
+        <div>
+          <span>Driver</span>
+          <strong>${escapeHtml(selectedDriver?.name || "Select a driver")}</strong>
+        </div>
+      </div>
+
+      ${assignedDriver ? `
+        <div class="collection-preview-note">
+          <strong>Current request</strong>
+          <p>${escapeHtml(assignedDriver.name || "Driver")}${assignedDriver.phone ? ` | ${escapeHtml(assignedDriver.phone)}` : ""} assigned ${escapeHtml(assignedAt)}.</p>
+          <p>${escapeHtml(note || "No note saved yet.")}</p>
+        </div>
+      ` : ""}
+      <div class="collection-preview-note">
+        <strong>WhatsApp preview</strong>
+        <p>${escapeHtml(`Collection Request - Al Taj Al Malaky`)}</p>
+        <p>${escapeHtml(`Order ID: ${selectedOrder.orderId || selectedOrder.id || "N/A"}`)}</p>
+        <p>${escapeHtml(`Customer: ${selectedOrder.customerName || "Unknown customer"}`)}</p>
+        <p>${escapeHtml(`Location: ${selectedOrder.eventLocation || "No location recorded"}`)}</p>
+        <p>${escapeHtml(`Rental Days: ${getOrderRentalDays(selectedOrder)}`)}</p>
+        <p>${escapeHtml(`Optional note: ${pendingNote || "None"}`)}</p>
+      </div>
+    </article>
+  `;
+
+  syncCollectionRequestActionState();
+}
+
+function renderCollectionAssignmentSection(){
+  if(!collectionOrderSelect || !collectionDriverSelect || !collectionRequestPreview){
+    return;
+  }
+
+  const awaitingOrders = getOrdersAwaitingCollection();
+  const currentOrderExists = awaitingOrders.some((order) => order.id === selectedCollectionOrderId);
+
+  if(!currentOrderExists){
+    selectedCollectionOrderId = awaitingOrders[0]?.id || "";
+  }
+
+  collectionOrderSelect.innerHTML = awaitingOrders.length
+    ? awaitingOrders.map((order) => `
+      <option value="${escapeAttribute(order.id)}" ${order.id === selectedCollectionOrderId ? "selected" : ""}>
+        ${escapeHtml(`${order.orderId || order.id} - ${order.customerName || "Unknown customer"}`)}
+      </option>
+    `).join("")
+    : '<option value="">No delivered orders awaiting collection</option>';
+  collectionOrderSelect.disabled = !awaitingOrders.length || isSendingCollectionRequest;
+
+  const driverOptions = driversList
+    .map((driver) => {
+      const value = getDriverAssignmentOptionValue(driver);
+
+      if(!value){
+        return null;
+      }
+
+      return {
+        value,
+        label: driver.name ? `${driver.name}${driver.phone ? ` (${driver.phone})` : driver.email ? ` (${driver.email})` : ""}` : (driver.email || driver.phone || "Unnamed Driver")
+      };
+    })
+    .filter(Boolean)
+    .sort((first, second) => first.label.localeCompare(second.label));
+  const currentDriverExists = driverOptions.some((driver) => driver.value === selectedCollectionDriverId);
+
+  if(!currentDriverExists){
+    selectedCollectionDriverId = "";
+  }
+
+  collectionDriverSelect.innerHTML = driverOptions.length
+    ? `
+      <option value="">Select a driver</option>
+      ${driverOptions.map((driver) => `
+        <option value="${escapeAttribute(driver.value)}" ${driver.value === selectedCollectionDriverId ? "selected" : ""}>
+          ${escapeHtml(driver.label)}
+        </option>
+      `).join("")}
+    `
+    : '<option value="">No drivers available</option>';
+  collectionDriverSelect.disabled = !driverOptions.length || isSendingCollectionRequest;
+
+  if(collectionPanelSummary){
+    collectionPanelSummary.textContent = awaitingOrders.length
+      ? `${awaitingOrders.length} delivered order${awaitingOrders.length === 1 ? "" : "s"} awaiting collection assignment.`
+      : "No delivered orders are currently awaiting collection.";
+  }
+
+  renderCollectionRequestPreview();
+}
+
+function buildCollectionRequestMessage(order, driver, note = ""){
+  const cleanNote = note.trim();
+
+  return `Collection Request - Al Taj Al Malaky
+
+Order ID: ${order.orderId || order.id || "N/A"}
+Customer: ${order.customerName || "Unknown customer"}
+Location: ${order.eventLocation || "No location recorded"}
+Rental Days: ${getOrderRentalDays(order)}
+
+Use this Order ID in the driver dashboard under:
+Collect an Order
+
+Optional note: ${cleanNote || "None"}`;
+}
+
+async function handleSendCollectionRequest(){
+  if(isSendingCollectionRequest){
+    return;
+  }
+
+  const selectedOrder = getSelectedCollectionOrder();
+  const selectedDriver = getSelectedCollectionDriver();
+
+  if(!selectedOrder){
+    showToast("Select a delivered order first", "warning");
+    renderCollectionRequestPreview();
+    return;
+  }
+
+  if(normalizeOrderStatusValue(selectedOrder.status) !== "delivered"){
+    showToast("Only delivered orders can be assigned for collection", "warning");
+    renderCollectionAssignmentSection();
+    return;
+  }
+
+  if(!selectedDriver){
+    showToast("Select a driver first", "warning");
+    renderCollectionRequestPreview();
+    return;
+  }
+
+  const whatsappPhone = getFormattedWhatsAppPhone(selectedDriver.phone);
+
+  if(!whatsappPhone){
+    showToast("Selected driver does not have a WhatsApp phone number", "warning");
+    return;
+  }
+
+  isSendingCollectionRequest = true;
+  syncCollectionRequestActionState();
+
+  let whatsappWindow = null;
+
+  try{
+    whatsappWindow = window.open("about:blank", "_blank");
+  }catch{
+    whatsappWindow = null;
+  }
+
+  try{
+    const latestOrderSnapshot = await getDoc(doc(db, "orders", selectedOrder.id));
+
+    if(!latestOrderSnapshot.exists()){
+      showToast("This order no longer exists", "error");
+      renderCollectionAssignmentSection();
+      if(whatsappWindow && !whatsappWindow.closed){
+        whatsappWindow.close();
+      }
+      return;
+    }
+
+    const latestOrder = {
+      id: latestOrderSnapshot.id,
+      ...latestOrderSnapshot.data()
+    };
+
+    if(normalizeOrderStatusValue(latestOrder.status) !== "delivered"){
+      showToast("This order is no longer eligible for collection assignment", "warning");
+      renderCollectionAssignmentSection();
+      if(whatsappWindow && !whatsappWindow.closed){
+        whatsappWindow.close();
+      }
+      return;
+    }
+
+    const requestNote = collectionRequestNote?.value.trim() || "";
+    const assignedBy = getCurrentAdminMeta();
+    const assignedDriver = getDriverAssignmentMeta(selectedDriver);
+    const message = buildCollectionRequestMessage(latestOrder, selectedDriver, requestNote);
+    const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
+
+    await updateDoc(doc(db, "orders", latestOrder.id), {
+      collectionRequest: {
+        assigned: true,
+        assignedAt: serverTimestamp(),
+        assignedBy,
+        assignedDriver,
+        note: requestNote
+      }
+    });
+
+    const localOrderIndex = allOrders.findIndex((order) => order.id === latestOrder.id);
+
+    if(localOrderIndex >= 0){
+      allOrders[localOrderIndex] = {
+        ...allOrders[localOrderIndex],
+        collectionRequest: {
+          assigned: true,
+          assignedAt: new Date(),
+          assignedBy,
+          assignedDriver,
+          note: requestNote
+        }
+      };
+    }
+
+    if(whatsappWindow && !whatsappWindow.closed){
+      whatsappWindow.location.href = whatsappUrl;
+    }else{
+      window.open(whatsappUrl, "_blank");
+    }
+
+    renderCollectionAssignmentSection();
+    showToast("Collection request sent to driver", "success");
+  }catch(error){
+    console.error("Failed to send collection request:", error);
+    if(whatsappWindow && !whatsappWindow.closed){
+      whatsappWindow.close();
+    }
+    showToast("Could not send collection request", "error");
+  }finally{
+    isSendingCollectionRequest = false;
+    syncCollectionRequestActionState();
+  }
+}
+
 /* STATUS OPTIONS */
 
 function getStatusOptions(current){
@@ -1135,6 +2210,7 @@ function getStatusOptions(current){
     "preparing",
     "out-for-delivery",
     "delivered",
+    "collected",
     "cancelled"
   ];
 
@@ -1328,9 +2404,11 @@ function openOrderModal(order, options = {}){
 
   const mapUrl = getOrderMapUrl(order);
   const modalOrderTitle = document.getElementById("modalOrderTitle");
+  const modalOrderSubtitle = document.getElementById("modalOrderSubtitle");
   const modalOrderIdValue = document.getElementById("modalOrderIdValue");
   const modalCopyOrderIdBtn = document.getElementById("modalCopyOrderIdBtn");
   const modalPhone = document.getElementById("modalPhone");
+  const modalEventDate = document.getElementById("modalEventDate");
   const modalRentalDays = document.getElementById("modalRentalDays");
   const modalEventTime = document.getElementById("modalEventTime");
   const modalSetupTime = document.getElementById("modalSetupTime");
@@ -1348,12 +2426,22 @@ function openOrderModal(order, options = {}){
     modalOrderTitle.textContent = order.customerName || "Unknown customer";
   }
 
+  if(modalOrderSubtitle){
+    const statusLabel = formatStatusLabel(order.status);
+    const eventDateLabel = order.eventDate || "date pending";
+    modalOrderSubtitle.textContent = `${statusLabel} order scheduled for ${eventDateLabel}.`;
+  }
+
   if(modalOrderIdValue){
     modalOrderIdValue.textContent = order.orderId || order.id || "";
   }
 
   if(modalPhone){
     modalPhone.textContent = order.phone || "N/A";
+  }
+
+  if(modalEventDate){
+    modalEventDate.textContent = order.eventDate || "N/A";
   }
 
   if(modalRentalDays){
@@ -1635,8 +2723,17 @@ function getOrderMapUrl(order){
 
 function getOrderItemsListMarkup(items = []){
   return items.length
-    ? items.map((item) => `<li>${escapeHtml(item.name || "Unnamed item")} x${Math.max(1, Number(item.quantity) || 1)}</li>`).join("")
-    : "<li>No items added</li>";
+    ? items.map((item) => `
+      <li class="admin-order-item">
+        <span class="admin-order-item-name">${escapeHtml(item.name || "Unnamed item")}</span>
+        <span class="admin-order-item-qty">x${Math.max(1, Number(item.quantity) || 1)}</span>
+      </li>
+    `).join("")
+    : `
+      <li class="admin-order-item is-empty">
+        <span class="admin-order-item-name">No items added</span>
+      </li>
+    `;
 }
 
 function getOrderItemsText(items = []){
@@ -2801,6 +3898,10 @@ function normalizeInventoryText(value){
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function normalizeOrderStatusValue(value){
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
 function getInventoryItemKey(name, variant = ""){
   return `${normalizeInventoryText(name)}::${normalizeInventoryText(variant)}`;
 }
@@ -2841,26 +3942,21 @@ function doDateRangesOverlap(firstWindow, secondWindow){
   return Boolean(firstWindow && secondWindow && firstWindow.start < secondWindow.end && firstWindow.end > secondWindow.start);
 }
 
+function isOrderActivelyReservingInventory(order){
+  return Boolean(order && INVENTORY_RESERVATION_STATUSES.has(normalizeOrderStatusValue(order.status)));
+}
+
 function isOrderReservableForInventory(order, targetWindow = null){
-  if(!order || order.status === "cancelled"){
+  if(!isOrderActivelyReservingInventory(order)){
     return false;
   }
 
-  if(INVENTORY_RESERVATION_STATUSES.has(order.status)){
+  if(!targetWindow){
     return true;
   }
 
-  if(order.status === "delivered"){
-    const rentalWindow = getRentalWindow(order.eventDate, getOrderRentalDays(order));
-
-    if(targetWindow){
-      return doDateRangesOverlap(rentalWindow, targetWindow);
-    }
-
-    return Boolean(rentalWindow && rentalWindow.end > getTodayWindow().start);
-  }
-
-  return false;
+  const rentalWindow = getRentalWindow(order.eventDate, getOrderRentalDays(order));
+  return doDateRangesOverlap(rentalWindow, targetWindow);
 }
 
 function getInventoryItemUsableStock(item){
@@ -2873,7 +3969,10 @@ function doesInventoryItemMatchOrderItem(inventoryItem, orderItem){
   }
 
   const orderProductId = orderItem.productId ?? orderItem.id ?? "";
-  if(orderProductId && inventoryItem.productId && String(inventoryItem.productId) === String(orderProductId)){
+  const normalizedInventoryProductId = String(inventoryItem.productId || "").trim().toLowerCase();
+  const normalizedOrderProductId = String(orderProductId || "").trim().toLowerCase();
+
+  if(normalizedOrderProductId && normalizedInventoryProductId && normalizedInventoryProductId === normalizedOrderProductId){
     const inventoryVariant = normalizeInventoryText(inventoryItem.variant);
     const orderVariant = normalizeInventoryText(orderItem.variant);
     return !inventoryVariant || inventoryVariant === orderVariant;
@@ -2901,6 +4000,34 @@ function doesInventoryItemMatchOrderItem(inventoryItem, orderItem){
 
 function findInventoryItemForOrderItem(orderItem){
   return allInventoryItems.find((inventoryItem) => doesInventoryItemMatchOrderItem(inventoryItem, orderItem)) || null;
+}
+
+function getReservedQuantityForInventoryItem(inventoryItem, options = {}){
+  const excludeOrderId = options.excludeOrderId || "";
+
+  if(!inventoryItem){
+    return 0;
+  }
+
+  return allOrders.reduce((reservedTotal, order) => {
+    if(excludeOrderId && order.id === excludeOrderId){
+      return reservedTotal;
+    }
+
+    if(!isOrderActivelyReservingInventory(order)){
+      return reservedTotal;
+    }
+
+    const orderReservedQuantity = (order.items || []).reduce((itemTotal, orderItem) => {
+      if(!doesInventoryItemMatchOrderItem(inventoryItem, orderItem)){
+        return itemTotal;
+      }
+
+      return itemTotal + normalizeStockNumber(orderItem.quantity);
+    }, 0);
+
+    return reservedTotal + orderReservedQuantity;
+  }, 0);
 }
 
 function getReservationsForInventoryItem(inventoryItem, options = {}){
@@ -2985,7 +4112,7 @@ function getInventoryComputedState(item){
   const totalStock = normalizeStockNumber(item.totalStock);
   const damagedStock = normalizeStockNumber(item.damagedStock);
   const usableStock = Math.max(0, totalStock - damagedStock);
-  const reservedStock = getInventoryReservedQuantityForSelectedDate(item);
+  const reservedStock = getReservedQuantityForInventoryItem(item);
   const rawAvailable = usableStock - reservedStock;
   const lowStockThreshold = normalizeStockNumber(item.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD);
   const isOverbooked = rawAvailable < 0;
@@ -4357,6 +5484,7 @@ function getStatusColor(status){
     preparing: "#d17f14",
     "out-for-delivery": "#7b4dd2",
     delivered: "#2f8b57",
+    collected: "#1e7a6d",
     cancelled: "#c04343",
     unknown: "#8a8173"
   };
@@ -4550,17 +5678,43 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   startInventoryClockRefresh();
   attachAdminSummaryCardEvents();
 
-  document.getElementById("searchInput").addEventListener("input", () => applyFilters(true));
+  searchInput?.addEventListener("input", () => {
+    syncSearchClearButton();
+    applyFilters(true);
+  });
+  clearSearchBtn?.addEventListener("click", () => {
+    if(!searchInput){
+      return;
+    }
+
+    searchInput.value = "";
+    syncSearchClearButton();
+    applyFilters(true);
+    searchInput.focus();
+  });
   document.getElementById("statusFilter").addEventListener("change", () => {
     syncAdminSummaryCardState();
     applyFilters(true);
   });
   document.getElementById("priorityFilter").addEventListener("change", () => applyFilters(true));
   driverFilter?.addEventListener("change", () => applyFilters(true));
+  collectionOrderSelect?.addEventListener("change", () => {
+    selectedCollectionOrderId = collectionOrderSelect.value || "";
+    renderCollectionRequestPreview();
+  });
+  collectionDriverSelect?.addEventListener("change", () => {
+    selectedCollectionDriverId = collectionDriverSelect.value || "";
+    renderCollectionRequestPreview();
+  });
+  collectionRequestNote?.addEventListener("input", renderCollectionRequestPreview);
+  sendCollectionRequestBtn?.addEventListener("click", handleSendCollectionRequest);
   inventorySearchInput?.addEventListener("input", renderInventoryTable);
   inventorySourceFilter?.addEventListener("change", renderInventoryTable);
   inventoryStatusFilter?.addEventListener("change", renderInventoryTable);
   reservationDateFilter?.addEventListener("change", renderInventoryDashboard);
+  syncSearchClearButton();
+  renderOperationsMapSection();
+  renderCollectionAssignmentSection();
   document.querySelectorAll(".inventory-sort-btn").forEach((button) => {
     button.addEventListener("click", () => {
       const key = button.dataset.sortKey || "name";

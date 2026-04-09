@@ -8,7 +8,7 @@ import {
 } from "./location-utils.js";
 import { initScrollTopButton } from "./scroll-top.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDocs, onSnapshot, query, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const driverWelcomeName = document.getElementById("driverWelcomeName");
 const driverSummaryText = document.getElementById("driverSummaryText");
@@ -27,6 +27,10 @@ const driverCompletedPagination = document.getElementById("driverCompletedPagina
 const driverCompletedPrevBtn = document.getElementById("driverCompletedPrevBtn");
 const driverCompletedNextBtn = document.getElementById("driverCompletedNextBtn");
 const driverCompletedPageInfo = document.getElementById("driverCompletedPageInfo");
+const driverCollectionForm = document.getElementById("driverCollectionForm");
+const driverCollectionOrderIdInput = document.getElementById("driverCollectionOrderIdInput");
+const driverCollectionFindBtn = document.getElementById("driverCollectionFindBtn");
+const driverCollectionResult = document.getElementById("driverCollectionResult");
 
 let currentDriver = null;
 let currentOrders = [];
@@ -41,6 +45,9 @@ let isLocationSharingEnabled = false;
 let locationWatchHealthCheckId = null;
 let lastLocationActivityAt = 0;
 let completedOrdersPage = 1;
+let currentCollectionLookupOrder = null;
+let isFindingCollectionOrder = false;
+let isMarkingCollected = false;
 
 const GEOLOCATION_OPTIONS = {
   enableHighAccuracy: true,
@@ -105,8 +112,25 @@ function formatStatusLabel(status){
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function normalizeOrderStatusValue(status){
+  return String(status || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function normalizeOrderIdInput(value){
+  return String(value || "").trim().replace(/\s+/g, "").toUpperCase();
+}
+
 function normalizeEmail(email){
   return String(email || "").trim().toLowerCase();
+}
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function isDriverActiveOrder(order){
@@ -114,7 +138,7 @@ function isDriverActiveOrder(order){
 }
 
 function isCompletedOrder(order){
-  return order.status === "delivered";
+  return order.status === "delivered" || order.status === "collected";
 }
 
 function getPriorityValue(priority){
@@ -141,7 +165,7 @@ function getOrderItemsMarkup(order){
 
   return items.map((item) => `
     <li>
-      <span>${item.name || "Unnamed item"}</span>
+      <span>${escapeHtml(item.name || "Unnamed item")}</span>
       <strong>x${Math.max(1, Number(item.quantity) || 1)}</strong>
     </li>
   `).join("");
@@ -168,6 +192,42 @@ function getDriverMeta(driver){
     email: driver?.email || "",
     uid: driver?.uid || ""
   };
+}
+
+function formatDriverDateTime(value, fallback = "Not recorded"){
+  const timestamp = getTimestampValue(value);
+
+  if(!timestamp){
+    return fallback;
+  }
+
+  return new Date(timestamp).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function getDeliveredByDisplay(order){
+  const deliveredBy = order?.deliveredBy || order?.driver || null;
+
+  if(!deliveredBy){
+    return "Not recorded";
+  }
+
+  return [deliveredBy.name, deliveredBy.phone || deliveredBy.email].filter(Boolean).join(" | ") || "Not recorded";
+}
+
+function getCollectedByDisplay(order){
+  const collectedBy = order?.collectedBy || null;
+
+  if(!collectedBy){
+    return "Not recorded";
+  }
+
+  return [collectedBy.name, collectedBy.phone || collectedBy.email].filter(Boolean).join(" | ") || "Not recorded";
 }
 
 function getPhoneForWhatsApp(phone){
@@ -346,6 +406,12 @@ function sortDriverOrders(orders){
 }
 
 function getOrderSortTime(order, fallback = Number.MAX_SAFE_INTEGER){
+  const collectedTime = getTimestampValue(order.collectedAt);
+
+  if(collectedTime){
+    return collectedTime;
+  }
+
   const deliveredTime = getTimestampValue(order.deliveredAt);
 
   if(deliveredTime){
@@ -417,7 +483,7 @@ function getEventDateTimeValue(order){
 }
 
 function getCompletedOrdersRangeValue(order){
-  return getTimestampValue(order.deliveredAt) || getEventDateTimeValue(order) || getTimestampValue(order.createdAt);
+  return getTimestampValue(order.collectedAt) || getTimestampValue(order.deliveredAt) || getEventDateTimeValue(order) || getTimestampValue(order.createdAt);
 }
 
 function isOrderInCurrentMonth(order){
@@ -458,6 +524,321 @@ function getCompletedOrders(){
   });
 
   return completedOrders;
+}
+
+function syncCollectionControls(){
+  if(driverCollectionOrderIdInput){
+    driverCollectionOrderIdInput.disabled = isFindingCollectionOrder || isMarkingCollected;
+  }
+
+  if(driverCollectionFindBtn){
+    driverCollectionFindBtn.disabled = isFindingCollectionOrder || isMarkingCollected || !currentDriver;
+    driverCollectionFindBtn.textContent = isFindingCollectionOrder ? "Finding..." : "Find Order";
+  }
+
+  const confirmButton = document.getElementById("driverCollectionConfirmBtn");
+
+  if(confirmButton){
+    confirmButton.disabled = isMarkingCollected;
+    confirmButton.textContent = isMarkingCollected ? "Marking Items Collected..." : "Mark Items Collected";
+  }
+}
+
+function renderCollectionState(markup){
+  if(!driverCollectionResult){
+    return;
+  }
+
+  driverCollectionResult.innerHTML = markup;
+  document.getElementById("driverCollectionConfirmBtn")?.addEventListener("click", handleMarkItemsCollected);
+  syncCollectionControls();
+}
+
+function renderCollectionEmptyState(){
+  currentCollectionLookupOrder = null;
+  renderCollectionState(`
+    <article class="driver-collection-state is-empty">
+      <strong>Ready to collect a delivered order</strong>
+      <p>Search by the customer-facing order ID to view the order summary and release inventory after collection.</p>
+    </article>
+  `);
+}
+
+function getCollectionSummaryMarkup(order){
+  return `
+    <div class="driver-collection-summary-grid">
+      <div>
+        <span>Order ID</span>
+        <strong>${escapeHtml(order.orderId || order.id || "N/A")}</strong>
+      </div>
+      <div>
+        <span>Customer</span>
+        <strong>${escapeHtml(order.customerName || "Unknown customer")}</strong>
+      </div>
+      <div>
+        <span>Event Date</span>
+        <strong>${escapeHtml(order.eventDate || "N/A")}</strong>
+      </div>
+      <div>
+        <span>Rental Days</span>
+        <strong>${getOrderRentalDays(order)}</strong>
+      </div>
+      <div class="is-wide">
+        <span>Event Location</span>
+        <strong>${escapeHtml(order.eventLocation || "No location recorded")}</strong>
+      </div>
+    </div>
+    <div class="driver-order-items driver-collection-items">
+      <span>Items in this Order</span>
+      <ul class="driver-order-items-list">
+        ${getOrderItemsMarkup(order)}
+      </ul>
+    </div>
+    <div class="driver-collection-summary-grid driver-collection-history-grid">
+      <div>
+        <span>Delivered By</span>
+        <strong>${escapeHtml(getDeliveredByDisplay(order))}</strong>
+      </div>
+      <div>
+        <span>Delivered At</span>
+        <strong>${escapeHtml(formatDriverDateTime(order.deliveredAt))}</strong>
+      </div>
+      ${normalizeOrderStatusValue(order.status) === "collected" ? `
+        <div>
+          <span>Collected By</span>
+          <strong>${escapeHtml(getCollectedByDisplay(order))}</strong>
+        </div>
+        <div>
+          <span>Collected At</span>
+          <strong>${escapeHtml(formatDriverDateTime(order.collectedAt))}</strong>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderCollectionLookupOrder(order, options = {}){
+  const normalizedStatus = normalizeOrderStatusValue(order?.status);
+  const isDeliveredOrder = normalizedStatus === "delivered";
+  const isCollectedOrder = normalizedStatus === "collected";
+  const tone = options.tone || (isDeliveredOrder ? "ready" : isCollectedOrder ? "success" : "warning");
+  const title = options.title || (
+    isDeliveredOrder
+      ? "Order Ready for Collection"
+      : isCollectedOrder
+        ? "This order has already been collected"
+        : "This order is not ready for collection"
+  );
+  const description = options.description || (
+    isDeliveredOrder
+      ? "Review the summary below, then confirm that the rental items have been collected back."
+      : isCollectedOrder
+        ? "This rental order has already been returned and inventory has been released."
+        : `Only orders with status Delivered can be collected. Current status: ${formatStatusLabel(order.status)}.`
+  );
+
+  renderCollectionState(`
+    <article class="driver-collection-state is-${tone}">
+      <div class="driver-collection-state-head">
+        <div>
+          <span class="driver-order-kicker">Collection Lookup</span>
+          <h3>${escapeHtml(title)}</h3>
+          <p>${escapeHtml(description)}</p>
+        </div>
+        <span class="driver-order-badge is-${escapeHtml(normalizedStatus || "unknown")}">
+          ${escapeHtml(formatStatusLabel(order.status))}
+        </span>
+      </div>
+      ${getCollectionSummaryMarkup(order)}
+      ${isDeliveredOrder ? `
+        <div class="driver-collection-actions">
+          <button id="driverCollectionConfirmBtn" class="btn btn-primary" type="button">
+            Mark Items Collected
+          </button>
+        </div>
+      ` : ""}
+    </article>
+  `);
+}
+
+function renderCollectionLookupMessage(tone, title, description){
+  currentCollectionLookupOrder = null;
+  renderCollectionState(`
+    <article class="driver-collection-state is-${tone}">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(description)}</p>
+    </article>
+  `);
+}
+
+async function findOrderByLookupId(orderIdValue){
+  const rawValue = String(orderIdValue || "").trim();
+  const normalizedValue = normalizeOrderIdInput(orderIdValue);
+  const directCandidates = [...new Set([
+    rawValue,
+    normalizedValue,
+    rawValue.toLowerCase(),
+    normalizedValue.toLowerCase()
+  ].filter(Boolean))];
+
+  for(const candidate of directCandidates){
+    const snapshot = await getDoc(doc(db, "orders", candidate));
+
+    if(snapshot.exists()){
+      return {
+        id: snapshot.id,
+        ...snapshot.data()
+      };
+    }
+  }
+
+  const orderIdCandidates = [...new Set([
+    rawValue,
+    normalizedValue,
+    rawValue.toLowerCase(),
+    normalizedValue.toLowerCase()
+  ].filter(Boolean))];
+
+  for(const candidate of orderIdCandidates){
+    const snapshot = await getDocs(query(collection(db, "orders"), where("orderId", "==", candidate)));
+
+    if(!snapshot.empty){
+      return {
+        id: snapshot.docs[0].id,
+        ...snapshot.docs[0].data()
+      };
+    }
+  }
+
+  return null;
+}
+
+async function handleCollectionLookup(event){
+  event.preventDefault();
+
+  if(isFindingCollectionOrder || isMarkingCollected){
+    return;
+  }
+
+  if(!currentDriver){
+    renderCollectionLookupMessage("warning", "Driver profile is still loading", "Please wait a moment and try again.");
+    return;
+  }
+
+  const enteredOrderId = driverCollectionOrderIdInput?.value || "";
+  const normalizedOrderId = normalizeOrderIdInput(enteredOrderId);
+
+  if(!normalizedOrderId){
+    renderCollectionLookupMessage("error", "Enter an order ID", "Type the customer-facing order ID before searching.");
+    driverCollectionOrderIdInput?.focus();
+    return;
+  }
+
+  isFindingCollectionOrder = true;
+  currentCollectionLookupOrder = null;
+  renderCollectionLookupMessage("info", "Searching for order", `Looking up ${normalizedOrderId} now.`);
+  syncCollectionControls();
+
+  try{
+    const order = await findOrderByLookupId(enteredOrderId);
+
+    if(!order){
+      renderCollectionLookupMessage("error", "Order not found", "We could not find an order with that ID. Please check the ID and try again.");
+      return;
+    }
+
+    currentCollectionLookupOrder = order;
+    renderCollectionLookupOrder(order);
+  }catch(error){
+    console.error("Failed to find collection order:", error);
+    renderCollectionLookupMessage("error", "Lookup failed", "We could not load that order right now. Please try again.");
+  }finally{
+    isFindingCollectionOrder = false;
+    syncCollectionControls();
+  }
+}
+
+async function handleMarkItemsCollected(){
+  if(!currentCollectionLookupOrder || isMarkingCollected){
+    return;
+  }
+
+  if(!currentDriver){
+    setDashboardMessage("Your driver profile is unavailable right now.", "error");
+    return;
+  }
+
+  isMarkingCollected = true;
+  syncCollectionControls();
+
+  try{
+    const orderRef = doc(db, "orders", currentCollectionLookupOrder.id);
+    const latestSnapshot = await getDoc(orderRef);
+
+    if(!latestSnapshot.exists()){
+      renderCollectionLookupMessage("error", "Order no longer exists", "This order could not be found anymore.");
+      return;
+    }
+
+    const latestOrder = {
+      id: latestSnapshot.id,
+      ...latestSnapshot.data()
+    };
+    const latestStatus = normalizeOrderStatusValue(latestOrder.status);
+
+    if(latestStatus === "collected"){
+      currentCollectionLookupOrder = latestOrder;
+      renderCollectionLookupOrder(latestOrder);
+      setDashboardMessage(`Order ${latestOrder.orderId || latestOrder.id} has already been collected.`, "warning");
+      return;
+    }
+
+    if(latestStatus !== "delivered"){
+      currentCollectionLookupOrder = latestOrder;
+      renderCollectionLookupOrder(latestOrder);
+      setDashboardMessage("This order is not ready for collection.", "warning");
+      return;
+    }
+
+    const collectedBy = getDriverMeta(currentDriver);
+
+    // Preserve the original delivery assignment/details and only append the return metadata.
+    await updateDoc(orderRef, {
+      status: "collected",
+      collectedAt: serverTimestamp(),
+      collectedBy
+    });
+
+    currentCollectionLookupOrder = {
+      ...latestOrder,
+      status: "collected",
+      collectedAt: new Date(),
+      collectedBy
+    };
+
+    renderCollectionLookupOrder(currentCollectionLookupOrder, {
+      tone: "success",
+      title: "Items marked as collected",
+      description: "This order has been returned successfully and the reserved inventory is now released."
+    });
+    setDashboardMessage(`Order ${currentCollectionLookupOrder.orderId || currentCollectionLookupOrder.id} marked as collected.`, "success");
+  }catch(error){
+    console.error("Failed to mark order as collected:", error);
+    setDashboardMessage("We could not mark this order as collected right now.", "error");
+
+    if(currentCollectionLookupOrder){
+      renderCollectionLookupOrder(currentCollectionLookupOrder, {
+        tone: "warning",
+        title: "Collection update failed",
+        description: "The order is still eligible for collection, but the update did not go through. Please try again."
+      });
+    }else{
+      renderCollectionLookupMessage("error", "Collection update failed", "We could not mark this order as collected right now.");
+    }
+  }finally{
+    isMarkingCollected = false;
+    syncCollectionControls();
+  }
 }
 
 function getCompletedOrdersPagination(totalOrders){
@@ -514,8 +895,9 @@ function getActionBlock(order, options){
   const isStarting = startingOrderIds.has(order.id);
   const isOutForDelivery = order.status === "out-for-delivery";
   const isDelivered = order.status === "delivered";
+  const isCollected = order.status === "collected";
   const isCancelled = order.status === "cancelled";
-  const isClosed = isDelivered || isCancelled;
+  const isClosed = isDelivered || isCollected || isCancelled;
   const isFinishing = finishingOrderIds.has(order.id);
   const isSharingLocation = isOrderLocationSharingActive(order);
   const needsLocationWarning = isOutForDelivery && !isSharingLocation;
@@ -570,6 +952,13 @@ function getActionBlock(order, options){
     statusAction = `
       <div class="driver-completed-state">
         <strong>Delivery Completed</strong>
+        <span>${formatCompletedDateLabel(order)}</span>
+      </div>
+    `;
+  }else if(isCollected){
+    statusAction = `
+      <div class="driver-completed-state">
+        <strong>Items Collected Back</strong>
         <span>${formatCompletedDateLabel(order)}</span>
       </div>
     `;
@@ -710,7 +1099,7 @@ function renderCompletedOrders(orders){
     driverCompletedOrdersGrid.innerHTML = `
       <article class="driver-empty-state is-soft">
         <strong>No completed orders found</strong>
-        <p>Try a different filter or finish an active delivery to see it here.</p>
+        <p>Try a different filter or complete a delivery or collection to see it here.</p>
       </article>
     `;
     syncCompletedOrdersPagination(0);
@@ -772,7 +1161,7 @@ function updateDashboardSummary(){
   if(driverCompletedOrdersSummary){
     driverCompletedOrdersSummary.textContent = completedOrders.length
       ? `${completedOrdersInMonth.length} completed this month and ${completedOrders.length} completed all time.`
-      : "Delivered orders you complete will appear here automatically.";
+      : "Delivered and collected orders will appear here automatically.";
   }
 
   if(activeDeliveryPill){
@@ -1193,6 +1582,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initScrollTopButton();
   attachCompletedOrderFilters();
   hydrateLocationSharingPreference();
+  renderCollectionEmptyState();
+  syncCollectionControls();
+  driverCollectionForm?.addEventListener("submit", handleCollectionLookup);
 
   document.addEventListener("visibilitychange", () => {
     if(document.visibilityState === "visible" && isLocationSharingEnabled){
@@ -1221,6 +1613,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try{
       await initializeDriverDashboard(user);
+      syncCollectionControls();
     }catch(error){
       console.error("Driver dashboard init failed:", error);
       setDashboardMessage("We could not open your dashboard right now.", "error");

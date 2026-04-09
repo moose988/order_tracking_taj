@@ -64,13 +64,41 @@
         </section>
       </section>
 
+      <section class="driver-section driver-collection-section" aria-labelledby="driverCollectionTitle">
+        <div class="driver-section-head">
+          <div>
+            <span class="section-kicker">Rental Returns</span>
+            <h2 id="driverCollectionTitle" class="section-title">Collect an Order</h2>
+          </div>
+          <p class="driver-section-summary">Enter any delivered order ID to mark the rental items as collected back.</p>
+        </div>
+
+        <div class="driver-collection-shell">
+          <form id="driverCollectionForm" class="driver-collection-form">
+            <label class="driver-history-control driver-collection-control" for="driverCollectionOrderIdInput">
+              <span>Order ID</span>
+              <input id="driverCollectionOrderIdInput" type="text" placeholder="TAJ-1053-VC2" autocomplete="off" />
+            </label>
+
+            <button id="driverCollectionFindBtn" class="btn btn-primary" type="submit">Find Order</button>
+          </form>
+
+          <div id="driverCollectionResult" class="driver-collection-result" aria-live="polite">
+            <article class="driver-collection-state is-empty">
+              <strong>Ready to collect a delivered order</strong>
+              <p>Search by the customer-facing order ID to view the order summary and release inventory after collection.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section class="driver-section driver-completed-section" aria-labelledby="driverCompletedOrdersTitle">
         <div class="driver-section-head">
           <div>
             <span class="section-kicker">Delivery History</span>
             <h2 id="driverCompletedOrdersTitle" class="section-title">Completed Orders</h2>
           </div>
-          <p id="driverCompletedOrdersSummary" class="driver-section-summary">Delivered orders you complete will appear here automatically.</p>
+          <p id="driverCompletedOrdersSummary" class="driver-section-summary">Delivered and collected orders will appear here automatically.</p>
         </div>
 
         <div class="driver-history-toolbar">
@@ -99,7 +127,7 @@
         <section id="driverCompletedOrders" class="driver-orders-grid driver-completed-grid" aria-live="polite">
           <article class="driver-empty-state is-soft">
             <strong>No completed orders yet</strong>
-            <p>Finished deliveries will move here automatically.</p>
+            <p>Delivered and collected orders will move here automatically.</p>
           </article>
         </section>
 

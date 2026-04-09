@@ -868,7 +868,6 @@ ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.
   <div class="track-location-copy">
     <span class="track-status-eyebrow">Delivery Location</span>
     <strong>${order.eventLocation || "Location pending"}</strong>
-    <p>Rental days: ${getOrderRentalDays(order)}</p>
   </div>
   <a href="${openLocationUrl}" target="_blank" class="track-open-location-link">
     Open Location
@@ -999,6 +998,7 @@ function renderStatus(status){
     preparing: 3,
     "out-for-delivery": 4,
     delivered: 5,
+    collected: 5,
     cancelled: -1
   };
 
@@ -1030,7 +1030,7 @@ async function updateReviewUI(order){
   reviewForm.style.display = "none";
   setReviewMessage("", "");
 
-  if(order.status !== "delivered"){
+  if(normalizeStatus(order.status) !== "delivered"){
     return;
   }
 
@@ -1061,7 +1061,7 @@ async function getExistingReview(orderId){
 async function submitReview(event){
   event.preventDefault();
 
-  if(!currentOrder || currentOrder.status !== "delivered"){
+  if(!currentOrder || normalizeStatus(currentOrder.status) !== "delivered"){
     return;
   }
 
@@ -1162,7 +1162,10 @@ function formatStatusLabel(status){
 }
 
 function normalizeStatus(status){
-  return (status || "").toLowerCase().trim().replaceAll(" ", "-");
+  const normalizedStatus = (status || "").toLowerCase().trim().replaceAll(" ", "-");
+
+  // Customer tracking still treats returned rentals as a completed delivery milestone.
+  return normalizedStatus === "collected" ? "delivered" : normalizedStatus;
 }
 
 function updateDriverInfo(order, normalizedStatus){
