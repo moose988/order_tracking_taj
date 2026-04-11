@@ -900,7 +900,6 @@ ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.
   <div>
     <span class="track-status-eyebrow">Estimated Arrival</span>
     <strong>${formatEta(etaEstimate.minutes)}</strong>
-    <p>Based on the current live driver location and the delivery destination.</p>
   </div>
 </article>
 `

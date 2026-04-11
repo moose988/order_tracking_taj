@@ -10,6 +10,7 @@ import {
   getValidatedUaeCoordinates,
   normalizeGoogleMapsLink
 } from "./location-utils.js";
+import { WAREHOUSE_LOCATION } from "./app-config.js";
 import { initScrollTopButton } from "./scroll-top.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -38,6 +39,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const tableBody = document.getElementById("ordersTableBody");
+const adminSidebarNav = document.getElementById("adminSidebarNav");
 const calendarGrid = document.getElementById("calendarGrid");
 const calendarMonthLabel = document.getElementById("calendarMonthLabel");
 const prevMonthBtn = document.getElementById("prevMonthBtn");
@@ -62,6 +64,8 @@ const operationsMapActiveDeliveries = document.getElementById("operationsMapActi
 const collectionPanelSummary = document.getElementById("collectionPanelSummary");
 const collectionOrderSelect = document.getElementById("collectionOrderSelect");
 const collectionDriverSelect = document.getElementById("collectionDriverSelect");
+const collectionPickupDate = document.getElementById("collectionPickupDate");
+const collectionPickupTime = document.getElementById("collectionPickupTime");
 const collectionRequestNote = document.getElementById("collectionRequestNote");
 const collectionRequestPreview = document.getElementById("collectionRequestPreview");
 const sendCollectionRequestBtn = document.getElementById("sendCollectionRequestBtn");
@@ -151,11 +155,14 @@ const editInventoryWarnings = document.getElementById("editInventoryWarnings");
 let allOrders = [];
 let driversList = [];
 let allInventoryItems = [];
+let hasLoadedOrdersSnapshot = false;
 let hasLoadedInventorySnapshot = false;
 let currentCalendarDate = new Date();
 let ordersPerDayChart = null;
 let ordersByStatusChart = null;
 let topProductsChart = null;
+let hasLoggedInitialAdminApplyFilters = false;
+let hasLoggedInitialAdminRenderOrders = false;
 let selectedOrderId = null;
 let currentEditingOrder = null;
 let currentPage = 1;
@@ -208,15 +215,8 @@ const PRODUCTS_BY_CATEGORY = buildProductsByCategory();
 const PRODUCTS_BY_ID = buildProductsById();
 // Rental inventory stays reserved until items are physically collected back.
 const INVENTORY_RESERVATION_STATUSES = new Set(["confirmed", "preparing", "out-for-delivery", "delivered"]);
-// Keep the warehouse location centralized so operations can update it in one place later.
-const OPERATIONS_WAREHOUSE = {
-  name: "Al Taj Al Malaky Warehouse",
-  label: "Main Store / Warehouse",
-  coordinates: {
-    lat: 25.2048,
-    lng: 55.2708
-  }
-};
+const OPERATIONS_WAREHOUSE = WAREHOUSE_LOCATION;
+const OPERATIONS_DRIVER_ICON_URL = new URL("../../images/logo/drivericon.png", import.meta.url).href;
 const DRIVER_LOCATION_LIVE_THRESHOLD_MS = 5 * 60 * 1000;
 const DEFAULT_RENTAL_DAYS = 1;
 const DEFAULT_LOW_STOCK_THRESHOLD = 1;
@@ -267,32 +267,124 @@ function initMobileMenu(){
 
 function subscribeToOrders(){
   ordersUnsubscribe?.();
+  hasLoadedOrdersSnapshot = false;
   ordersUnsubscribe = onSnapshot(collection(db, "orders"), async (snapshot) => {
     allOrders = snapshot.docs.map((orderDoc) => ({
       id: orderDoc.id,
       ...orderDoc.data()
     }));
+    hasLoadedOrdersSnapshot = true;
+
+    console.debug("[admin] orders snapshot received", {
+      allOrdersLength: allOrders.length
+    });
+
+    console.debug("[collection] orders loaded from Firestore", {
+      totalOrders: allOrders.length,
+      deliveredOrders: allOrders.filter((order) => normalizeOrderStatusValue(order.status) === "delivered").length
+    });
 
     syncCurrentEditingOrder();
     syncCurrentQuoteOrder();
     syncOpenOrderModal();
+    renderAdminDashboardAfterOrdersSnapshot("orders-snapshot");
+
     try{
       await syncMissingInventoryForReservableOrderItems();
+      renderInventoryDashboard();
     }catch(error){
       console.error("Failed to sync order inventory items:", error);
     }
-    renderOpsPanel();
-    renderDriverPanel();
-    renderOperationsMapSection();
-    renderCollectionAssignmentSection();
-    renderInventoryDashboard();
-    applyFilters();
-    updateStats(allOrders);
-    generateAnalytics();
-    renderCalendar();
   }, (error) => {
     console.error("Failed to subscribe to orders:", error);
   });
+}
+
+function getAdminSidebarLinks(){
+  return Array.from(document.querySelectorAll(".admin-sidebar-link[data-target]"));
+}
+
+function getAdminSidebarOffset(){
+  return (document.querySelector(".site-header")?.offsetHeight || 0) + 18;
+}
+
+function setActiveAdminSidebarLink(targetId = ""){
+  getAdminSidebarLinks().forEach((link) => {
+    const isActive = link.dataset.target === targetId;
+    link.classList.toggle("is-active", isActive);
+
+    if(isActive){
+      link.setAttribute("aria-current", "location");
+    }else{
+      link.removeAttribute("aria-current");
+    }
+  });
+}
+
+function scrollToAdminSection(targetId){
+  const targetSection = document.getElementById(targetId);
+
+  if(!targetSection){
+    return;
+  }
+
+  const nextTop = targetSection.getBoundingClientRect().top + window.scrollY - getAdminSidebarOffset();
+
+  window.scrollTo({
+    top: Math.max(0, nextTop),
+    behavior: "smooth"
+  });
+}
+
+function updateActiveAdminSidebarLink(){
+  const sidebarLinks = getAdminSidebarLinks();
+
+  if(!sidebarLinks.length){
+    return;
+  }
+
+  const activationOffset = getAdminSidebarOffset() + 36;
+  let activeTargetId = sidebarLinks[0].dataset.target || "";
+
+  sidebarLinks.forEach((link) => {
+    const targetSection = document.getElementById(link.dataset.target || "");
+
+    if(targetSection && targetSection.getBoundingClientRect().top <= activationOffset){
+      activeTargetId = link.dataset.target || activeTargetId;
+    }
+  });
+
+  setActiveAdminSidebarLink(activeTargetId);
+}
+
+function initAdminSidebarNavigation(){
+  if(!adminSidebarNav || adminSidebarNav.dataset.bound === "true"){
+    updateActiveAdminSidebarLink();
+    return;
+  }
+
+  adminSidebarNav.addEventListener("click", (event) => {
+    const sidebarLink = event.target.closest(".admin-sidebar-link[data-target]");
+
+    if(!sidebarLink){
+      return;
+    }
+
+    event.preventDefault();
+    const targetId = sidebarLink.dataset.target || "";
+
+    if(!targetId){
+      return;
+    }
+
+    setActiveAdminSidebarLink(targetId);
+    scrollToAdminSection(targetId);
+  });
+
+  adminSidebarNav.dataset.bound = "true";
+  updateActiveAdminSidebarLink();
+  window.addEventListener("scroll", updateActiveAdminSidebarLink, { passive: true });
+  window.addEventListener("resize", updateActiveAdminSidebarLink);
 }
 
 function subscribeToInventory(){
@@ -337,7 +429,16 @@ function subscribeToDrivers(){
     renderDriverPanel();
     renderOperationsMapSection();
     renderCollectionAssignmentSection();
-    applyFilters();
+
+    if(hasLoadedOrdersSnapshot){
+      applyFilters(false, "drivers-snapshot");
+      return;
+    }
+
+    console.debug("[admin] deferring applyFilters until orders snapshot", {
+      source: "drivers-snapshot",
+      allOrdersLength: allOrders.length
+    });
   }, (error) => {
     console.error("Failed to subscribe to drivers:", error);
   });
@@ -357,7 +458,17 @@ function startInventoryClockRefresh(){
 
 /* RENDER TABLE */
 
-function renderOrders(orders){
+function renderOrders(orders, source = "general"){
+  if(hasLoadedOrdersSnapshot && !hasLoggedInitialAdminRenderOrders){
+    console.debug("[admin] renderOrders call on first load", {
+      source,
+      renderedOrdersLength: orders.length,
+      allOrdersLength: allOrders.length,
+      currentPage
+    });
+    hasLoggedInitialAdminRenderOrders = true;
+  }
+
   const sortedOrders = sortOrders(orders);
   const paginatedOrders = getPaginatedOrders(sortedOrders);
 
@@ -1436,6 +1547,22 @@ function formatOperationsLocationAge(timestampMs){
   return `Updated ${differenceDays} day${differenceDays === 1 ? "" : "s"} ago`;
 }
 
+function formatShortOrderId(orderId){
+  const value = String(orderId || "").trim();
+
+  if(!value){
+    return "N/A";
+  }
+
+  if(value.startsWith("TAJ-")){
+    return value.replace(/^TAJ-/, "#");
+  }
+
+  return value.length > 12
+    ? `${value.slice(0, 6)}...${value.slice(-4)}`
+    : value;
+}
+
 function getOperationsMapData(){
   const registry = new Map();
   const aliases = new Map();
@@ -1497,16 +1624,16 @@ function getOperationsMapData(){
 
       return String(first.name || "").localeCompare(String(second.name || ""));
     });
-  const activeEntries = entries.filter((entry) => entry.isOperationallyActive);
-  const driversWithVisibleLocation = activeEntries.filter((entry) => entry.hasLocation);
-  const liveEntries = activeEntries.filter((entry) => entry.isLive);
-  const staleEntries = activeEntries.filter((entry) => entry.isStale);
-  const noLocationEntries = activeEntries.filter((entry) => entry.activeDeliveryCount > 0 && !entry.hasLocation);
+  const activeDriverEntries = entries.filter((entry) => entry.activeDeliveryCount > 0);
+  const driversWithVisibleLocation = activeDriverEntries.filter((entry) => entry.hasLocation);
+  const liveEntries = activeDriverEntries.filter((entry) => entry.isLive);
+  const staleEntries = activeDriverEntries.filter((entry) => entry.isStale);
+  const noLocationEntries = activeDriverEntries.filter((entry) => !entry.hasLocation);
 
   return {
     entries,
-    activeEntries,
-    activeDriversCount: activeEntries.length,
+    activeDriverEntries,
+    activeDriversCount: activeDriverEntries.length,
     liveDriversCount: liveEntries.length,
     staleDriversCount: staleEntries.length,
     driversWithoutLocationCount: noLocationEntries.length,
@@ -1571,7 +1698,7 @@ function getOperationsDriverListMarkup(entry){
 
       ${orderIds.length ? `
         <div class="operations-driver-orders">
-          ${orderIds.map((orderId) => `<span>${escapeHtml(orderId)}</span>`).join("")}
+          ${orderIds.map((orderId) => `<span title="${escapeAttribute(orderId)}">${escapeHtml(formatShortOrderId(orderId))}</span>`).join("")}
         </div>
       ` : `
         <div class="operations-driver-orders is-empty">
@@ -1587,17 +1714,17 @@ function renderOperationsMapDriverList(data){
     return;
   }
 
-  if(!data.entries.length){
+  if(!data.activeDriverEntries.length){
     operationsMapDriverList.innerHTML = `
       <article class="operations-driver-empty">
-        <strong>No drivers available yet</strong>
-        <p>Add or load drivers to start monitoring live delivery activity here.</p>
+        <strong>No active drivers on delivery right now</strong>
+        <p>Drivers with live delivery assignments will appear here automatically.</p>
       </article>
     `;
     return;
   }
 
-  operationsMapDriverList.innerHTML = data.entries.map(getOperationsDriverListMarkup).join("");
+  operationsMapDriverList.innerHTML = data.activeDriverEntries.map(getOperationsDriverListMarkup).join("");
 }
 
 function attachOperationsMapDriverEvents(){
@@ -1612,22 +1739,38 @@ function attachOperationsMapDriverEvents(){
   });
 }
 
-function createOperationsMapIcon(type, state = "live"){
+function createOperationsMapIcon(type, options = {}){
   if(typeof window === "undefined" || !window.L){
     return null;
   }
 
-  const markerClass = type === "warehouse"
-    ? "operations-map-marker is-warehouse"
-    : `operations-map-marker is-driver is-${state}`;
-  const markerLabel = type === "warehouse" ? "W" : "D";
+  const state = options.state || "live";
+  const orderCount = Math.max(0, Number(options.orderCount) || 0);
+  const markerHtml = type === "warehouse"
+    ? `
+      <div class="operations-map-marker is-warehouse" aria-hidden="true">
+        <div class="operations-map-warehouse-core">
+          <svg viewBox="0 0 24 24" class="operations-map-warehouse-icon" role="presentation" focusable="false">
+            <path d="M3.5 10.5 12 4l8.5 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-3.5v-5.5h-7V20H5a1.5 1.5 0 0 1-1.5-1.5z"></path>
+          </svg>
+        </div>
+      </div>
+    `
+    : `
+      <div class="operations-map-marker is-driver is-${state}" aria-hidden="true">
+        <div class="operations-map-driver-core">
+          <img class="operations-map-driver-icon" src="${OPERATIONS_DRIVER_ICON_URL}" alt="" />
+        </div>
+        ${orderCount ? `<span class="operations-map-driver-count">${orderCount > 9 ? "9+" : orderCount}</span>` : ""}
+      </div>
+    `;
 
   return window.L.divIcon({
     className: "operations-map-marker-wrapper",
-    html: `<div class="${markerClass}"><span>${markerLabel}</span></div>`,
-    iconSize: [42, 42],
-    iconAnchor: [21, 21],
-    popupAnchor: [0, -18]
+    html: markerHtml,
+    iconSize: type === "warehouse" ? [48, 56] : [56, 64],
+    iconAnchor: type === "warehouse" ? [24, 48] : [28, 56],
+    popupAnchor: [0, -48]
   });
 }
 
@@ -1674,8 +1817,11 @@ function getWarehousePopupMarkup(data){
   return `
     <div class="operations-map-popup is-warehouse">
       <div class="operations-map-popup-head">
-        <strong>${escapeHtml(OPERATIONS_WAREHOUSE.name)}</strong>
-        <span class="operations-driver-state is-live">Warehouse</span>
+        <div class="operations-map-popup-title">
+          <span class="operations-map-popup-eyebrow">Warehouse</span>
+          <strong>${escapeHtml(OPERATIONS_WAREHOUSE.name)}</strong>
+        </div>
+        <span class="operations-driver-state is-live">Hub</span>
       </div>
       <p>${escapeHtml(OPERATIONS_WAREHOUSE.label)}</p>
       <div class="operations-map-popup-grid">
@@ -1688,7 +1834,10 @@ function getWarehousePopupMarkup(data){
           <strong>${data.activeDeliveriesCount}</strong>
         </div>
       </div>
-      <p>${escapeHtml(formatCoordinatePair(OPERATIONS_WAREHOUSE.coordinates))}</p>
+      <div class="operations-map-popup-section">
+        <span class="operations-map-popup-label">Coordinates</span>
+        <p>${escapeHtml(formatCoordinatePair(OPERATIONS_WAREHOUSE.coordinates))}</p>
+      </div>
     </div>
   `;
 }
@@ -1698,28 +1847,40 @@ function getOperationsDriverPopupMarkup(entry){
   const lastUpdatedLabel = entry.hasLocation
     ? `${formatOperationsLocationAge(entry.lastUpdatedAtMs)} (${formatQuoteHistoryDate(entry.lastUpdatedAtMs)})`
     : "No live location shared yet";
-  const modeLabel = entry.activeDeliveryCount > 0 ? "On delivery" : "Location active";
   const coordinateLink = entry.hasLocation ? buildGoogleMapsCoordinateLink(entry.latestLocation) : "";
+  const orderChipsMarkup = orderIds.length
+    ? orderIds.map((orderId) => `<span title="${escapeAttribute(orderId)}">${escapeHtml(formatShortOrderId(orderId))}</span>`).join("")
+    : '<span class="is-empty">None</span>';
 
   return `
-    <div class="operations-map-popup">
+    <div class="operations-map-popup is-driver">
       <div class="operations-map-popup-head">
-        <strong>${escapeHtml(entry.name || "Unnamed Driver")}</strong>
+        <div class="operations-map-popup-title">
+          <span class="operations-map-popup-eyebrow">Driver</span>
+          <strong>${escapeHtml(entry.name || "Unnamed Driver")}</strong>
+        </div>
         <span class="operations-driver-state is-${entry.state}">${escapeHtml(getOperationsDriverStatusLabel(entry))}</span>
       </div>
-      <p>${escapeHtml(entry.phone || entry.email || "No direct contact saved")}</p>
       <div class="operations-map-popup-grid">
-        <div>
-          <span>Mode</span>
-          <strong>${escapeHtml(modeLabel)}</strong>
-        </div>
         <div>
           <span>Active Orders</span>
           <strong>${entry.activeDeliveryCount}</strong>
         </div>
+        <div>
+          <span>Last Update</span>
+          <strong>${escapeHtml(entry.hasLocation ? formatOperationsLocationAge(entry.lastUpdatedAtMs).replace("Updated ", "") : "Unavailable")}</strong>
+        </div>
       </div>
-      <p>${escapeHtml(`Order IDs: ${orderIds.length ? orderIds.join(", ") : "None"}`)}</p>
-      <p>${escapeHtml(`Last location update: ${lastUpdatedLabel}`)}</p>
+      <div class="operations-map-popup-section">
+        <span class="operations-map-popup-label">Order IDs</span>
+        <div class="operations-map-popup-chips">
+          ${orderChipsMarkup}
+        </div>
+      </div>
+      <div class="operations-map-popup-section">
+        <span class="operations-map-popup-label">Last Location Update</span>
+        <p>${escapeHtml(lastUpdatedLabel)}</p>
+      </div>
       ${coordinateLink ? `
         <a class="operations-map-popup-link" href="${coordinateLink}" target="_blank" rel="noreferrer">
           Open latest location
@@ -1759,17 +1920,9 @@ function renderOperationsMapCanvas(data){
     return;
   }
 
-  const emptyState = getOperationsMapEmptyState(data);
-
   if(operationsMapEmptyState){
-    operationsMapEmptyState.hidden = !emptyState;
-
-    if(emptyState){
-      operationsMapEmptyState.innerHTML = `
-        <strong>${escapeHtml(emptyState.title)}</strong>
-        <p>${escapeHtml(emptyState.copy)}</p>
-      `;
-    }
+    operationsMapEmptyState.hidden = true;
+    operationsMapEmptyState.innerHTML = "";
   }
 
   const map = ensureOperationsMap();
@@ -1792,12 +1945,15 @@ function renderOperationsMapCanvas(data){
 
   data.visibleDriverEntries.forEach((entry) => {
     const marker = window.L.marker([entry.latestLocation.lat, entry.latestLocation.lng], {
-      icon: createOperationsMapIcon("driver", entry.isLive ? "live" : "stale")
+      icon: createOperationsMapIcon("driver", {
+        state: entry.isLive ? "live" : "stale",
+        orderCount: entry.activeDeliveryCount
+      })
     })
       .bindPopup(getOperationsDriverPopupMarkup(entry))
       .bindTooltip(entry.name || "Driver", {
         direction: "top",
-        offset: [0, -18]
+        offset: [0, -42]
       });
 
     liveOperationsMapLayer.addLayer(marker);
@@ -1814,8 +1970,8 @@ function renderOperationsMapCanvas(data){
   if(shouldAutoFrame){
     if(visibleLatLngs.length > 1){
       map.fitBounds(visibleLatLngs, {
-        padding: [40, 40],
-        maxZoom: 13
+        padding: [56, 56],
+        maxZoom: 14
       });
     }else{
       map.setView(warehouseLatLng, 11);
@@ -1863,14 +2019,14 @@ function getOrdersAwaitingCollection(){
   return [...allOrders]
     .filter((order) => normalizeOrderStatusValue(order.status) === "delivered")
     .sort((first, second) => {
-      const secondDeliveredTime = getTimestampValue(second.deliveredAt);
-      const firstDeliveredTime = getTimestampValue(first.deliveredAt);
+      const secondDeliveredTime = getTimestampValue(second.deliveredAt || second.createdAt);
+      const firstDeliveredTime = getTimestampValue(first.deliveredAt || first.createdAt);
 
       if(secondDeliveredTime !== firstDeliveredTime){
         return secondDeliveredTime - firstDeliveredTime;
       }
 
-      return String(second.eventDate || "").localeCompare(String(first.eventDate || ""));
+      return String(second.orderId || second.id || "").localeCompare(String(first.orderId || first.id || ""));
     });
 }
 
@@ -1900,8 +2056,98 @@ function getCurrentAdminMeta(){
   };
 }
 
+function formatPickupTimeLabel(value){
+  const rawValue = String(value || "").trim();
+
+  if(!rawValue){
+    return "";
+  }
+
+  const timeMatch = rawValue.match(/^(\d{1,2}):(\d{2})$/);
+
+  if(!timeMatch){
+    return rawValue;
+  }
+
+  const hoursValue = Number(timeMatch[1]);
+  const minutesValue = Number(timeMatch[2]);
+
+  if(!Number.isFinite(hoursValue) || !Number.isFinite(minutesValue)){
+    return rawValue;
+  }
+
+  const formattedDate = new Date();
+  formattedDate.setHours(hoursValue, minutesValue, 0, 0);
+
+  return formattedDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatPickupDateLabel(value){
+  const rawValue = String(value || "").trim();
+
+  if(!rawValue){
+    return "";
+  }
+
+  const parsed = new Date(`${rawValue}T00:00:00`);
+
+  if(Number.isNaN(parsed.getTime())){
+    return rawValue;
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function getCollectionRequestDefaults(order){
+  const request = order?.collectionRequest || {};
+
+  return {
+    pickupDate: String(request.pickupDate || "").trim(),
+    pickupTime: String(request.pickupTime || "").trim(),
+    note: String(request.note || "").trim()
+  };
+}
+
+function syncCollectionRequestInputsFromOrder(order){
+  const defaults = getCollectionRequestDefaults(order);
+
+  if(collectionPickupDate){
+    collectionPickupDate.value = defaults.pickupDate;
+  }
+
+  if(collectionPickupTime){
+    collectionPickupTime.value = defaults.pickupTime;
+  }
+
+  if(collectionRequestNote){
+    collectionRequestNote.value = defaults.note;
+  }
+}
+
+function resolveCollectionOrderByValue(value, orders = allOrders){
+  const normalizedValue = String(value || "").trim();
+
+  if(!normalizedValue){
+    return null;
+  }
+
+  return orders.find((order) => {
+    const orderDocumentId = String(order?.id || "").trim();
+    const orderDisplayId = String(order?.orderId || "").trim();
+
+    return orderDocumentId === normalizedValue || orderDisplayId === normalizedValue;
+  }) || null;
+}
+
 function getSelectedCollectionOrder(){
-  return allOrders.find((order) => order.id === selectedCollectionOrderId) || null;
+  return resolveCollectionOrderByValue(selectedCollectionOrderId, allOrders);
 }
 
 function getSelectedCollectionDriver(){
@@ -1909,39 +2155,69 @@ function getSelectedCollectionDriver(){
 }
 
 function syncCollectionRequestActionState(){
+  const awaitingOrdersCount = hasLoadedOrdersSnapshot ? getOrdersAwaitingCollection().length : 0;
+  const isCollectionLoading = !hasLoadedOrdersSnapshot;
+
+  if(collectionOrderSelect){
+    collectionOrderSelect.disabled = isSendingCollectionRequest || isCollectionLoading || !awaitingOrdersCount;
+  }
+
+  if(collectionDriverSelect){
+    collectionDriverSelect.disabled = isSendingCollectionRequest || isCollectionLoading || !driversList.length;
+  }
+
+  if(collectionPickupDate){
+    collectionPickupDate.disabled = isSendingCollectionRequest || isCollectionLoading;
+  }
+
+  if(collectionPickupTime){
+    collectionPickupTime.disabled = isSendingCollectionRequest || isCollectionLoading;
+  }
+
+  if(collectionRequestNote){
+    collectionRequestNote.disabled = isSendingCollectionRequest || isCollectionLoading;
+  }
+
   if(!sendCollectionRequestBtn){
     return;
   }
 
   const hasValidOrder = Boolean(getSelectedCollectionOrder());
   const hasValidDriver = Boolean(getSelectedCollectionDriver());
-  sendCollectionRequestBtn.disabled = isSendingCollectionRequest || !hasValidOrder || !hasValidDriver;
+  sendCollectionRequestBtn.disabled = isSendingCollectionRequest || isCollectionLoading || !hasValidOrder || !hasValidDriver;
   sendCollectionRequestBtn.textContent = isSendingCollectionRequest ? "Sending Collection Request..." : "Send Collection Request";
 }
 
 function renderCollectionRequestPreview(){
   if(!collectionRequestPreview){
+    syncCollectionRequestActionState();
     return;
   }
 
-  const selectedOrder = getSelectedCollectionOrder();
+  const awaitingOrders = getOrdersAwaitingCollection();
+  const resolvedSelectedOrder = awaitingOrders.find((order) => order.id === selectedCollectionOrderId)
+    || awaitingOrders.find((order) => order.orderId === selectedCollectionOrderId)
+    || null;
+  const selectedOrder = resolvedSelectedOrder;
   const selectedDriver = getSelectedCollectionDriver();
-  const pendingNote = collectionRequestNote?.value.trim() || "";
+  const pickupDateLabel = formatPickupDateLabel(collectionPickupDate?.value);
+  const pickupTimeLabel = formatPickupTimeLabel(collectionPickupTime?.value);
+  const currentNote = collectionRequestNote?.value.trim() || "";
+  const savedRequest = selectedOrder?.collectionRequest || null;
+  const locationLink = selectedOrder ? (getOrderMapUrl(selectedOrder) || "") : "";
 
   if(!selectedOrder){
     collectionRequestPreview.innerHTML = `
       <article class="collection-preview-state is-empty">
-        <strong>No delivered order selected yet</strong>
-        <p>Select a delivered order and driver to preview the collection request before sending it on WhatsApp.</p>
+        <strong>Select a delivered order to view collection details.</strong>
+        <p>${awaitingOrders.length
+          ? "Choose a delivered order from the dropdown to review its collection details."
+          : "No delivered orders are currently awaiting collection."}</p>
       </article>
     `;
     syncCollectionRequestActionState();
     return;
   }
-
-  const assignedDriver = selectedOrder.collectionRequest?.assignedDriver || null;
-  const assignedAt = formatQuoteHistoryDate(selectedOrder.collectionRequest?.assignedAt);
-  const note = selectedOrder.collectionRequest?.note || "";
 
   collectionRequestPreview.innerHTML = `
     <article class="collection-preview-state is-ready">
@@ -1951,7 +2227,7 @@ function renderCollectionRequestPreview(){
           <h3>${escapeHtml(selectedOrder.orderId || selectedOrder.id || "Order")}</h3>
           <p>${escapeHtml(selectedOrder.customerName || "Unknown customer")}</p>
         </div>
-        <span class="inventory-status-pill is-warning">Delivered</span>
+        <span class="inventory-status-pill is-warning">${escapeHtml(formatStatusLabel(selectedOrder.status))}</span>
       </div>
 
       <div class="collection-preview-grid">
@@ -1963,35 +2239,47 @@ function renderCollectionRequestPreview(){
           <span>Customer</span>
           <strong>${escapeHtml(selectedOrder.customerName || "Unknown customer")}</strong>
         </div>
-        <div class="is-wide">
-          <span>Location</span>
-          <strong>${escapeHtml(selectedOrder.eventLocation || "No location recorded")}</strong>
+        <div>
+          <span>Event Date</span>
+          <strong>${escapeHtml(selectedOrder.eventDate || "N/A")}</strong>
         </div>
         <div>
           <span>Rental Days</span>
           <strong>${getOrderRentalDays(selectedOrder)}</strong>
         </div>
         <div>
+          <span>Pickup Date</span>
+          <strong>${escapeHtml(pickupDateLabel || formatPickupDateLabel(savedRequest?.pickupDate) || "Not set")}</strong>
+        </div>
+        <div>
+          <span>Pickup Time</span>
+          <strong>${escapeHtml(pickupTimeLabel || formatPickupTimeLabel(savedRequest?.pickupTime) || "Not set")}</strong>
+        </div>
+        <div>
           <span>Driver</span>
-          <strong>${escapeHtml(selectedDriver?.name || "Select a driver")}</strong>
+          <strong>${escapeHtml(selectedDriver?.name || savedRequest?.assignedDriver?.name || "Select a driver")}</strong>
+        </div>
+        <div>
+          <span>Status</span>
+          <strong>${escapeHtml(formatStatusLabel(selectedOrder.status))}</strong>
+        </div>
+        <div class="is-wide">
+          <span>Event Location</span>
+          <strong>${escapeHtml(selectedOrder.eventLocation || "No location recorded")}</strong>
         </div>
       </div>
 
-      ${assignedDriver ? `
-        <div class="collection-preview-note">
-          <strong>Current request</strong>
-          <p>${escapeHtml(assignedDriver.name || "Driver")}${assignedDriver.phone ? ` | ${escapeHtml(assignedDriver.phone)}` : ""} assigned ${escapeHtml(assignedAt)}.</p>
-          <p>${escapeHtml(note || "No note saved yet.")}</p>
-        </div>
-      ` : ""}
+      <div class="driver-order-items driver-collection-items">
+        <span>Items in this Order</span>
+        <ul class="driver-order-items-list">
+          ${getOrderItemsListMarkup(selectedOrder.items || [])}
+        </ul>
+      </div>
+
       <div class="collection-preview-note">
-        <strong>WhatsApp preview</strong>
-        <p>${escapeHtml(`Collection Request - Al Taj Al Malaky`)}</p>
-        <p>${escapeHtml(`Order ID: ${selectedOrder.orderId || selectedOrder.id || "N/A"}`)}</p>
-        <p>${escapeHtml(`Customer: ${selectedOrder.customerName || "Unknown customer"}`)}</p>
-        <p>${escapeHtml(`Location: ${selectedOrder.eventLocation || "No location recorded"}`)}</p>
-        <p>${escapeHtml(`Rental Days: ${getOrderRentalDays(selectedOrder)}`)}</p>
-        <p>${escapeHtml(`Optional note: ${pendingNote || "None"}`)}</p>
+        <strong>Collection Request Summary</strong>
+        <p>${locationLink ? `<a href="${escapeAttribute(locationLink)}" target="_blank" rel="noreferrer">Open location link</a>` : "Location link unavailable"}</p>
+        <p>${escapeHtml(`Optional note: ${currentNote || savedRequest?.note || "None"}`)}</p>
       </div>
     </article>
   `;
@@ -2000,14 +2288,43 @@ function renderCollectionRequestPreview(){
 }
 
 function renderCollectionAssignmentSection(){
-  if(!collectionOrderSelect || !collectionDriverSelect || !collectionRequestPreview){
+  if(!collectionOrderSelect || !collectionDriverSelect){
+    return;
+  }
+
+  if(!hasLoadedOrdersSnapshot){
+    console.debug("[collection] empty-state decision", {
+      reason: "orders-loading",
+      hasLoadedOrdersSnapshot
+    });
+
+    collectionOrderSelect.innerHTML = '<option value="">Loading delivered orders...</option>';
+    collectionOrderSelect.disabled = true;
+
+    if(collectionPanelSummary){
+      collectionPanelSummary.textContent = "Loading delivered orders awaiting collection...";
+      collectionPanelSummary.classList.remove("is-alert", "is-calm");
+    }
+
+    if(sendCollectionRequestBtn){
+      sendCollectionRequestBtn.disabled = true;
+    }
+
+    renderCollectionRequestPreview();
     return;
   }
 
   const awaitingOrders = getOrdersAwaitingCollection();
-  const currentOrderExists = awaitingOrders.some((order) => order.id === selectedCollectionOrderId);
+  const resolvedSelectedOrder = awaitingOrders.find((order) => order.id === selectedCollectionOrderId)
+    || awaitingOrders.find((order) => order.orderId === selectedCollectionOrderId)
+    || null;
+  const previousOrderId = selectedCollectionOrderId || "";
 
-  if(!currentOrderExists){
+  if(!selectedCollectionOrderId && awaitingOrders.length){
+    selectedCollectionOrderId = awaitingOrders[0].id;
+  }else if(selectedCollectionOrderId && resolvedSelectedOrder){
+    selectedCollectionOrderId = resolvedSelectedOrder.id || selectedCollectionOrderId;
+  }else if(selectedCollectionOrderId && !resolvedSelectedOrder){
     selectedCollectionOrderId = awaitingOrders[0]?.id || "";
   }
 
@@ -2018,7 +2335,14 @@ function renderCollectionAssignmentSection(){
       </option>
     `).join("")
     : '<option value="">No delivered orders awaiting collection</option>';
-  collectionOrderSelect.disabled = !awaitingOrders.length || isSendingCollectionRequest;
+
+  if(collectionOrderSelect){
+    const nextValue = selectedCollectionOrderId || "";
+
+    if(collectionOrderSelect.value !== nextValue){
+      collectionOrderSelect.value = nextValue;
+    }
+  }
 
   const driverOptions = driversList
     .map((driver) => {
@@ -2051,29 +2375,48 @@ function renderCollectionAssignmentSection(){
       `).join("")}
     `
     : '<option value="">No drivers available</option>';
-  collectionDriverSelect.disabled = !driverOptions.length || isSendingCollectionRequest;
-
   if(collectionPanelSummary){
     collectionPanelSummary.textContent = awaitingOrders.length
       ? `${awaitingOrders.length} delivered order${awaitingOrders.length === 1 ? "" : "s"} awaiting collection assignment.`
       : "No delivered orders are currently awaiting collection.";
+    collectionPanelSummary.classList.toggle("is-alert", awaitingOrders.length > 0);
+    collectionPanelSummary.classList.toggle("is-calm", !awaitingOrders.length);
+  }
+
+  if(selectedCollectionOrderId !== previousOrderId || (!collectionPickupDate?.value && !collectionPickupTime?.value && !collectionRequestNote?.value)){
+    syncCollectionRequestInputsFromOrder(getSelectedCollectionOrder());
   }
 
   renderCollectionRequestPreview();
 }
 
+function handleCollectionOrderSelectionChange(){
+  const selectedValue = String(collectionOrderSelect?.value || "").trim();
+  const awaitingOrders = hasLoadedOrdersSnapshot ? getOrdersAwaitingCollection() : [];
+  const resolvedOrder = awaitingOrders.find((order) => order.id === selectedValue)
+    || awaitingOrders.find((order) => order.orderId === selectedValue)
+    || null;
+
+  selectedCollectionOrderId = resolvedOrder?.id || "";
+  syncCollectionRequestInputsFromOrder(resolvedOrder);
+  renderCollectionRequestPreview();
+}
+
 function buildCollectionRequestMessage(order, driver, note = ""){
   const cleanNote = note.trim();
+  const pickupDateLabel = formatPickupDateLabel(collectionPickupDate?.value);
+  const pickupTimeLabel = formatPickupTimeLabel(collectionPickupTime?.value);
+  const locationLink = getOrderMapUrl(order) || "Unavailable";
 
   return `Collection Request - Al Taj Al Malaky
 
 Order ID: ${order.orderId || order.id || "N/A"}
 Customer: ${order.customerName || "Unknown customer"}
 Location: ${order.eventLocation || "No location recorded"}
+Location Link: ${locationLink}
+Pickup Date: ${pickupDateLabel || "Not specified"}
+Pickup Time: ${pickupTimeLabel || "Not specified"}
 Rental Days: ${getOrderRentalDays(order)}
-
-Use this Order ID in the driver dashboard under:
-Collect an Order
 
 Optional note: ${cleanNote || "None"}`;
 }
@@ -2149,8 +2492,13 @@ async function handleSendCollectionRequest(){
     }
 
     const requestNote = collectionRequestNote?.value.trim() || "";
+    const pickupDate = String(collectionPickupDate?.value || "").trim();
+    const pickupDateLabel = formatPickupDateLabel(pickupDate);
+    const pickupTime = String(collectionPickupTime?.value || "").trim();
+    const pickupTimeLabel = formatPickupTimeLabel(pickupTime);
     const assignedBy = getCurrentAdminMeta();
     const assignedDriver = getDriverAssignmentMeta(selectedDriver);
+    const locationLink = getOrderMapUrl(latestOrder) || "";
     const message = buildCollectionRequestMessage(latestOrder, selectedDriver, requestNote);
     const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
 
@@ -2160,7 +2508,12 @@ async function handleSendCollectionRequest(){
         assignedAt: serverTimestamp(),
         assignedBy,
         assignedDriver,
-        note: requestNote
+        note: requestNote,
+        pickupDate,
+        pickupDateLabel,
+        pickupTime,
+        pickupTimeLabel,
+        locationLink
       }
     });
 
@@ -2174,7 +2527,12 @@ async function handleSendCollectionRequest(){
           assignedAt: new Date(),
           assignedBy,
           assignedDriver,
-          note: requestNote
+          note: requestNote,
+          pickupDate,
+          pickupDateLabel,
+          pickupTime,
+          pickupTimeLabel,
+          locationLink
         }
       };
     }
@@ -2707,6 +3065,10 @@ function getQuoteDiscountPercentage(source = {}){
   return clampDiscountPercentage((discountAmount / preDiscountSubtotal) * 100);
 }
 
+function getQuoteRentalDaysValue(){
+  return Math.max(1, Math.floor(Number(quoteRentalDaysInput?.value) || 1));
+}
+
 function getOrderMapUrl(order){
   const normalizedMapLink = normalizeGoogleMapsLink(order?.mapLink || "");
 
@@ -3016,7 +3378,7 @@ function renderQuoteItems(items = []){
     const hasUnitPrice = item.unitPrice !== "" && item.unitPrice !== null && item.unitPrice !== undefined;
     const unitPrice = hasUnitPrice ? Number(item.unitPrice) : "";
     const isEditing = Boolean(item.isEdited);
-    const amount = quantity * (Number(unitPrice) || 0);
+    const amount = quantity * (Number(unitPrice) || 0) * getQuoteRentalDaysValue();
 
     return `
       <article class="quote-item-card ${isEditing ? "is-editing" : ""}" data-index="${index}" data-editing="${isEditing ? "true" : "false"}">
@@ -3084,9 +3446,10 @@ function updateQuoteTotals(){
     quantity: Math.max(1, Number(item.quantity) || 1),
     unitPrice: Number.isFinite(item.unitPrice) && item.unitPrice >= 0 ? item.unitPrice : 0
   }));
+  const rentalDays = getQuoteRentalDaysValue();
   const deliveryCharge = Math.max(0, Number(quoteDeliveryChargeInput?.value) || 0);
   const discountPercentage = clampDiscountPercentage(quoteDiscountInput?.value);
-  const totals = calculateQuoteTotals(safeItems, deliveryCharge, discountPercentage);
+  const totals = calculateQuoteTotals(safeItems, rentalDays, deliveryCharge, discountPercentage);
 
   totals.items.forEach((item, index) => {
     const amountInput = getQuoteItemRows()[index]?.querySelector(".quote-item-amount");
@@ -3451,12 +3814,12 @@ function validateQuoteDraft(){
     unitPrice: Number(item.unitPrice) || 0,
     isEdited: Boolean(item.isEdited)
   }));
-  const totals = calculateQuoteTotals(normalizedItems, deliveryCharge, discountPercentage);
+  const totals = calculateQuoteTotals(normalizedItems, rentalDays, deliveryCharge, discountPercentage);
 
   return {
     language: quoteLanguageSelect?.value === "ar" ? "ar" : "en",
     bankPreset: getQuoteBankPreset(quoteBankPresetSelect?.value),
-    rentalDays: Math.max(1, Number(rentalDays) || 1),
+    rentalDays: Math.max(1, Math.floor(Number(rentalDays) || 1)),
     deliveryCharge,
     discountPercentage: clampDiscountPercentage(discountPercentage),
     totals
@@ -5494,12 +5857,26 @@ function getStatusColor(status){
 
 /* SEARCH + FILTER */
 
-function applyFilters(resetPage = false){
+function applyFilters(resetPage = false, source = "general"){
+  ensureValidAdminFilterState();
+
   if(resetPage){
     currentPage = 1;
   }
 
-  renderOrders(getFilteredOrders());
+  const filteredOrders = getFilteredOrders();
+
+  if(hasLoadedOrdersSnapshot && !hasLoggedInitialAdminApplyFilters){
+    console.debug("[admin] applyFilters call on first load", {
+      source,
+      allOrdersLength: allOrders.length,
+      filteredOrdersLength: filteredOrders.length,
+      ...getAdminInitialFilterState()
+    });
+    hasLoggedInitialAdminApplyFilters = true;
+  }
+
+  renderOrders(filteredOrders, source);
 }
 
 function handlePageChange(direction){
@@ -5559,6 +5936,74 @@ function getFilteredOrders(){
   }
 
   return filtered;
+}
+
+function getAdminInitialFilterState(){
+  return {
+    search: String(searchInput?.value || "").trim(),
+    status: document.getElementById("statusFilter")?.value || "all",
+    priority: document.getElementById("priorityFilter")?.value || "all",
+    driver: driverFilter?.value || "all",
+    activeOpsFilter,
+    currentPage
+  };
+}
+
+function ensureValidAdminFilterState(){
+  const statusFilterElement = document.getElementById("statusFilter");
+  const priorityFilterElement = document.getElementById("priorityFilter");
+  const validOpsFilters = new Set(["all", "today", "tomorrow", "week"]);
+
+  if(statusFilterElement && ![...statusFilterElement.options].some((option) => option.value === statusFilterElement.value)){
+    statusFilterElement.value = "all";
+  }
+
+  if(priorityFilterElement && ![...priorityFilterElement.options].some((option) => option.value === priorityFilterElement.value)){
+    priorityFilterElement.value = "all";
+  }
+
+  if(driverFilter && ![...driverFilter.options].some((option) => option.value === driverFilter.value)){
+    driverFilter.value = "all";
+  }
+
+  if(!validOpsFilters.has(activeOpsFilter)){
+    activeOpsFilter = "all";
+  }
+
+  if(!Number.isFinite(currentPage) || currentPage < 1){
+    currentPage = 1;
+  }
+}
+
+function renderAdminDashboardAfterOrdersSnapshot(source = "orders-snapshot"){
+  ensureValidAdminFilterState();
+
+  console.debug("[admin] initial filter state", {
+    source,
+    ...getAdminInitialFilterState()
+  });
+
+  const renderSteps = [
+    ["ops-panel", () => renderOpsPanel()],
+    ["driver-panel", () => renderDriverPanel()],
+    ["map", () => renderOperationsMapSection()],
+    ["collection", () => renderCollectionAssignmentSection()],
+    ["inventory-dashboard", () => renderInventoryDashboard()],
+    ["orders-table", () => applyFilters(false, source)],
+    ["stats", () => updateStats(allOrders)],
+    ["analytics", () => generateAnalytics()],
+    ["calendar", () => renderCalendar()]
+  ];
+
+  renderSteps.forEach(([step, renderStep]) => {
+    try{
+      renderStep();
+    }catch(error){
+      console.error(`[admin] Failed to render ${step}:`, error);
+    }
+  });
+
+  updateActiveAdminSidebarLink();
 }
 
 /* STATS */
@@ -5627,7 +6072,14 @@ function attachAdminSummaryCardEvents(){
 /* INIT */
 
 document.addEventListener("DOMContentLoaded", async ()=>{
+  ensureValidAdminFilterState();
+  console.debug("[admin] page initialization", {
+    ...getAdminInitialFilterState(),
+    hasLoadedOrdersSnapshot
+  });
+
   initMobileMenu();
+  initAdminSidebarNavigation();
   initScrollTopButton();
   initAdminLocationBindings();
   document.getElementById("closeModalBtn").addEventListener("click", closeOrderModal);
@@ -5698,21 +6150,36 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   });
   document.getElementById("priorityFilter").addEventListener("change", () => applyFilters(true));
   driverFilter?.addEventListener("change", () => applyFilters(true));
-  collectionOrderSelect?.addEventListener("change", () => {
-    selectedCollectionOrderId = collectionOrderSelect.value || "";
-    renderCollectionRequestPreview();
-  });
-  collectionDriverSelect?.addEventListener("change", () => {
-    selectedCollectionDriverId = collectionDriverSelect.value || "";
-    renderCollectionRequestPreview();
-  });
-  collectionRequestNote?.addEventListener("input", renderCollectionRequestPreview);
+  if(collectionOrderSelect && collectionOrderSelect.dataset.collectionBound !== "true"){
+    collectionOrderSelect.addEventListener("change", handleCollectionOrderSelectionChange);
+    collectionOrderSelect.dataset.collectionBound = "true";
+  }
+  if(collectionDriverSelect && collectionDriverSelect.dataset.collectionBound !== "true"){
+    collectionDriverSelect.addEventListener("change", () => {
+      selectedCollectionDriverId = collectionDriverSelect.value || "";
+      renderCollectionRequestPreview();
+    });
+    collectionDriverSelect.dataset.collectionBound = "true";
+  }
+  if(collectionPickupDate && collectionPickupDate.dataset.collectionBound !== "true"){
+    collectionPickupDate.addEventListener("input", renderCollectionRequestPreview);
+    collectionPickupDate.dataset.collectionBound = "true";
+  }
+  if(collectionPickupTime && collectionPickupTime.dataset.collectionBound !== "true"){
+    collectionPickupTime.addEventListener("input", renderCollectionRequestPreview);
+    collectionPickupTime.dataset.collectionBound = "true";
+  }
+  if(collectionRequestNote && collectionRequestNote.dataset.collectionBound !== "true"){
+    collectionRequestNote.addEventListener("input", renderCollectionRequestPreview);
+    collectionRequestNote.dataset.collectionBound = "true";
+  }
   sendCollectionRequestBtn?.addEventListener("click", handleSendCollectionRequest);
   inventorySearchInput?.addEventListener("input", renderInventoryTable);
   inventorySourceFilter?.addEventListener("change", renderInventoryTable);
   inventoryStatusFilter?.addEventListener("change", renderInventoryTable);
   reservationDateFilter?.addEventListener("change", renderInventoryDashboard);
   syncSearchClearButton();
+  updateActiveAdminSidebarLink();
   renderOperationsMapSection();
   renderCollectionAssignmentSection();
   document.querySelectorAll(".inventory-sort-btn").forEach((button) => {
@@ -5776,7 +6243,10 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     markQuoteDraftDirty();
   });
   quoteBankPresetSelect?.addEventListener("change", markQuoteDraftDirty);
-  quoteRentalDaysInput?.addEventListener("input", markQuoteDraftDirty);
+  quoteRentalDaysInput?.addEventListener("input", () => {
+    updateQuoteTotals();
+    markQuoteDraftDirty();
+  });
   quoteDeliveryChargeInput?.addEventListener("input", () => {
     updateQuoteTotals();
     markQuoteDraftDirty();

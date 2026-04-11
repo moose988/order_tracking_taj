@@ -243,12 +243,13 @@ function buildPreparedQuote(quote){
   const language = quote.language === "ar" ? "ar" : "en";
   const labels = getQuoteLabels(language);
   const discountState = resolveQuoteDiscountValues(quote);
+  const rentalDays = Math.max(1, Math.floor(Number(quote.rentalDays) || 1));
   const items = (quote.items || []).map((item, index) => ({
     index: index + 1,
     name: toDisplayText(item.name),
     quantity: Math.max(1, Number(item.quantity) || 1),
     unitPrice: `${formatMoney(item.unitPrice)} ${labels.currency}`,
-    amount: `${formatMoney(item.amount)} ${labels.currency}`
+    amount: `${formatMoney(Number.isFinite(Number(item.amount)) ? Number(item.amount) : ((Number(item.quantity) || 1) * (Number(item.unitPrice) || 0) * rentalDays))} ${labels.currency}`
   }));
 
   return {
@@ -1314,7 +1315,8 @@ export function buildQuotePdfFileName(orderId, version, language = "en"){
   return `${safeOrderId}-quotation-v${version}-${language}.pdf`;
 }
 
-export function calculateQuoteTotals(items, deliveryCharge = 0, discountPercentage = 0){
+export function calculateQuoteTotals(items, rentalDays = 1, deliveryCharge = 0, discountPercentage = 0){
+  const safeRentalDays = Math.max(1, Math.floor(Number(rentalDays) || 1));
   const normalizedItems = (items || []).map((item) => {
     const quantity = Math.max(1, Number(item.quantity) || 0);
     const unitPrice = Number(item.unitPrice) || 0;
@@ -1323,7 +1325,8 @@ export function calculateQuoteTotals(items, deliveryCharge = 0, discountPercenta
       ...item,
       quantity,
       unitPrice,
-      amount: quantity * unitPrice
+      rentalDays: safeRentalDays,
+      amount: quantity * unitPrice * safeRentalDays
     };
   });
 
@@ -1338,6 +1341,7 @@ export function calculateQuoteTotals(items, deliveryCharge = 0, discountPercenta
 
   return {
     items: normalizedItems,
+    rentalDays: safeRentalDays,
     itemsTotal,
     deliveryCharge: safeDeliveryCharge,
     preDiscountSubtotal,

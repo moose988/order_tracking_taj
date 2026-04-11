@@ -288,6 +288,10 @@ function getMapUrl(order){
     return normalizeMapUrl(order.mapLink);
   }
 
+  if(order?.collectionRequest?.locationLink){
+    return normalizeMapUrl(order.collectionRequest.locationLink);
+  }
+
   if(order.eventLocation){
     return `https://www.google.com/maps?q=${encodeURIComponent(order.eventLocation)}`;
   }
@@ -564,7 +568,67 @@ function renderCollectionEmptyState(){
   `);
 }
 
+function formatPickupTimeLabel(value){
+  const rawValue = String(value || "").trim();
+
+  if(!rawValue){
+    return "";
+  }
+
+  const timeMatch = rawValue.match(/^(\d{1,2}):(\d{2})$/);
+
+  if(!timeMatch){
+    return rawValue;
+  }
+
+  const hoursValue = Number(timeMatch[1]);
+  const minutesValue = Number(timeMatch[2]);
+
+  if(!Number.isFinite(hoursValue) || !Number.isFinite(minutesValue)){
+    return rawValue;
+  }
+
+  const formattedDate = new Date();
+  formattedDate.setHours(hoursValue, minutesValue, 0, 0);
+
+  return formattedDate.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatPickupDateLabel(value){
+  const rawValue = String(value || "").trim();
+
+  if(!rawValue){
+    return "";
+  }
+
+  const parsed = new Date(`${rawValue}T00:00:00`);
+
+  if(Number.isNaN(parsed.getTime())){
+    return rawValue;
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function getCollectionPickupDateLabel(order){
+  return String(order?.collectionRequest?.pickupDateLabel || "").trim() || formatPickupDateLabel(order?.collectionRequest?.pickupDate);
+}
+
+function getCollectionPickupTimeLabel(order){
+  return String(order?.collectionRequest?.pickupTimeLabel || "").trim() || formatPickupTimeLabel(order?.collectionRequest?.pickupTime);
+}
+
 function getCollectionSummaryMarkup(order){
+  const pickupDateLabel = getCollectionPickupDateLabel(order);
+  const pickupTimeLabel = getCollectionPickupTimeLabel(order);
+
   return `
     <div class="driver-collection-summary-grid">
       <div>
@@ -583,6 +647,18 @@ function getCollectionSummaryMarkup(order){
         <span>Rental Days</span>
         <strong>${getOrderRentalDays(order)}</strong>
       </div>
+      ${pickupDateLabel ? `
+        <div>
+          <span>Pickup Date</span>
+          <strong>${escapeHtml(pickupDateLabel)}</strong>
+        </div>
+      ` : ""}
+      ${pickupTimeLabel ? `
+        <div>
+          <span>Pickup Time</span>
+          <strong>${escapeHtml(pickupTimeLabel)}</strong>
+        </div>
+      ` : ""}
       <div class="is-wide">
         <span>Event Location</span>
         <strong>${escapeHtml(order.eventLocation || "No location recorded")}</strong>
@@ -621,6 +697,8 @@ function renderCollectionLookupOrder(order, options = {}){
   const normalizedStatus = normalizeOrderStatusValue(order?.status);
   const isDeliveredOrder = normalizedStatus === "delivered";
   const isCollectedOrder = normalizedStatus === "collected";
+  const mapUrl = getMapUrl(order);
+  const hasMapUrl = mapUrl !== "#";
   const tone = options.tone || (isDeliveredOrder ? "ready" : isCollectedOrder ? "success" : "warning");
   const title = options.title || (
     isDeliveredOrder
@@ -652,6 +730,9 @@ function renderCollectionLookupOrder(order, options = {}){
       ${getCollectionSummaryMarkup(order)}
       ${isDeliveredOrder ? `
         <div class="driver-collection-actions">
+          <a class="btn btn-secondary driver-action-link ${hasMapUrl ? "" : "is-disabled"}" href="${hasMapUrl ? mapUrl : "#"}" target="_blank" rel="noreferrer">
+            Open Map
+          </a>
           <button id="driverCollectionConfirmBtn" class="btn btn-primary" type="button">
             Mark Items Collected
           </button>
@@ -1002,24 +1083,67 @@ function getActionBlock(order, options){
   `;
 }
 
-function formatCompletedDateLabel(order){
+function getCompletedDateDisplay(order, fallback = "Not recorded"){
   const completedTime = getCompletedOrdersRangeValue(order);
 
   if(!completedTime){
-    return "Completed";
+    return fallback;
   }
 
-  return `Completed ${new Date(completedTime).toLocaleDateString("en-US", {
+  return new Date(completedTime).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric"
-  })}`;
+  });
+}
+
+function formatCompletedDateLabel(order){
+  const completedDate = getCompletedDateDisplay(order, "");
+
+  if(!completedDate){
+    return "Completed";
+  }
+
+  return `Completed ${completedDate}`;
+}
+
+function renderCompletedOrderCard(order){
+  const priority = getPriorityValue(order.priority);
+  const normalizedStatus = normalizeOrderStatusValue(order.status) || "unknown";
+
+  return `
+    <article class="driver-order-card is-completed-card">
+      <div class="driver-order-top">
+        <div>
+          <span class="driver-order-kicker">${escapeHtml(order.orderId || order.id || "N/A")}</span>
+          <h3>${escapeHtml(order.customerName || "Unknown customer")}</h3>
+        </div>
+        <span class="driver-order-badge is-${escapeHtml(normalizedStatus)}">
+          ${escapeHtml(formatStatusLabel(order.status))}
+        </span>
+      </div>
+
+      <div class="driver-order-priority">
+        <span>Priority</span>
+        <strong class="driver-priority-badge is-${priority}">${formatPriorityLabel(priority)}</strong>
+      </div>
+
+      <div class="driver-completed-meta">
+        <span>Completed Date</span>
+        <strong>${escapeHtml(getCompletedDateDisplay(order))}</strong>
+      </div>
+    </article>
+  `;
 }
 
 function renderOrderCard(order, options = {}){
   const isActive = order.status === "out-for-delivery" || startingOrderIds.has(order.id);
   const isCompletedCard = options.variant === "completed";
   const priority = getPriorityValue(order.priority);
+
+  if(isCompletedCard){
+    return renderCompletedOrderCard(order);
+  }
 
   return `
     <article class="driver-order-card ${isActive ? "is-active" : ""} ${isCompletedCard ? "is-completed-card" : ""}">
@@ -1448,7 +1572,15 @@ function ensureLocationSharingWatch(reason = "resume"){
 async function finishOrder(orderId){
   const order = currentOrders.find((item) => item.id === orderId);
 
-  if(!order || order.status !== "out-for-delivery"){
+  if(!order || order.status !== "out-for-delivery" || finishingOrderIds.has(orderId)){
+    return;
+  }
+
+  if(!window.confirm(`Are you sure you want to finish order ${order.orderId || order.id}?`)){
+    return;
+  }
+
+  if(!window.confirm(`This will mark order ${order.orderId || order.id} as delivered. Continue?`)){
     return;
   }
 
