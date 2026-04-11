@@ -8,33 +8,69 @@
 </head>
 <body class="driver-dashboard-page">
   <header class="site-header">
-    <div class="container navbar">
+    <div class="container navbar driver-navbar">
       <a href="index.html" class="brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" />
+        <img
+          src="../images/logo/logo.jpeg"
+          alt="Al Taj Al Malaky logo"
+          class="brand-logo"
+          data-i18n-alt="meta.logoAlt"
+        />
         <div class="brand-copy">
           <h2>Al Taj Al Malaky</h2>
-          <span>Luxury Event Setup & Rental</span>
+          <span data-i18n="brand.subtitle">Luxury Event Setup & Rental</span>
         </div>
       </a>
 
-      <nav class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="track.html">Track Order</a>
-        <a href="driver.html" class="active">Driver Dashboard</a>
-      </nav>
-
-      <button id="driverLogoutBtn" class="btn btn-secondary admin-logout-btn" type="button">Logout</button>
-      <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
+      <button id="driverLogoutBtn" class="btn btn-secondary driver-logout-btn" type="button" data-i18n="header.logout">Logout</button>
     </div>
   </header>
 
-  <main class="page-section">
-    <div class="container">
-      <section class="driver-hero">
-        <div>
-          <span class="section-kicker">Driver Dashboard</span>
-          <h1 class="section-title">Hello, <span id="driverWelcomeName">Driver</span></h1>
-          <p id="driverSummaryText" class="section-text">Assigned deliveries will appear here in real time.</p>
+  <main class="page-section driver-dashboard-main">
+    <div class="driver-dashboard-layout">
+      <aside class="driver-sidebar" aria-label="Driver dashboard navigation" data-i18n-aria-label="sidebar.ariaLabel">
+        <div class="driver-sidebar-panel">
+          <div class="section-kicker" data-i18n="sidebar.quickNav">Quick Navigation</div>
+          <nav id="driverSidebarNav" class="driver-sidebar-nav">
+            <div class="driver-sidebar-group">
+              <p class="driver-sidebar-group-title" data-i18n="sidebar.groupDriver">Driver</p>
+              <a class="driver-sidebar-link is-active" href="#driverDashboardSection" data-target="driverDashboardSection" data-i18n="sidebar.dashboard">Dashboard</a>
+              <a class="driver-sidebar-link" href="#driverActiveOrdersSection" data-target="driverActiveOrdersSection" data-i18n="sidebar.activeOrders">Active Orders</a>
+              <a class="driver-sidebar-link" href="#driverCollectionSection" data-target="driverCollectionSection" data-i18n="sidebar.collection">Collection</a>
+              <a class="driver-sidebar-link" href="#driverCompletedOrdersSection" data-target="driverCompletedOrdersSection" data-i18n="sidebar.completedOrders">Completed Orders</a>
+            </div>
+
+            <div class="driver-sidebar-group">
+              <p class="driver-sidebar-group-title" data-i18n="sidebar.groupSystem">System</p>
+              <a class="driver-sidebar-link" href="#driverSupportSection" data-target="driverSupportSection" data-i18n="sidebar.support">Support</a>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <div class="driver-dashboard-content">
+        <div class="container">
+      <section id="driverDashboardSection" class="driver-hero driver-section-anchor">
+        <div class="driver-hero-copy">
+          <div class="driver-hero-head">
+            <div>
+              <span class="section-kicker" data-i18n="hero.kicker">Driver Dashboard</span>
+              <h1 id="driverWelcomeTitle" class="section-title">Hello, Driver</h1>
+            </div>
+
+            <label class="driver-language-control" for="driverLanguageSelect">
+              <span data-i18n="language.label">Language</span>
+              <select id="driverLanguageSelect" aria-label="Language" data-i18n-aria-label="language.label">
+                <option value="en">English</option>
+                <option value="ar">العربية</option>
+                <option value="hi">Hindustani</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="driverSummaryText" class="driver-summary-strip" role="status" aria-live="polite">
+            Assigned deliveries will appear here in real time.
+          </div>
         </div>
 
         <div class="driver-pill-row">
@@ -47,13 +83,12 @@
         Connecting to your assigned orders...
       </div>
 
-      <section class="driver-section" aria-labelledby="driverActiveOrdersTitle">
+      <section id="driverActiveOrdersSection" class="driver-section driver-section-anchor" aria-labelledby="driverActiveOrdersTitle">
         <div class="driver-section-head">
           <div>
-            <span class="section-kicker">Assigned Work</span>
-            <h2 id="driverActiveOrdersTitle" class="section-title">Active Orders</h2>
+            <span class="section-kicker" data-i18n="activeOrders.kicker">Assigned Work</span>
+            <h2 id="driverActiveOrdersTitle" class="section-title" data-i18n="activeOrders.title">Active Orders</h2>
           </div>
-          <p id="driverActiveOrdersSummary" class="driver-section-summary">Loading your active deliveries...</p>
         </div>
 
         <section id="driverOrders" class="driver-orders-grid" aria-live="polite">
@@ -64,23 +99,29 @@
         </section>
       </section>
 
-      <section class="driver-section driver-collection-section" aria-labelledby="driverCollectionTitle">
+      <section id="driverCollectionSection" class="driver-section driver-collection-section driver-section-anchor" aria-labelledby="driverCollectionTitle">
         <div class="driver-section-head">
           <div>
-            <span class="section-kicker">Rental Returns</span>
-            <h2 id="driverCollectionTitle" class="section-title">Collect an Order</h2>
+            <span class="section-kicker" data-i18n="collection.kicker">Rental Returns</span>
+            <h2 id="driverCollectionTitle" class="section-title" data-i18n="collection.title">Collect an Order</h2>
           </div>
-          <p class="driver-section-summary">Enter any delivered order ID to mark the rental items as collected back.</p>
+          <p class="driver-section-summary" data-i18n="collection.summary">Enter any delivered order ID to mark the rental items as collected back.</p>
         </div>
 
         <div class="driver-collection-shell">
           <form id="driverCollectionForm" class="driver-collection-form">
             <label class="driver-history-control driver-collection-control" for="driverCollectionOrderIdInput">
-              <span>Order ID</span>
-              <input id="driverCollectionOrderIdInput" type="text" placeholder="TAJ-1053-VC2" autocomplete="off" />
+              <span data-i18n="collection.orderIdLabel">Order ID</span>
+              <input
+                id="driverCollectionOrderIdInput"
+                type="text"
+                placeholder="TAJ-1053-VC2"
+                autocomplete="off"
+                data-i18n-placeholder="collection.orderIdPlaceholder"
+              />
             </label>
 
-            <button id="driverCollectionFindBtn" class="btn btn-primary" type="submit">Find Order</button>
+            <button id="driverCollectionFindBtn" class="btn btn-primary" type="submit" data-i18n="collection.find">Find Order</button>
           </form>
 
           <div id="driverCollectionResult" class="driver-collection-result" aria-live="polite">
@@ -92,35 +133,35 @@
         </div>
       </section>
 
-      <section class="driver-section driver-completed-section" aria-labelledby="driverCompletedOrdersTitle">
+      <section id="driverCompletedOrdersSection" class="driver-section driver-completed-section driver-section-anchor" aria-labelledby="driverCompletedOrdersTitle">
         <div class="driver-section-head">
           <div>
-            <span class="section-kicker">Delivery History</span>
-            <h2 id="driverCompletedOrdersTitle" class="section-title">Completed Orders</h2>
+            <span class="section-kicker" data-i18n="completed.kicker">Delivery History</span>
+            <h2 id="driverCompletedOrdersTitle" class="section-title" data-i18n="completed.title">Completed Orders</h2>
           </div>
           <p id="driverCompletedOrdersSummary" class="driver-section-summary">Delivered and collected orders will appear here automatically.</p>
         </div>
 
         <div class="driver-history-toolbar">
           <label class="driver-history-control">
-            <span>Range</span>
+            <span data-i18n="completed.range">Range</span>
             <select id="completedRangeFilter">
-              <option value="month">This Month</option>
-              <option value="all">All Time</option>
+              <option value="month" data-i18n="completed.rangeMonth">This Month</option>
+              <option value="all" data-i18n="completed.rangeAll">All Time</option>
             </select>
           </label>
 
           <label class="driver-history-control">
-            <span>Sort</span>
+            <span data-i18n="completed.sort">Sort</span>
             <select id="completedSortFilter">
-              <option value="recent">Most Recent First</option>
-              <option value="oldest">Oldest First</option>
+              <option value="recent" data-i18n="completed.sortRecent">Most Recent First</option>
+              <option value="oldest" data-i18n="completed.sortOldest">Oldest First</option>
             </select>
           </label>
 
           <label class="driver-history-control driver-history-search">
-            <span>Search</span>
-            <input id="completedSearchInput" type="search" placeholder="Order ID or customer name" />
+            <span data-i18n="completed.search">Search</span>
+            <input id="completedSearchInput" type="search" placeholder="Order ID or customer name" data-i18n-placeholder="completed.searchPlaceholder" />
           </label>
         </div>
 
@@ -132,18 +173,46 @@
         </section>
 
         <div id="driverCompletedPagination" class="driver-pagination" style="display:none;">
-          <button id="driverCompletedPrevBtn" class="btn btn-secondary" type="button">Previous</button>
+          <button id="driverCompletedPrevBtn" class="btn btn-secondary" type="button" data-i18n="completed.previous">Previous</button>
           <span id="driverCompletedPageInfo" class="driver-pagination-info">Page 1 of 1</span>
-          <button id="driverCompletedNextBtn" class="btn btn-secondary" type="button">Next</button>
+          <button id="driverCompletedNextBtn" class="btn btn-secondary" type="button" data-i18n="completed.next">Next</button>
         </div>
       </section>
+
+      <section id="driverSupportSection" class="driver-support-section driver-section-anchor" aria-labelledby="driverSupportTitle">
+        <article class="driver-support-card">
+          <div class="driver-support-icon" aria-hidden="true">
+            <span data-i18n="support.icon">TEL</span>
+          </div>
+          <div class="driver-support-copy">
+            <span class="section-kicker" data-i18n="support.kicker">Need Help</span>
+            <h2 id="driverSupportTitle" class="section-title" data-i18n="support.title">Support</h2>
+            <p data-i18n="support.description">For dispatch or technical issues, please contact MR Mohamad Daya.</p>
+          </div>
+          <a class="driver-support-link" href="tel:+971505349907">
+            +971 50 534 9907
+          </a>
+        </article>
+      </section>
+        </div>
+      </div>
     </div>
   </main>
 
-  <button class="scroll-top-btn" type="button" data-scroll-top aria-label="Scroll back to top" title="Back to top">
+  <button
+    class="scroll-top-btn"
+    type="button"
+    data-scroll-top
+    aria-label="Scroll back to top"
+    title="Back to top"
+    data-i18n="scrollTop.text"
+    data-i18n-aria-label="scrollTop.ariaLabel"
+    data-i18n-title="scrollTop.title"
+  >
     Top
   </button>
 
   <script type="module" src="../src/js/driver.js"></script>
 </body>
 </html>
+
