@@ -671,6 +671,14 @@
 
       </div>
 
+      <section class="admin-order-modal-panel admin-order-modal-timeline" aria-labelledby="adminOrderTimelineTitle">
+        <div class="admin-order-modal-panel-head">
+          <h4 id="adminOrderTimelineTitle">Order Timeline</h4>
+        </div>
+
+        <div id="modalOrderTimeline" class="admin-order-timeline" aria-live="polite"></div>
+      </section>
+
       <div class="modal-actions admin-order-modal-actions">
         <button id="modalMapBtn" class="btn btn-secondary">Open Map</button>
         <button id="modalCopyBtn" class="btn btn-dark">Copy Full Details</button>
@@ -698,6 +706,50 @@
         <button id="confirmAssignDriver" type="button" class="btn btn-primary">Assign Driver</button>
         <button type="button" onclick="closeDriverModal()" class="btn btn-secondary">Cancel</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="driverPerformanceModal" class="modal-overlay">
+  <div class="modal driver-performance-modal">
+    <div class="modal-content">
+      <button class="modal-close" id="closeDriverPerformanceModalBtn" type="button" aria-label="Close modal">&times;</button>
+
+      <div class="driver-performance-head">
+        <div>
+          <span class="section-kicker">Driver Performance</span>
+          <h3 id="driverPerformanceTitle">Driver Performance</h3>
+          <p id="driverPerformanceSubtitle" class="driver-performance-subtitle">Review workload, recent deliveries, and operational performance.</p>
+        </div>
+      </div>
+
+      <div id="driverPerformanceStats" class="driver-performance-stats"></div>
+
+      <div class="driver-performance-grid">
+        <section class="driver-performance-panel" aria-labelledby="driverPerformanceCurrentOrdersTitle">
+          <div class="driver-performance-panel-head">
+            <h4 id="driverPerformanceCurrentOrdersTitle">Current Assigned Orders</h4>
+            <p>Live workload currently assigned to this driver.</p>
+          </div>
+          <div id="driverPerformanceCurrentOrders" class="driver-performance-list" aria-live="polite"></div>
+        </section>
+
+        <section class="driver-performance-panel" aria-labelledby="driverPerformanceRecentOrdersTitle">
+          <div class="driver-performance-panel-head">
+            <h4 id="driverPerformanceRecentOrdersTitle">Recently Completed Orders</h4>
+            <p>Most recent delivered or collected orders handled by this driver.</p>
+          </div>
+          <div id="driverPerformanceRecentOrders" class="driver-performance-list" aria-live="polite"></div>
+        </section>
+      </div>
+
+      <section class="driver-performance-panel driver-performance-summary-panel" aria-labelledby="driverPerformanceSummaryTitle">
+        <div class="driver-performance-panel-head">
+          <h4 id="driverPerformanceSummaryTitle">Performance Summary</h4>
+          <p>A compact operational readout for quick decision-making.</p>
+        </div>
+        <div id="driverPerformanceSummary" class="driver-performance-summary"></div>
+      </section>
     </div>
   </div>
 </div>
@@ -1109,7 +1161,7 @@
 
           <div class="form-group">
             <label for="inventoryCategory">Category</label>
-            <input id="inventoryCategory" name="category" type="text" placeholder="Tables, Chairs, Custom..." />
+            <input id="inventoryCategory" name="category" type="text" placeholder="Dining Tables, Chairs, Bridal Sofa, Coffee Table..." />
           </div>
 
           <div class="form-group">

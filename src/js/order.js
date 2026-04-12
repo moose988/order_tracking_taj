@@ -1,9 +1,11 @@
-import { PRODUCTS } from "../data/products.js";
+import { CATALOG_PLACEHOLDER_IMAGE, PRODUCTS } from "../data/products.js";
 
 let order = JSON.parse(localStorage.getItem("tajOrder")) || [];
 let selectedProduct = null;
 let selectedQuantity = 1;
 let currentImageIndex = 0;
+let currentCategory = "All";
+let currentSearchQuery = "";
 
 function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
@@ -30,15 +32,84 @@ function initMobileMenu(){
   });
 }
 
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function saveOrder(){
   localStorage.setItem("tajOrder", JSON.stringify(order));
 }
 
 function getFilterCategories(){
-  return [...new Set(PRODUCTS.map((product) => product.category).filter(Boolean))];
+  const preferredOrder = [
+    "Chairs",
+    "Dining Tables",
+    "Coffee Table",
+    "Cocktail Table",
+    "Majlis Sofa",
+    "Bridal Sofa"
+  ];
+  const availableCategories = [...new Set(PRODUCTS.map((product) => product.category).filter(Boolean))];
+  const orderedCategories = preferredOrder.filter((category) => availableCategories.includes(category));
+  const remainingCategories = availableCategories.filter((category) => !preferredOrder.includes(category));
+
+  return [...orderedCategories, ...remainingCategories];
 }
 
-function renderFilterButtons(activeCategory = "All"){
+function getNormalizedSearchValue(value){
+  return String(value || "").trim().toLowerCase();
+}
+
+function getProductImages(product){
+  const images = Array.isArray(product?.images)
+    ? product.images.filter((image) => String(image || "").trim())
+    : [];
+
+  return images.length ? images : [CATALOG_PLACEHOLDER_IMAGE];
+}
+
+function getPrimaryProductImage(product){
+  return getProductImages(product)[0];
+}
+
+function getImageFallbackAttribute(){
+  return `this.onerror=null;this.src='${CATALOG_PLACEHOLDER_IMAGE.replaceAll("'", "\\'")}';`;
+}
+
+function getVisibleProducts(){
+  const searchValue = getNormalizedSearchValue(currentSearchQuery);
+  let visibleProducts = [...PRODUCTS];
+
+  if(currentCategory !== "All"){
+    visibleProducts = visibleProducts.filter((product) => product.category === currentCategory);
+  }
+
+  if(searchValue){
+    visibleProducts = visibleProducts.filter((product) => {
+      const haystack = `${product.name} ${product.category} ${product.shortDescription}`.toLowerCase();
+      return haystack.includes(searchValue);
+    });
+  }
+
+  return visibleProducts;
+}
+
+function syncSearchClearButton(){
+  const clearSearchButton = document.getElementById("clearProductSearchBtn");
+
+  if(!clearSearchButton){
+    return;
+  }
+
+  clearSearchButton.hidden = !getNormalizedSearchValue(currentSearchQuery);
+}
+
+function renderFilterButtons(){
   const filtersContainer = document.getElementById("productFilters");
 
   if(!filtersContainer){
@@ -48,50 +119,66 @@ function renderFilterButtons(activeCategory = "All"){
   const categories = ["All", ...getFilterCategories()];
   filtersContainer.innerHTML = categories.map((category) => `
     <button
-      class="filter-btn ${category === activeCategory ? "active" : ""}"
+      class="filter-btn ${category === currentCategory ? "active" : ""}"
       type="button"
-      data-category="${category}"
+      data-category="${escapeHtml(category)}"
     >
-      ${category}
+      ${escapeHtml(category)}
     </button>
   `).join("");
 }
 
-function renderProducts(filter = "All"){
+function renderProducts(){
   const grid = document.getElementById("productsGrid");
 
   if(!grid){
     return;
   }
 
-  const filteredProducts = filter === "All"
-    ? PRODUCTS
-    : PRODUCTS.filter((product) => product.category === filter);
+  const visibleProducts = getVisibleProducts();
 
-  grid.innerHTML = filteredProducts.map((product) => `
+  if(!visibleProducts.length){
+    grid.innerHTML = `
+      <article class="order-products-empty">
+        <span class="section-kicker">No Matches</span>
+        <h3>No products found</h3>
+        <p>Try a different search or switch categories to continue browsing the collection.</p>
+      </article>
+    `;
+    return;
+  }
+
+  grid.innerHTML = visibleProducts.map((product) => `
     <article class="product-card" data-product-id="${product.id}">
-      <img class="product-thumb" src="${product.images[0]}" alt="${product.name}">
+      <div class="product-media">
+        <img
+          class="product-thumb"
+          src="${escapeHtml(getPrimaryProductImage(product))}"
+          alt="${escapeHtml(product.name)}"
+          onerror="${getImageFallbackAttribute()}"
+        >
+        <span class="badge product-badge">${escapeHtml(product.category)}</span>
+      </div>
 
       <div class="product-copy">
-        <span class="badge">${product.category}</span>
-        <h3>${product.name}</h3>
-        <p>${product.shortDescription}</p>
-
-        <div class="product-meta">
-          <span>${product.measurements}</span>
-          <span>View Details</span>
+        <div class="product-copy-head">
+          <h3>${escapeHtml(product.name)}</h3>
+          <span class="product-card-link">Tap to view details</span>
         </div>
       </div>
     </article>
   `).join("");
 }
 
-function filterProducts(category, button = null){
-  renderProducts(category);
+function applyCatalogView(){
+  renderFilterButtons();
+  renderProducts();
+  syncSearchClearButton();
+}
 
-  document.querySelectorAll(".filter-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn === button || btn.dataset.category === category);
-  });
+function filterProducts(category){
+  currentCategory = category || "All";
+  applyCatalogView();
 }
 
 function syncOrderFromStorage(){
@@ -132,7 +219,7 @@ function updateQuantityDisplay(){
   const quantityInput = document.getElementById("modalQuantity");
 
   if(quantityInput){
-    quantityInput.value = selectedQuantity;
+    quantityInput.value = String(selectedQuantity);
   }
 }
 
@@ -173,37 +260,108 @@ function clearOrder(){
   }
 }
 
+function updateOrderActionState(totalItems){
+  const summaryQuoteBtn = document.getElementById("summaryQuoteBtn");
+  const summaryClearBtn = document.getElementById("summaryClearBtn");
+  const mobileCartBtn = document.getElementById("mobileCartBtn");
+
+  [summaryQuoteBtn, summaryClearBtn, mobileCartBtn].forEach((button) => {
+    if(button){
+      button.disabled = totalItems === 0;
+    }
+  });
+}
+
 function renderOrderSummary(){
   const list = document.getElementById("orderItemsList");
   const totalText = document.getElementById("orderTotalText");
+  const summaryCaption = document.getElementById("orderSummaryCaption");
+  const mobileCartCount = document.getElementById("mobileCartCount");
 
-  if(!list || !totalText){
+  if(!list || !totalText || !summaryCaption || !mobileCartCount){
     return;
   }
 
-  if(order.length === 0){
-    list.innerHTML = '<p style="color:#888;text-align:center;padding:10px;">Empty</p>';
+  const totalItems = order.reduce((sum, item) => sum + item.quantity, 0);
+  const selectionCount = order.length;
+
+  if(!order.length){
+    list.innerHTML = `
+      <article class="order-empty-state">
+        <span class="order-empty-icon" aria-hidden="true">+</span>
+        <strong>Your basket is ready</strong>
+        <p>Select products from the collection to build a polished quote request.</p>
+      </article>
+    `;
     totalText.textContent = "0 items selected";
+    summaryCaption.textContent = "Select pieces from the collection to start building your quote.";
+    mobileCartCount.textContent = "0 items selected";
+    updateOrderActionState(0);
     return;
   }
 
   list.innerHTML = order.map((item) => `
-    <div class="order-item-row">
-      <div>
-        <strong>${item.name}</strong><br>
-        <small class="item-category">${item.category}</small>
+    <article class="order-item-row">
+      <div class="order-item-copy">
+        <strong>${escapeHtml(item.name)}</strong>
+        <small class="item-category">${escapeHtml(item.category)}</small>
       </div>
 
       <div class="qty-controls">
-        <button type="button" class="qty-minus" data-id="${item.id}">-</button>
+        <button type="button" class="qty-minus" data-id="${item.id}" aria-label="Decrease ${escapeHtml(item.name)} quantity">-</button>
         <span>${item.quantity}</span>
-        <button type="button" class="qty-plus" data-id="${item.id}">+</button>
+        <button type="button" class="qty-plus" data-id="${item.id}" aria-label="Increase ${escapeHtml(item.name)} quantity">+</button>
       </div>
-    </div>
+    </article>
   `).join("");
 
-  const count = order.reduce((sum, item) => sum + item.quantity, 0);
-  totalText.textContent = `${count} item${count !== 1 ? "s" : ""} selected`;
+  totalText.textContent = `${totalItems} item${totalItems !== 1 ? "s" : ""} selected`;
+  summaryCaption.textContent = `${selectionCount} selection${selectionCount !== 1 ? "s" : ""} prepared for your quote request.`;
+  mobileCartCount.textContent = `${totalItems} item${totalItems !== 1 ? "s" : ""} selected`;
+  updateOrderActionState(totalItems);
+}
+
+function renderModalGallery(){
+  if(!selectedProduct){
+    return;
+  }
+
+  const modalImage = document.getElementById("modalImage");
+  const modalThumbs = document.getElementById("modalThumbs");
+  const modalImageCount = document.getElementById("modalImageCount");
+  const galleryButtons = document.querySelectorAll("#productModal .gallery-nav button");
+  const productImages = getProductImages(selectedProduct);
+
+  if(modalImage){
+    modalImage.src = productImages[currentImageIndex];
+    modalImage.alt = selectedProduct.name;
+    modalImage.setAttribute("onerror", getImageFallbackAttribute());
+  }
+
+  if(modalImageCount){
+    modalImageCount.textContent = `${currentImageIndex + 1} / ${productImages.length}`;
+  }
+
+  if(modalThumbs){
+    modalThumbs.innerHTML = productImages.map((image, index) => `
+      <button
+        type="button"
+        class="order-modal-thumb ${index === currentImageIndex ? "is-active" : ""}"
+        data-index="${index}"
+        aria-label="View image ${index + 1}"
+      >
+        <img
+          src="${escapeHtml(image)}"
+          alt="${escapeHtml(`${selectedProduct.name} thumbnail ${index + 1}`)}"
+          onerror="${getImageFallbackAttribute()}"
+        >
+      </button>
+    `).join("");
+  }
+
+  galleryButtons.forEach((button) => {
+    button.disabled = productImages.length <= 1;
+  });
 }
 
 function openProductModal(id){
@@ -213,22 +371,39 @@ function openProductModal(id){
     return;
   }
 
+  const modalTitle = document.getElementById("modalProductTitle");
+  const modalDescription = document.getElementById("modalProductDescription");
+  const modalMeasurements = document.getElementById("modalMeasurements");
+  const modalCategoryBadge = document.getElementById("modalCategoryBadge");
+
   selectedQuantity = 1;
   currentImageIndex = 0;
 
-  document.getElementById("modalProductTitle").textContent = selectedProduct.name;
-  document.getElementById("modalProductDescription").textContent = selectedProduct.shortDescription;
-  document.getElementById("modalMeasurements").textContent = selectedProduct.measurements;
-  document.getElementById("modalImage").src = selectedProduct.images[0];
+  if(modalTitle){
+    modalTitle.textContent = selectedProduct.name;
+  }
+
+  if(modalDescription){
+    modalDescription.textContent = selectedProduct.shortDescription;
+  }
+
+  if(modalMeasurements){
+    modalMeasurements.textContent = selectedProduct.measurements;
+  }
+
+  if(modalCategoryBadge){
+    modalCategoryBadge.textContent = selectedProduct.category || "Collection";
+  }
 
   updateQuantityDisplay();
+  renderModalGallery();
 
   document.getElementById("productModal").classList.add("active");
   document.body.style.overflow = "hidden";
 }
 
 function closeProductModal(){
-  document.getElementById("productModal").classList.remove("active");
+  document.getElementById("productModal")?.classList.remove("active");
   document.body.style.overflow = "auto";
 }
 
@@ -237,8 +412,8 @@ function nextImage(){
     return;
   }
 
-  currentImageIndex = (currentImageIndex + 1) % selectedProduct.images.length;
-  document.getElementById("modalImage").src = selectedProduct.images[currentImageIndex];
+  currentImageIndex = (currentImageIndex + 1) % getProductImages(selectedProduct).length;
+  renderModalGallery();
 }
 
 function prevImage(){
@@ -246,8 +421,9 @@ function prevImage(){
     return;
   }
 
-  currentImageIndex = (currentImageIndex - 1 + selectedProduct.images.length) % selectedProduct.images.length;
-  document.getElementById("modalImage").src = selectedProduct.images[currentImageIndex];
+  const productImages = getProductImages(selectedProduct);
+  currentImageIndex = (currentImageIndex - 1 + productImages.length) % productImages.length;
+  renderModalGallery();
 }
 
 function addToOrder(){
@@ -285,6 +461,9 @@ function attachOrderEvents(){
   const productsGrid = document.getElementById("productsGrid");
   const orderItemsList = document.getElementById("orderItemsList");
   const modal = document.getElementById("productModal");
+  const productSearchInput = document.getElementById("productSearchInput");
+  const clearProductSearchBtn = document.getElementById("clearProductSearchBtn");
+  const modalThumbs = document.getElementById("modalThumbs");
 
   filtersContainer?.addEventListener("click", (event) => {
     const button = event.target.closest(".filter-btn");
@@ -293,7 +472,23 @@ function attachOrderEvents(){
       return;
     }
 
-    filterProducts(button.dataset.category || "All", button);
+    filterProducts(button.dataset.category || "All");
+  });
+
+  productSearchInput?.addEventListener("input", () => {
+    currentSearchQuery = productSearchInput.value || "";
+    applyCatalogView();
+  });
+
+  clearProductSearchBtn?.addEventListener("click", () => {
+    currentSearchQuery = "";
+
+    if(productSearchInput){
+      productSearchInput.value = "";
+      productSearchInput.focus();
+    }
+
+    applyCatalogView();
   });
 
   productsGrid?.addEventListener("click", (event) => {
@@ -324,6 +519,17 @@ function attachOrderEvents(){
       closeProductModal();
     }
   });
+
+  modalThumbs?.addEventListener("click", (event) => {
+    const thumb = event.target.closest(".order-modal-thumb");
+
+    if(!thumb || !selectedProduct){
+      return;
+    }
+
+    currentImageIndex = Number(thumb.dataset.index) || 0;
+    renderModalGallery();
+  });
 }
 
 function setCurrentYear(){
@@ -339,6 +545,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderProducts();
   syncOrderFromStorage();
   attachOrderEvents();
+  syncSearchClearButton();
 });
 
 window.addEventListener("pageshow", () => {

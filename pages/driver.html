@@ -22,7 +22,17 @@
         </div>
       </a>
 
-      <button id="driverLogoutBtn" class="btn btn-secondary driver-logout-btn" type="button" data-i18n="header.logout">Logout</button>
+      <div class="driver-header-actions">
+        <label class="driver-language-control driver-language-control--header" for="driverLanguageSelect" data-i18n-aria-label="language.label">
+          <select id="driverLanguageSelect" aria-label="Language" data-i18n-aria-label="language.label">
+            <option value="en">English</option>
+            <option value="ar">العربية</option>
+            <option value="ur">اردو</option>
+          </select>
+        </label>
+
+        <button id="driverLogoutBtn" class="btn btn-secondary driver-logout-btn" type="button" data-i18n="header.logout">Logout</button>
+      </div>
     </div>
   </header>
 
@@ -50,150 +60,148 @@
 
       <div class="driver-dashboard-content">
         <div class="container">
-      <section id="driverDashboardSection" class="driver-hero driver-section-anchor">
-        <div class="driver-hero-copy">
-          <div class="driver-hero-head">
-            <div>
-              <span class="section-kicker" data-i18n="hero.kicker">Driver Dashboard</span>
-              <h1 id="driverWelcomeTitle" class="section-title">Hello, Driver</h1>
+          <section id="driverDashboardSection" class="driver-hero driver-section-anchor">
+            <div class="driver-hero-copy">
+              <div class="driver-hero-head">
+                <div>
+                  <span class="section-kicker" data-i18n="hero.kicker">Driver Dashboard</span>
+                  <h1 id="driverWelcomeTitle" class="section-title">Hello, Driver</h1>
+                </div>
+              </div>
+
+              <div class="driver-status-bar" role="status" aria-live="polite">
+                <div class="status-card deliveries">
+                  <span class="label" data-i18n="hero.activeDeliveries">Active Deliveries</span>
+                  <span id="activeDeliveryPill" class="value">No active deliveries</span>
+                </div>
+
+                <div class="status-card location">
+                  <span class="label" data-i18n="hero.locationSharingLabel">Location Sharing</span>
+                  <span id="locationSharingPill" class="value off">OFF</span>
+                </div>
+              </div>
+
+              <div id="driverSummaryText" class="driver-summary-strip" role="status" aria-live="polite">
+                Assigned deliveries will appear here in real time.
+              </div>
+            </div>
+          </section>
+
+          <div id="driverDashboardStatus" class="driver-dashboard-message is-info" role="status" aria-live="polite">
+            Connecting to your assigned orders...
+          </div>
+
+          <section id="driverActiveOrdersSection" class="driver-section driver-section-anchor" aria-labelledby="driverActiveOrdersTitle">
+            <div class="driver-section-head">
+              <div>
+                <span class="section-kicker" data-i18n="activeOrders.kicker">Assigned Work</span>
+                <h2 id="driverActiveOrdersTitle" class="section-title" data-i18n="activeOrders.title">Active Orders</h2>
+              </div>
             </div>
 
-            <label class="driver-language-control" for="driverLanguageSelect">
-              <span data-i18n="language.label">Language</span>
-              <select id="driverLanguageSelect" aria-label="Language" data-i18n-aria-label="language.label">
-                <option value="en">English</option>
-                <option value="ar">العربية</option>
-                <option value="hi">Hindustani</option>
-              </select>
-            </label>
-          </div>
+            <section id="driverOrders" class="driver-orders-grid" aria-live="polite">
+              <article class="driver-empty-state">
+                <strong>Loading assigned orders...</strong>
+                <p>Please wait while your dashboard connects.</p>
+              </article>
+            </section>
+          </section>
 
-          <div id="driverSummaryText" class="driver-summary-strip" role="status" aria-live="polite">
-            Assigned deliveries will appear here in real time.
-          </div>
-        </div>
+          <section id="driverCollectionSection" class="driver-section driver-collection-section driver-section-anchor" aria-labelledby="driverCollectionTitle">
+            <div class="driver-section-head">
+              <div>
+                <span class="section-kicker" data-i18n="collection.kicker">Rental Returns</span>
+                <h2 id="driverCollectionTitle" class="section-title" data-i18n="collection.title">Collect an Order</h2>
+              </div>
+              <p class="driver-section-summary" data-i18n="collection.summary">Enter any delivered order ID to mark the rental items as collected back.</p>
+            </div>
 
-        <div class="driver-pill-row">
-          <span id="activeDeliveryPill" class="driver-pill">Active order: none</span>
-          <span id="locationSharingPill" class="driver-pill">Location sharing: off</span>
-        </div>
-      </section>
+            <div class="driver-collection-shell">
+              <form id="driverCollectionForm" class="driver-collection-form">
+                <label class="driver-history-control driver-collection-control" for="driverCollectionOrderIdInput">
+                  <span data-i18n="collection.orderIdLabel">Order ID</span>
+                  <input
+                    id="driverCollectionOrderIdInput"
+                    type="text"
+                    placeholder="TAJ-1053-VC2"
+                    autocomplete="off"
+                    data-i18n-placeholder="collection.orderIdPlaceholder"
+                  />
+                </label>
 
-      <div id="driverDashboardStatus" class="driver-dashboard-message is-info" role="status" aria-live="polite">
-        Connecting to your assigned orders...
-      </div>
+                <button id="driverCollectionFindBtn" class="btn btn-primary" type="submit" data-i18n="collection.find">Find Order</button>
+              </form>
 
-      <section id="driverActiveOrdersSection" class="driver-section driver-section-anchor" aria-labelledby="driverActiveOrdersTitle">
-        <div class="driver-section-head">
-          <div>
-            <span class="section-kicker" data-i18n="activeOrders.kicker">Assigned Work</span>
-            <h2 id="driverActiveOrdersTitle" class="section-title" data-i18n="activeOrders.title">Active Orders</h2>
-          </div>
-        </div>
+              <div id="driverCollectionResult" class="driver-collection-result" aria-live="polite">
+                <article class="driver-collection-state is-empty">
+                  <strong>Ready to collect a delivered order</strong>
+                  <p>Search by the customer-facing order ID to view the order summary and release inventory after collection.</p>
+                </article>
+              </div>
+            </div>
+          </section>
 
-        <section id="driverOrders" class="driver-orders-grid" aria-live="polite">
-          <article class="driver-empty-state">
-            <strong>Loading assigned orders...</strong>
-            <p>Please wait while your dashboard connects.</p>
-          </article>
-        </section>
-      </section>
+          <section id="driverCompletedOrdersSection" class="driver-section driver-completed-section driver-section-anchor" aria-labelledby="driverCompletedOrdersTitle">
+            <div class="driver-section-head">
+              <div>
+                <span class="section-kicker" data-i18n="completed.kicker">Delivery History</span>
+                <h2 id="driverCompletedOrdersTitle" class="section-title" data-i18n="completed.title">Completed Orders</h2>
+              </div>
+              <p id="driverCompletedOrdersSummary" class="driver-section-summary">Delivered and collected orders will appear here automatically.</p>
+            </div>
 
-      <section id="driverCollectionSection" class="driver-section driver-collection-section driver-section-anchor" aria-labelledby="driverCollectionTitle">
-        <div class="driver-section-head">
-          <div>
-            <span class="section-kicker" data-i18n="collection.kicker">Rental Returns</span>
-            <h2 id="driverCollectionTitle" class="section-title" data-i18n="collection.title">Collect an Order</h2>
-          </div>
-          <p class="driver-section-summary" data-i18n="collection.summary">Enter any delivered order ID to mark the rental items as collected back.</p>
-        </div>
+            <div class="driver-history-toolbar">
+              <label class="driver-history-control">
+                <span data-i18n="completed.range">Range</span>
+                <select id="completedRangeFilter">
+                  <option value="month" data-i18n="completed.rangeMonth">This Month</option>
+                  <option value="all" data-i18n="completed.rangeAll">All Time</option>
+                </select>
+              </label>
 
-        <div class="driver-collection-shell">
-          <form id="driverCollectionForm" class="driver-collection-form">
-            <label class="driver-history-control driver-collection-control" for="driverCollectionOrderIdInput">
-              <span data-i18n="collection.orderIdLabel">Order ID</span>
-              <input
-                id="driverCollectionOrderIdInput"
-                type="text"
-                placeholder="TAJ-1053-VC2"
-                autocomplete="off"
-                data-i18n-placeholder="collection.orderIdPlaceholder"
-              />
-            </label>
+              <label class="driver-history-control">
+                <span data-i18n="completed.sort">Sort</span>
+                <select id="completedSortFilter">
+                  <option value="recent" data-i18n="completed.sortRecent">Most Recent First</option>
+                  <option value="oldest" data-i18n="completed.sortOldest">Oldest First</option>
+                </select>
+              </label>
 
-            <button id="driverCollectionFindBtn" class="btn btn-primary" type="submit" data-i18n="collection.find">Find Order</button>
-          </form>
+              <label class="driver-history-control driver-history-search">
+                <span data-i18n="completed.search">Search</span>
+                <input id="completedSearchInput" type="search" placeholder="Order ID or customer name" data-i18n-placeholder="completed.searchPlaceholder" />
+              </label>
+            </div>
 
-          <div id="driverCollectionResult" class="driver-collection-result" aria-live="polite">
-            <article class="driver-collection-state is-empty">
-              <strong>Ready to collect a delivered order</strong>
-              <p>Search by the customer-facing order ID to view the order summary and release inventory after collection.</p>
+            <section id="driverCompletedOrders" class="driver-orders-grid driver-completed-grid" aria-live="polite">
+              <article class="driver-empty-state is-soft">
+                <strong>No completed orders yet</strong>
+                <p>Delivered and collected orders will move here automatically.</p>
+              </article>
+            </section>
+
+            <div id="driverCompletedPagination" class="driver-pagination" style="display:none;">
+              <button id="driverCompletedPrevBtn" class="btn btn-secondary" type="button" data-i18n="completed.previous">Previous</button>
+              <span id="driverCompletedPageInfo" class="driver-pagination-info">Page 1 of 1</span>
+              <button id="driverCompletedNextBtn" class="btn btn-secondary" type="button" data-i18n="completed.next">Next</button>
+            </div>
+          </section>
+
+          <section id="driverSupportSection" class="driver-support-section driver-section-anchor" aria-labelledby="driverSupportTitle">
+            <article class="driver-support-card">
+              <div class="driver-support-icon" aria-hidden="true">
+                <span data-i18n="support.icon">TEL</span>
+              </div>
+              <div class="driver-support-copy">
+                <span class="section-kicker" data-i18n="support.kicker">Need Help</span>
+                <h2 id="driverSupportTitle" class="section-title" data-i18n="support.title">Support</h2>
+                <p data-i18n="support.description">For dispatch or technical issues, please contact MR Mohamad Daya.</p>
+              </div>
+              <a class="driver-support-link" href="tel:+971505349907">
+                +971 50 534 9907
+              </a>
             </article>
-          </div>
-        </div>
-      </section>
-
-      <section id="driverCompletedOrdersSection" class="driver-section driver-completed-section driver-section-anchor" aria-labelledby="driverCompletedOrdersTitle">
-        <div class="driver-section-head">
-          <div>
-            <span class="section-kicker" data-i18n="completed.kicker">Delivery History</span>
-            <h2 id="driverCompletedOrdersTitle" class="section-title" data-i18n="completed.title">Completed Orders</h2>
-          </div>
-          <p id="driverCompletedOrdersSummary" class="driver-section-summary">Delivered and collected orders will appear here automatically.</p>
-        </div>
-
-        <div class="driver-history-toolbar">
-          <label class="driver-history-control">
-            <span data-i18n="completed.range">Range</span>
-            <select id="completedRangeFilter">
-              <option value="month" data-i18n="completed.rangeMonth">This Month</option>
-              <option value="all" data-i18n="completed.rangeAll">All Time</option>
-            </select>
-          </label>
-
-          <label class="driver-history-control">
-            <span data-i18n="completed.sort">Sort</span>
-            <select id="completedSortFilter">
-              <option value="recent" data-i18n="completed.sortRecent">Most Recent First</option>
-              <option value="oldest" data-i18n="completed.sortOldest">Oldest First</option>
-            </select>
-          </label>
-
-          <label class="driver-history-control driver-history-search">
-            <span data-i18n="completed.search">Search</span>
-            <input id="completedSearchInput" type="search" placeholder="Order ID or customer name" data-i18n-placeholder="completed.searchPlaceholder" />
-          </label>
-        </div>
-
-        <section id="driverCompletedOrders" class="driver-orders-grid driver-completed-grid" aria-live="polite">
-          <article class="driver-empty-state is-soft">
-            <strong>No completed orders yet</strong>
-            <p>Delivered and collected orders will move here automatically.</p>
-          </article>
-        </section>
-
-        <div id="driverCompletedPagination" class="driver-pagination" style="display:none;">
-          <button id="driverCompletedPrevBtn" class="btn btn-secondary" type="button" data-i18n="completed.previous">Previous</button>
-          <span id="driverCompletedPageInfo" class="driver-pagination-info">Page 1 of 1</span>
-          <button id="driverCompletedNextBtn" class="btn btn-secondary" type="button" data-i18n="completed.next">Next</button>
-        </div>
-      </section>
-
-      <section id="driverSupportSection" class="driver-support-section driver-section-anchor" aria-labelledby="driverSupportTitle">
-        <article class="driver-support-card">
-          <div class="driver-support-icon" aria-hidden="true">
-            <span data-i18n="support.icon">TEL</span>
-          </div>
-          <div class="driver-support-copy">
-            <span class="section-kicker" data-i18n="support.kicker">Need Help</span>
-            <h2 id="driverSupportTitle" class="section-title" data-i18n="support.title">Support</h2>
-            <p data-i18n="support.description">For dispatch or technical issues, please contact MR Mohamad Daya.</p>
-          </div>
-          <a class="driver-support-link" href="tel:+971505349907">
-            +971 50 534 9907
-          </a>
-        </article>
-      </section>
+          </section>
         </div>
       </div>
     </div>
@@ -215,4 +223,3 @@
   <script type="module" src="../src/js/driver.js"></script>
 </body>
 </html>
-

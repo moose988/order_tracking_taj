@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../src/css/styles.css">
 </head>
 
-<body>
+<body class="order-page">
 
 <header class="site-header">
   <div class="container navbar">
@@ -30,116 +30,135 @@
   </div>
 </header>
 
-
 <main>
+  <section class="page-section order-catalog-section">
+    <div class="container order-catalog-shell">
+      <header class="order-page-head">
+        <div class="order-page-head-copy">
+          <span class="section-kicker">Curated Collection</span>
+          <h1 class="section-title">Build Your Event Order</h1>
+          <p class="section-text">Browse our luxury event rental catalogue, refine by category, and prepare a polished quote-ready basket for your celebration.</p>
+        </div>
+      </header>
 
-<section class="page-section">
-<div class="container">
+      <section class="order-toolbar" aria-label="Browse products">
+        <div class="order-toolbar-top">
+          <label class="order-search-field" for="productSearchInput">
+            <span class="order-search-label">Search Collection</span>
+            <div class="order-search-input-wrap">
+              <input
+                id="productSearchInput"
+                type="search"
+                placeholder="Search by product name or category"
+                autocomplete="off"
+              >
+              <button id="clearProductSearchBtn" class="order-search-clear" type="button" aria-label="Clear product search" hidden>x</button>
+            </div>
+          </label>
+        </div>
 
-<header class="section-head">
-<h2 class="section-title">Our Collection</h2>
+        <div id="productFilters" class="product-filters" aria-label="Product categories"></div>
+      </section>
 
-<div id="productFilters" class="product-filters"></div>
-</header>
+      <div class="order-layout">
+        <section class="order-catalog-main">
+          <div id="productsGrid" class="products-grid" aria-live="polite"></div>
+        </section>
 
+        <aside class="order-summary">
+          <div class="order-summary-head">
+            <span class="order-summary-kicker">Booking Basket</span>
+            <h3>Your Order</h3>
+            <p id="orderSummaryCaption" class="order-summary-caption">Select pieces from the collection to start building your quote.</p>
+          </div>
 
-<div class="order-layout">
+          <div id="orderItemsList" class="order-items-list" aria-live="polite"></div>
 
-<section id="productsGrid" class="products-grid"></section>
+          <div class="order-summary-foot">
+            <p id="orderTotalText" class="order-total">0 items selected</p>
 
-
-<aside class="order-summary">
-
-<h3>Your Order</h3>
-
-<div id="orderItemsList" class="order-items-list"></div>
-
-<p id="orderTotalText">0 items selected</p>
-
-<div class="summary-actions">
-<button class="btn btn-primary" onclick="goToQuotePage()">Get Quote</button>
-<button class="btn btn-secondary btn-small" onclick="clearOrder()">Clear All</button>
-</div>
-
-</aside>
-
-</div>
-
-</div>
-</section>
-
+            <div class="summary-actions">
+              <button id="summaryQuoteBtn" class="btn btn-primary" type="button" onclick="goToQuotePage()">Get Quote</button>
+              <button id="summaryClearBtn" class="btn btn-secondary btn-small" type="button" onclick="clearOrder()">Clear All</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
 </main>
 
-
-
-<!-- PRODUCT MODAL -->
-
 <div id="productModal" class="modal-overlay">
+  <div class="modal order-product-modal">
+    <div class="modal-grid">
+      <div class="modal-gallery order-modal-gallery">
+        <div class="order-modal-gallery-shell">
+          <div class="order-modal-main-image-frame">
+            <img id="modalImage" src="" alt="Product Image">
+          </div>
 
-<div class="modal">
+          <div class="gallery-nav">
+            <button type="button" onclick="prevImage()" aria-label="Previous image">&#10094;</button>
+            <button type="button" onclick="nextImage()" aria-label="Next image">&#10095;</button>
+          </div>
 
-<div class="modal-grid">
+          <div id="modalImageCount" class="order-modal-image-count" aria-live="polite"></div>
+        </div>
 
-<div class="modal-gallery">
+        <div id="modalThumbs" class="order-modal-thumbs" aria-label="Product gallery thumbnails"></div>
+      </div>
 
-<img id="modalImage" src="" alt="Product Image">
+      <div class="modal-content order-modal-content">
+        <button class="modal-close" type="button" onclick="closeProductModal()" aria-label="Close product modal">&#10005;</button>
 
-<div class="gallery-nav">
-<button onclick="prevImage()">❮</button>
-<button onclick="nextImage()">❯</button>
+        <div class="order-modal-copy">
+          <span id="modalCategoryBadge" class="badge order-modal-badge"></span>
+          <h3 id="modalProductTitle"></h3>
+          <p id="modalProductDescription"></p>
+        </div>
+
+        <div class="order-modal-specs">
+          <div class="order-modal-spec-card">
+            <span>Measurements</span>
+            <strong id="modalMeasurements"></strong>
+          </div>
+        </div>
+
+        <div class="qty-box">
+          <button type="button" onclick="decreaseQty()" aria-label="Decrease quantity">-</button>
+          <input
+            type="number"
+            id="modalQuantity"
+            min="1"
+            value="1"
+            inputmode="numeric"
+            oninput="handleManualQtyInput()"
+            onblur="handleManualQtyInput()"
+            onfocus="this.select()"
+            aria-label="Quantity"
+          >
+          <button type="button" onclick="increaseQty()" aria-label="Increase quantity">+</button>
+        </div>
+
+        <div class="modal-actions order-modal-actions">
+          <button class="btn btn-primary" type="button" onclick="addToOrder()">Add to Order</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
+<div id="mobileCartBar" class="mobile-cart-bar" aria-live="polite">
+  <div class="mobile-cart-copy">
+    <strong id="mobileCartCount">0 items selected</strong>
+    <span>Open your basket and continue to quote</span>
+  </div>
+  <button id="mobileCartBtn" type="button" onclick="goToQuotePage()">Get Quote</button>
 </div>
-
-
-
-<div class="modal-content">
-
-<button class="modal-close" onclick="closeProductModal()">✕</button>
-
-<h3 id="modalProductTitle"></h3>
-
-<p id="modalProductDescription"></p>
-
-<p><strong>Measurements:</strong> <span id="modalMeasurements"></span></p>
-
-
-<div class="qty-box">
-<button onclick="decreaseQty()">−</button>
-<input
-type="number"
-id="modalQuantity"
-min="1"
-value="1"
-inputmode="numeric"
-oninput="handleManualQtyInput()"
-onblur="handleManualQtyInput()"
-onfocus="this.select()"
-aria-label="Quantity"
->
-<button onclick="increaseQty()">+</button>
-</div>
-<p class="qty-hint">Type a quantity or use the + / − buttons.</p>
-
-
-<div class="modal-actions">
-<button class="btn btn-primary" onclick="addToOrder()">Add to Order</button>
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-
 
 <footer class="footer">
   <div class="container">
     <div class="footer-grid">
-
       <div>
         <div class="footer-brand">
           <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo">
@@ -157,11 +176,10 @@ aria-label="Quantity"
           <a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
         </div>
       </div>
-
     </div>
 
     <div class="copyright">
-      © <span class="current-year"></span> Al Taj Al Malaky Parties & Events Management. All rights reserved.
+      &copy; <span class="current-year"></span> Al Taj Al Malaky Parties & Events Management. All rights reserved.
     </div>
   </div>
 </footer>
@@ -170,4 +188,3 @@ aria-label="Quantity"
 
 </body>
 </html>
-  

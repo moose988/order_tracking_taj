@@ -53,6 +53,14 @@ const opsPanel = document.getElementById("opsPanel");
 const opsPanelSummary = document.getElementById("opsPanelSummary");
 const driverPanel = document.getElementById("driverPanel");
 const driverPanelSummary = document.getElementById("driverPanelSummary");
+const driverPerformanceModal = document.getElementById("driverPerformanceModal");
+const closeDriverPerformanceModalBtn = document.getElementById("closeDriverPerformanceModalBtn");
+const driverPerformanceTitle = document.getElementById("driverPerformanceTitle");
+const driverPerformanceSubtitle = document.getElementById("driverPerformanceSubtitle");
+const driverPerformanceStats = document.getElementById("driverPerformanceStats");
+const driverPerformanceCurrentOrders = document.getElementById("driverPerformanceCurrentOrders");
+const driverPerformanceRecentOrders = document.getElementById("driverPerformanceRecentOrders");
+const driverPerformanceSummary = document.getElementById("driverPerformanceSummary");
 const operationsMapSummary = document.getElementById("operationsMapSummary");
 const operationsMapContainer = document.getElementById("operationsMap");
 const operationsMapEmptyState = document.getElementById("operationsMapEmptyState");
@@ -206,6 +214,7 @@ let isSavingInventory = false;
 let hasAttemptedCatalogInventorySeed = false;
 let inventoryClockIntervalId = null;
 let currentOpenOrderId = null;
+let currentDriverPerformanceKey = "";
 let currentInventorySort = {
   key: "name",
   direction: "asc"
@@ -221,11 +230,19 @@ const DRIVER_LOCATION_LIVE_THRESHOLD_MS = 5 * 60 * 1000;
 const DEFAULT_RENTAL_DAYS = 1;
 const DEFAULT_LOW_STOCK_THRESHOLD = 1;
 const CATALOG_INVENTORY_DEMO_STOCK = {
-  "Round Table": { totalStock: 18, damagedStock: 1, lowStockThreshold: 4 },
-  "Rectangular Table": { totalStock: 5, damagedStock: 1, lowStockThreshold: 4 },
+  "Round Dining Table": { totalStock: 18, damagedStock: 1, lowStockThreshold: 4 },
+  "Rectangular Dining Table": { totalStock: 5, damagedStock: 1, lowStockThreshold: 4 },
   "White Chair": { totalStock: 72, damagedStock: 6, lowStockThreshold: 14 },
-  "Gold Chair": { totalStock: 12, damagedStock: 3, lowStockThreshold: 9 }
+  "Gold Chair": { totalStock: 12, damagedStock: 3, lowStockThreshold: 9 },
+  "Bridal Sofa": { totalStock: 4, damagedStock: 0, lowStockThreshold: 1 },
+  "Coffee Table": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Cocktail Table": { totalStock: 12, damagedStock: 0, lowStockThreshold: 3 },
+  "Majlis Sofa": { totalStock: 6, damagedStock: 0, lowStockThreshold: 2 }
 };
+const LEGACY_CATALOG_PRODUCT_NAMES = new Map([
+  ["round table", "Round Dining Table"],
+  ["rectangular table", "Rectangular Dining Table"]
+]);
 
 const STATUS_META = {
   "quote-requested": { label: "Quote Requested", className: "is-quote-requested" },
@@ -287,6 +304,7 @@ function subscribeToOrders(){
     syncCurrentEditingOrder();
     syncCurrentQuoteOrder();
     syncOpenOrderModal();
+    syncOpenDriverPerformanceModal();
     renderAdminDashboardAfterOrdersSnapshot("orders-snapshot");
 
     try{
@@ -427,6 +445,7 @@ function subscribeToDrivers(){
 
     populateDriverFilter();
     renderDriverPanel();
+    syncOpenDriverPerformanceModal();
     renderOperationsMapSection();
     renderCollectionAssignmentSection();
 
@@ -494,9 +513,9 @@ function renderOrders(orders, source = "general"){
     row.classList.add("order-row");
 
     row.innerHTML = `
-    <td>${order.orderId}</td>
+    <td class="admin-order-id-cell"><span class="admin-cell-nowrap">${order.orderId}</span></td>
     <td>${order.customerName}</td>
-    <td>${order.eventDate}</td>
+    <td class="admin-date-cell"><span class="admin-cell-nowrap">${order.eventDate}</span></td>
     <td>${getOrderRentalDays(order)}</td>
     <td>${order.eventTime || "N/A"}</td>
     <td>${order.eventLocation}</td>
@@ -509,7 +528,6 @@ function renderOrders(orders, source = "general"){
 
     <td>
       <div class="priority-cell">
-        <span class="priority-badge ${getPriorityBadgeClass(priority)}">${getPriorityBadgeMarkup(priority)}</span>
         <select class="priority-select no-modal" data-id="${order.id}">
           ${getPriorityOptions(priority)}
         </select>
@@ -517,35 +535,33 @@ function renderOrders(orders, source = "general"){
     </td>
 
       <td>
-        <div class="action-buttons">
-          <button class="btn btn-secondary edit-order-btn no-modal" data-id="${order.id}" type="button">
+        <div class="action-buttons admin-order-actions">
+          <button class="btn btn-secondary edit-order-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
             Edit
           </button>
 
           ${order.status === "quote-requested" || order.status === "quote-sent" ? `
-            <button class="btn btn-secondary quote-builder-btn no-modal" data-id="${order.id}" type="button">
+            <button class="btn btn-secondary quote-builder-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
               ${order.status === "quote-requested" ? "Prepare Quote" : "Open Quote"}
             </button>
           ` : ""}
 
-          <button class="btn btn-primary wa-btn no-modal" data-id="${order.id}">
+          <button class="btn btn-primary wa-btn admin-order-action-btn admin-order-action-btn-primary no-modal" data-id="${order.id}">
             WhatsApp
           </button>
 
-          ${order.status === "delivered" || order.status === "collected"
-            ? `<span class="admin-badge no-modal completed-badge">${formatStatusLabel(order.status)}</span>`
-            : order.driver
-            ? `<button class="btn btn-secondary driver-btn no-modal" data-id="${order.id}" type="button">
+          ${order.driver
+            ? `<button class="btn btn-secondary driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
                 Driver: ${order.driver.name}
               </button>`
             : order.status === "preparing"
-              ? `<button class="btn btn-secondary assign-driver-btn no-modal" data-id="${order.id}" type="button">
+              ? `<button class="btn btn-secondary assign-driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
                   Assign Driver
                 </button>`
               : ""}
 
           ${order.status === "delivered" || order.status === "collected" ? `
-            <button class="btn btn-dark review-request-btn no-modal" data-id="${order.id}">
+            <button class="btn btn-dark review-request-btn admin-order-action-btn admin-order-action-btn-dark no-modal" data-id="${order.id}">
               Send Review Request
             </button>
           ` : ""}
@@ -960,19 +976,39 @@ async function seedCatalogInventoryIfNeeded(){
 
   hasAttemptedCatalogInventorySeed = true;
 
-  const missingProducts = PRODUCTS.filter((product) => product?.name && !hasInventoryForCatalogProduct(product));
-
-  if(!missingProducts.length){
-    return;
-  }
-
   try{
-    await Promise.all(missingProducts.map(async (product) => {
+    await Promise.all(PRODUCTS.filter((product) => product?.name).map(async (product) => {
       const stock = getCatalogInventoryDemoStock(product);
       const inventoryRef = doc(db, "inventory", getCatalogInventoryDocId(product));
       const inventorySnapshot = await getDoc(inventoryRef);
 
       if(inventorySnapshot.exists()){
+        const existingData = inventorySnapshot.data() || {};
+        const updates = {};
+
+        if(existingData.name !== product.name){
+          updates.name = product.name;
+        }
+
+        if((existingData.category || "Catalog") !== (product.category || "Catalog")){
+          updates.category = product.category || "Catalog";
+        }
+
+        if(String(existingData.productId || "") !== String(product.id)){
+          updates.productId = product.id;
+        }
+
+        if(existingData.sourceType !== "catalog"){
+          updates.sourceType = "catalog";
+        }
+
+        if(Object.keys(updates).length){
+          await updateDoc(inventoryRef, {
+            ...updates,
+            updatedAt: serverTimestamp()
+          });
+        }
+
         return;
       }
 
@@ -1000,7 +1036,8 @@ async function seedCatalogInventoryIfNeeded(){
 
 function getCatalogProductByName(name){
   const normalizedName = normalizeInventoryText(name);
-  return PRODUCTS.find((product) => normalizeInventoryText(product.name) === normalizedName) || null;
+  const resolvedName = LEGACY_CATALOG_PRODUCT_NAMES.get(normalizedName) || normalizedName;
+  return PRODUCTS.find((product) => normalizeInventoryText(product.name) === normalizeInventoryText(resolvedName)) || null;
 }
 
 function getInventoryProductOptionsMarkup(selectedProductId = ""){
@@ -1241,14 +1278,254 @@ function getDriverWorkload(){
     });
 }
 
+function getDriverPerformanceKey(driver = {}){
+  return String(
+    driver?.id ||
+    driver?.uid ||
+    normalizeEmail(driver?.email) ||
+    normalizePhoneForSearch(driver?.phone) ||
+    driver?.name ||
+    "unknown-driver"
+  ).trim().toLowerCase();
+}
+
+function getDriverPerformanceIdentityCandidates(driver = {}){
+  const candidates = [];
+  const uid = String(driver?.uid || "").trim().toLowerCase();
+  const id = String(driver?.id || "").trim().toLowerCase();
+  const email = normalizeEmail(driver?.email);
+  const normalizedName = normalizeInventoryText(driver?.name);
+
+  if(uid){
+    candidates.push(`uid:${uid}`);
+  }
+
+  if(id){
+    candidates.push(`id:${id}`);
+  }
+
+  if(email){
+    candidates.push(`email:${email}`);
+  }
+
+  if(normalizedName){
+    candidates.push(`name:${normalizedName}`);
+  }
+
+  return candidates;
+}
+
+function getDriverPerformanceDisplayName(driver = {}, fallback = "Driver"){
+  const name = String(driver?.name || "").trim();
+  return name || fallback;
+}
+
+function mergeDriverPerformanceIdentity(entry, driver = {}){
+  if(!entry || !driver){
+    return;
+  }
+
+  const nextName = getDriverPerformanceDisplayName(driver, entry.driverName || "Driver");
+  const hasBetterName = nextName && nextName !== "Driver" && (!entry.driverName || entry.driverName === "Driver");
+
+  entry.driver = {
+    ...driver,
+    ...entry.driver,
+    name: hasBetterName ? nextName : (entry.driver?.name || nextName || "Driver")
+  };
+  entry.driverName = hasBetterName ? nextName : (entry.driverName || nextName || "Driver");
+}
+
+function ensureDriverPerformanceEntry(registry, aliases, driver = {}, fallbackKey = ""){
+  const identityCandidates = getDriverPerformanceIdentityCandidates(driver);
+  const matchedKey = identityCandidates.find((candidate) => aliases.has(candidate));
+  const registryKey = matchedKey ? aliases.get(matchedKey) : (fallbackKey || identityCandidates[0] || `driver:${registry.size + 1}`);
+
+  if(!registry.has(registryKey)){
+    registry.set(registryKey, {
+      key: registryKey,
+      driver,
+      driverName: getDriverPerformanceDisplayName(driver, `Driver ${registry.size + 1}`),
+      activeOrders: 0,
+      completedToday: 0,
+      completedThisWeek: 0,
+      avgDeliveryTimeMs: 0,
+      lateDeliveries: 0,
+      currentAssignedOrders: [],
+      recentCompletedOrders: [],
+      _deliveryDurations: []
+    });
+  }
+
+  const entry = registry.get(registryKey);
+  mergeDriverPerformanceIdentity(entry, driver);
+  identityCandidates.forEach((candidate) => aliases.set(candidate, registryKey));
+
+  return entry;
+}
+
+function isCompletedDriverOrder(order){
+  const status = normalizeOrderStatusValue(order?.status);
+  return status === "delivered" || status === "collected";
+}
+
+function isActiveDriverOrder(order){
+  const status = normalizeOrderStatusValue(order?.status);
+  return status === "preparing" || status === "out-for-delivery";
+}
+
+function getOrderDeliveryDurationMs(order){
+  const deliveredAt = getTimestampValue(order?.deliveredAt || order?.collectedAt);
+
+  if(!deliveredAt){
+    return 0;
+  }
+
+  const startedAt = getTimestampValue(order?.outForDeliveryAt || order?.createdAt);
+
+  if(!startedAt || deliveredAt <= startedAt){
+    return 0;
+  }
+
+  return deliveredAt - startedAt;
+}
+
+function formatDurationMinutes(durationMs){
+  const totalMinutes = Math.round((Number(durationMs) || 0) / 60000);
+
+  if(!totalMinutes){
+    return "N/A";
+  }
+
+  if(totalMinutes < 60){
+    return `${totalMinutes} min`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return minutes ? `${hours} hr ${minutes} min` : `${hours} hr`;
+}
+
+function isLateDelivery(order){
+  const deliveredAt = getTimestampValue(order?.deliveredAt || order?.collectedAt);
+
+  if(!deliveredAt){
+    return false;
+  }
+
+  const scheduledAt = parseEventDateTime(order?.eventDate, order?.eventTime);
+
+  if(!scheduledAt){
+    return false;
+  }
+
+  return deliveredAt > scheduledAt.getTime();
+}
+
+function getDriverPerformanceData(){
+  const performanceMap = new Map();
+  const aliases = new Map();
+
+  driversList.forEach((driver, index) => {
+    ensureDriverPerformanceEntry(performanceMap, aliases, driver, `driver:${driver?.id || driver?.uid || index + 1}`);
+  });
+
+  allOrders.forEach((order) => {
+    const orderDriver = order?.driver || {};
+    const driverName = getDriverPerformanceDisplayName(orderDriver, "");
+
+    if(!driverName){
+      return;
+    }
+
+    const entry = ensureDriverPerformanceEntry(
+      performanceMap,
+      aliases,
+      orderDriver,
+      `order-driver:${order.id || performanceMap.size + 1}`
+    );
+
+    if(isActiveDriverOrder(order)){
+      if(!entry.currentAssignedOrders.some((assignedOrder) => assignedOrder.id === order.id)){
+        entry.currentAssignedOrders.push(order);
+        entry.activeOrders += 1;
+      }
+    }
+
+    if(isCompletedDriverOrder(order)){
+      const deliveredTime = getTimestampValue(order?.deliveredAt || order?.collectedAt);
+      const deliveredDate = deliveredTime ? formatLocalDate(new Date(deliveredTime)) : "";
+
+      if(deliveredDate && isToday(deliveredDate)){
+        entry.completedToday += 1;
+      }
+
+      if(deliveredDate && isInCurrentWeek(deliveredDate)){
+        entry.completedThisWeek += 1;
+      }
+
+      const deliveryDurationMs = getOrderDeliveryDurationMs(order);
+
+      if(deliveryDurationMs){
+        entry._deliveryDurations.push(deliveryDurationMs);
+      }
+
+      if(isLateDelivery(order)){
+        entry.lateDeliveries += 1;
+      }
+
+      if(!entry.recentCompletedOrders.some((completedOrder) => completedOrder.id === order.id)){
+        entry.recentCompletedOrders.push(order);
+      }
+    }
+  });
+
+  return [...performanceMap.values()]
+    .filter((entry) => normalizeInventoryText(entry.driverName) !== "unassigned")
+    .map((entry) => {
+      const averageDuration = entry._deliveryDurations.length
+        ? entry._deliveryDurations.reduce((sum, value) => sum + value, 0) / entry._deliveryDurations.length
+        : 0;
+
+      return {
+        ...entry,
+        avgDeliveryTimeMs: averageDuration,
+        avgDeliveryTimeLabel: formatDurationMinutes(averageDuration),
+        currentAssignedOrders: [...entry.currentAssignedOrders].sort((first, second) => {
+          return String(first.orderId || first.id || "").localeCompare(String(second.orderId || second.id || ""));
+        }),
+        recentCompletedOrders: [...entry.recentCompletedOrders]
+          .sort((first, second) => {
+            return getTimestampValue(second.deliveredAt || second.collectedAt || second.createdAt) -
+              getTimestampValue(first.deliveredAt || first.collectedAt || first.createdAt);
+          })
+          .slice(0, 6)
+      };
+    })
+    .sort((first, second) => {
+      if(second.activeOrders !== first.activeOrders){
+        return second.activeOrders - first.activeOrders;
+      }
+
+      if(second.completedToday !== first.completedToday){
+        return second.completedToday - first.completedToday;
+      }
+
+      return first.driverName.localeCompare(second.driverName);
+    });
+}
+
 function renderDriverPanel(){
   if(!driverPanel){
     return;
   }
 
-  const workload = getDriverWorkload();
-  const activeDriverCount = workload.filter(driver => driver.orders.length > 0 && driver.name !== "Unassigned").length;
-  const unassignedCount = workload.find(driver => driver.name === "Unassigned")?.orders.length || 0;
+  const workload = getDriverPerformanceData();
+  const unassignedCount = allOrders.filter((order) => {
+    return isActiveDriverOrder(order) && !String(order?.driver?.name || "").trim();
+  }).length;
+  const activeDriverCount = workload.filter(driver => driver.activeOrders > 0).length;
 
   if(driverPanelSummary){
     if(!workload.length){
@@ -1266,20 +1543,40 @@ function renderDriverPanel(){
   }
 
   driverPanel.innerHTML = workload.map(driver => `
-    <article class="driver-card ${driver.orders.length > 0 ? "is-busy" : "is-available"}">
+    <article class="driver-card ${driver.activeOrders > 0 ? "is-busy" : "is-available"}" data-driver-performance-key="${escapeAttribute(driver.key)}" role="button" tabindex="0" aria-label="${escapeAttribute(`Open performance details for ${driver.driverName}`)}">
       <div class="driver-card-top">
-        <strong>${driver.name}</strong>
-        <span class="driver-card-badge ${driver.orders.length > 0 ? "is-busy" : "is-available"}">
-          ${driver.orders.length > 0 ? "Busy" : "Available"}
+        <div>
+          <strong>${escapeHtml(driver.driverName)}</strong>
+          <p class="driver-card-subtitle">${driver.activeOrders > 0 ? "Currently handling active work" : "Available for the next assignment"}</p>
+        </div>
+        <span class="driver-card-badge ${driver.activeOrders > 0 ? "is-busy" : "is-available"}">
+          ${driver.activeOrders > 0 ? "Busy" : "Available"}
         </span>
       </div>
-      <div class="driver-card-count">${driver.orders.length} active order${driver.orders.length === 1 ? "" : "s"}</div>
-      <div class="driver-card-meta">${driver.name === "Unassigned" ? "Needs driver assignment" : "Live order status"}</div>
-      ${driver.orders.length ? `
+      <div class="driver-performance-mini-grid">
+        <div class="driver-performance-mini-stat">
+          <span>Completed Today</span>
+          <strong>${driver.completedToday}</strong>
+        </div>
+        <div class="driver-performance-mini-stat">
+          <span>Avg Delivery</span>
+          <strong>${escapeHtml(driver.avgDeliveryTimeLabel)}</strong>
+        </div>
+        <div class="driver-performance-mini-stat">
+          <span>Late Deliveries</span>
+          <strong>${driver.lateDeliveries}</strong>
+        </div>
+        <div class="driver-performance-mini-stat">
+          <span>Active Orders</span>
+          <strong>${driver.activeOrders}</strong>
+        </div>
+      </div>
+      <div class="driver-card-meta">Click to view full performance breakdown</div>
+      ${driver.currentAssignedOrders.length ? `
         <div class="driver-orders-list">
-          ${driver.orders.map(order => `
+          ${driver.currentAssignedOrders.map(order => `
             <div class="driver-order-item">
-              <span class="driver-order-text">${order.orderId} - ${order.customerName}</span>
+              <span class="driver-order-text">${escapeHtml(order.orderId || order.id || "N/A")} - ${escapeHtml(order.customerName || "Unknown customer")}</span>
               <span class="order-status">${formatStatusLabel(order.status).replace(/\b\w/g, (letter) => letter.toUpperCase())}</span>
             </div>
           `).join("")}
@@ -1287,6 +1584,172 @@ function renderDriverPanel(){
       ` : ""}
     </article>
   `).join("");
+
+  attachDriverPerformanceCardEvents();
+}
+
+function getDriverPerformanceListMarkup(orders, options = {}){
+  const {
+    variant = "active"
+  } = options;
+
+  if(!orders.length){
+    return `
+      <article class="driver-performance-empty">
+        <strong>${variant === "active" ? "No active orders right now" : "No recent completed orders yet"}</strong>
+        <p>${variant === "active" ? "This driver is currently available for the next assignment." : "Completed delivery history will appear here automatically."}</p>
+      </article>
+    `;
+  }
+
+  return orders.map((order) => {
+    const trailingLabel = variant === "completed"
+      ? formatQuoteHistoryDate(order.deliveredAt || order.collectedAt || order.createdAt)
+      : formatStatusLabel(order.status);
+    const secondaryLabel = variant === "completed"
+      ? formatStatusLabel(order.status)
+      : (order.customerName || "Unknown customer");
+    const metaLabel = variant === "completed" ? "Completed" : "Status";
+
+    return `
+      <article class="driver-performance-order-item">
+        <div class="driver-performance-order-main">
+          <strong>${escapeHtml(order.orderId || order.id || "N/A")}</strong>
+          <p>${escapeHtml(order.customerName || "Unknown customer")}</p>
+        </div>
+        <div class="driver-performance-order-side">
+          <span class="driver-performance-order-eyebrow">${escapeHtml(metaLabel)}</span>
+          <strong class="driver-performance-order-meta">${escapeHtml(trailingLabel)}</strong>
+          <span class="driver-performance-order-submeta">${escapeHtml(secondaryLabel)}</span>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function openDriverPerformanceModal(driverKey){
+  if(!driverPerformanceModal || !driverKey){
+    return;
+  }
+
+  const driver = getDriverPerformanceData().find((entry) => entry.key === driverKey);
+
+  if(!driver){
+    return;
+  }
+
+  currentDriverPerformanceKey = driverKey;
+
+  if(driverPerformanceTitle){
+    driverPerformanceTitle.textContent = driver.driverName;
+  }
+
+  if(driverPerformanceSubtitle){
+    driverPerformanceSubtitle.textContent = "Active workload, recent completions, and delivery performance overview.";
+  }
+
+  if(driverPerformanceStats){
+    driverPerformanceStats.innerHTML = `
+      <article class="driver-performance-stat-card">
+        <span>Active Orders</span>
+        <strong>${driver.activeOrders}</strong>
+        <p>Currently assigned and in progress.</p>
+      </article>
+      <article class="driver-performance-stat-card">
+        <span>Completed Today</span>
+        <strong>${driver.completedToday}</strong>
+        <p>Finished during today’s operating window.</p>
+      </article>
+      <article class="driver-performance-stat-card">
+        <span>Completed This Week</span>
+        <strong>${driver.completedThisWeek}</strong>
+        <p>Delivered or collected this week.</p>
+      </article>
+      <article class="driver-performance-stat-card">
+        <span>Average Delivery Time</span>
+        <strong>${escapeHtml(driver.avgDeliveryTimeLabel)}</strong>
+        <p>Measured from dispatch to completion.</p>
+      </article>
+      <article class="driver-performance-stat-card">
+        <span>Late Deliveries</span>
+        <strong>${driver.lateDeliveries}</strong>
+        <p>Completed after the scheduled event time.</p>
+      </article>
+    `;
+  }
+
+  if(driverPerformanceCurrentOrders){
+    driverPerformanceCurrentOrders.innerHTML = getDriverPerformanceListMarkup(driver.currentAssignedOrders, {
+      variant: "active"
+    });
+  }
+
+  if(driverPerformanceRecentOrders){
+    driverPerformanceRecentOrders.innerHTML = getDriverPerformanceListMarkup(driver.recentCompletedOrders, {
+      variant: "completed"
+    });
+  }
+
+  if(driverPerformanceSummary){
+    driverPerformanceSummary.innerHTML = `
+      <div class="driver-performance-summary-item">
+        <strong>${driver.lateDeliveries}</strong>
+        <span>${escapeHtml(`late deliver${driver.lateDeliveries === 1 ? "y" : "ies"} recorded in the recent weekly window.`)}</span>
+      </div>
+      <div class="driver-performance-summary-item">
+        <strong>${escapeHtml(driver.avgDeliveryTimeLabel)}</strong>
+        <span>average delivery time across completed deliveries.</span>
+      </div>
+      <div class="driver-performance-summary-item">
+        <strong>${driver.activeOrders}</strong>
+        <span>${escapeHtml(`active order${driver.activeOrders === 1 ? "" : "s"} currently assigned to this driver.`)}</span>
+      </div>
+    `;
+  }
+
+  driverPerformanceModal.classList.add("active");
+  document.body.style.overflow = "hidden";
+}
+
+function closeDriverPerformanceModal(){
+  currentDriverPerformanceKey = "";
+  driverPerformanceModal?.classList.remove("active");
+  document.body.style.overflow = "auto";
+}
+
+function syncOpenDriverPerformanceModal(){
+  if(!driverPerformanceModal?.classList.contains("active") || !currentDriverPerformanceKey){
+    return;
+  }
+
+  const driver = getDriverPerformanceData().find((entry) => entry.key === currentDriverPerformanceKey);
+
+  if(!driver){
+    closeDriverPerformanceModal();
+    return;
+  }
+
+  openDriverPerformanceModal(currentDriverPerformanceKey);
+}
+
+function attachDriverPerformanceCardEvents(){
+  if(!driverPanel){
+    return;
+  }
+
+  driverPanel.querySelectorAll(".driver-card[data-driver-performance-key]").forEach((card) => {
+    const openDetails = () => {
+      openDriverPerformanceModal(card.dataset.driverPerformanceKey || "");
+    };
+
+    card.addEventListener("click", openDetails);
+    card.addEventListener("keydown", (event) => {
+      if(event.key === "Enter" || event.key === " "){
+        event.preventDefault();
+        openDetails();
+      }
+    });
+  });
 }
 
 function getDriverOperationIdentityKeys(entity = {}){
@@ -2838,6 +3301,8 @@ function openOrderModal(order, options = {}){
     modalItems.innerHTML = getOrderItemsListMarkup(order.items || []);
   }
 
+  renderOrderTimeline(order);
+
   if(modalMapBtn){
     modalMapBtn.disabled = !mapUrl;
     modalMapBtn.onclick = () => {
@@ -3135,6 +3600,51 @@ function formatQuoteHistoryDate(value){
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function getOrderTimelineConfig(order){
+  const timeline = [
+    { key: "createdAt", label: "Created" },
+    { key: "quoteSentAt", label: "Quote Sent" },
+    { key: "confirmedAt", label: "Confirmed" },
+    { key: "preparingAt", label: "Preparing" },
+    { key: "driverAssignedAt", label: "Driver Assigned" },
+    { key: "outForDeliveryAt", label: "Out for Delivery" },
+    { key: "deliveredAt", label: "Delivered" },
+    { key: "collectionRequestedAt", label: "Collection Requested" },
+    { key: "collectedAt", label: "Collected" }
+  ];
+
+  if(order?.cancelledAt){
+    timeline.push({ key: "cancelledAt", label: "Cancelled" });
+  }
+
+  return timeline;
+}
+
+function renderOrderTimeline(order){
+  const modalOrderTimeline = document.getElementById("modalOrderTimeline");
+
+  if(!modalOrderTimeline){
+    return;
+  }
+
+  const timelineMarkup = getOrderTimelineConfig(order).map((entry) => {
+    const hasTimestamp = Boolean(getTimestampValue(order?.[entry.key]));
+    const timestampLabel = hasTimestamp ? formatQuoteHistoryDate(order?.[entry.key]) : "Pending";
+
+    return `
+      <div class="admin-order-timeline-row ${hasTimestamp ? "is-complete" : "is-pending"}">
+        <span class="admin-order-timeline-dot" aria-hidden="true">${hasTimestamp ? "●" : "○"}</span>
+        <div class="admin-order-timeline-copy">
+          <span class="admin-order-timeline-label">${escapeHtml(entry.label)}</span>
+          <span class="admin-order-timeline-time">${escapeHtml(timestampLabel)}</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  modalOrderTimeline.innerHTML = timelineMarkup;
 }
 
 function getQuoteVersionLanguageLabel(language){
@@ -6083,6 +6593,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   initScrollTopButton();
   initAdminLocationBindings();
   document.getElementById("closeModalBtn").addEventListener("click", closeOrderModal);
+  closeDriverPerformanceModalBtn?.addEventListener("click", () => closeDriverPerformanceModal());
   closeEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
   cancelEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
   openCreateOrderBtn?.addEventListener("click", openCreateOrderModal);
@@ -6227,6 +6738,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   quoteModal?.addEventListener("click", (event) => {
     if(event.target === quoteModal){
       closeQuoteModal();
+    }
+  });
+  driverPerformanceModal?.addEventListener("click", (event) => {
+    if(event.target === driverPerformanceModal){
+      closeDriverPerformanceModal();
     }
   });
   inventoryModal?.addEventListener("click", (event) => {

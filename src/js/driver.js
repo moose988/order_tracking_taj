@@ -67,7 +67,7 @@ const DRIVER_LANGUAGE_STORAGE_KEY = "tajDriverDashboardLanguage";
 const DRIVER_LANGUAGE_CONFIG = {
   en: { dir: "ltr", locale: "en-US", htmlLang: "en" },
   ar: { dir: "rtl", locale: "ar-AE", htmlLang: "ar" },
-  hi: { dir: "ltr", locale: "en-GB", htmlLang: "hi" }
+  ur: { dir: "rtl", locale: "ur-PK", htmlLang: "ur" }
 };
 const DRIVER_I18N = {};
 
@@ -93,6 +93,9 @@ let collectionRenderState = {
 
 function getStoredDriverLanguage(){
   const storedLanguage = localStorage.getItem(DRIVER_LANGUAGE_STORAGE_KEY);
+  if(storedLanguage === "hi"){
+    return "ur";
+  }
   return DRIVER_LANGUAGE_CONFIG[storedLanguage] ? storedLanguage : "en";
 }
 
@@ -165,6 +168,12 @@ DRIVER_I18N.en = {
     activeAssigned: "Active Assigned",
     completedOverall: "Completed Overall",
     inDeliveryFlow: "In Delivery Flow",
+    activeDeliveries: "Active Deliveries",
+    locationSharingLabel: "Location Sharing",
+    noActiveDeliveries: "No active deliveries",
+    activeCountSummary: "{count} active ({orders})",
+    locationOnShort: "ON",
+    locationOffShort: "OFF",
     activeNone: "Active deliveries: none",
     activeSome: "Active deliveries: {orders}",
     locationOn: "Location sharing: ON",
@@ -562,6 +571,15 @@ DRIVER_I18N.ar = {
   }
 };
 
+Object.assign(DRIVER_I18N.ar.hero, {
+  activeDeliveries: "الشحنات النشطة",
+  locationSharingLabel: "مشاركة الموقع",
+  noActiveDeliveries: "لا توجد شحنات نشطة",
+  activeCountSummary: "{count} نشطة ({orders})",
+  locationOnShort: "مفعل",
+  locationOffShort: "متوقف"
+});
+
 DRIVER_I18N.hi = {
   meta: {
     title: "Driver Dashboard | Al Taj Al Malaky",
@@ -777,6 +795,227 @@ DRIVER_I18N.hi = {
   }
 };
 
+DRIVER_I18N.ur = {
+  meta: {
+    title: "ڈرائیور ڈیش بورڈ | التاج المالکی",
+    logoAlt: "التاج المالکی کا لوگو"
+  },
+  brand: {
+    subtitle: "لگژری ایونٹ سیٹ اپ اور رینٹل"
+  },
+  header: {
+    logout: "لاگ آؤٹ"
+  },
+  language: {
+    label: "زبان"
+  },
+  sidebar: {
+    ariaLabel: "ڈرائیور ڈیش بورڈ نیویگیشن",
+    quickNav: "فوری نیویگیشن",
+    groupDriver: "ڈرائیور",
+    groupSystem: "سسٹم",
+    dashboard: "ڈیش بورڈ",
+    activeOrders: "فعال آرڈرز",
+    collection: "کلیکشن",
+    completedOrders: "مکمل شدہ آرڈرز",
+    support: "سپورٹ"
+  },
+  hero: {
+    kicker: "ڈرائیور ڈیش بورڈ",
+    greeting: "السلام علیکم، <span id=\"driverWelcomeName\">{name}</span>",
+    summaryEmpty: "آپ کی تفویض کردہ ڈیلیوریز یہاں ریئل ٹائم میں ظاہر ہوں گی۔",
+    summaryLabel: "آپریشنل خلاصہ",
+    activeAssigned: "فعال تفویض",
+    completedOverall: "کل مکمل",
+    inDeliveryFlow: "ڈیلیوری میں جاری",
+    activeDeliveries: "فعال ڈیلیوریز",
+    locationSharingLabel: "لوکیشن شیئرنگ",
+    noActiveDeliveries: "کوئی فعال ڈیلیوری نہیں",
+    activeCountSummary: "{count} فعال ({orders})",
+    locationOnShort: "آن",
+    locationOffShort: "آف",
+    activeNone: "فعال ڈیلیوریز: کوئی نہیں",
+    activeSome: "فعال ڈیلیوریز: {orders}",
+    locationOn: "لوکیشن شیئرنگ: آن",
+    locationOff: "لوکیشن شیئرنگ: آف"
+  },
+  activeOrders: {
+    kicker: "تفویض کردہ کام",
+    title: "فعال آرڈرز",
+    loadingTitle: "تفویض کردہ آرڈرز لوڈ ہو رہے ہیں...",
+    loadingDesc: "براہ کرم انتظار کریں، آپ کا ڈیش بورڈ کنیکٹ ہو رہا ہے۔",
+    emptyTitle: "اس وقت کوئی فعال آرڈر نہیں",
+    emptyDesc: "نئی تفویض کردہ ڈیلیوریز یہاں خودکار طور پر نظر آئیں گی۔"
+  },
+  collection: {
+    kicker: "رینٹل واپسی",
+    title: "آرڈر کلیکٹ کریں",
+    summary: "کسی بھی ڈیلیور شدہ آرڈر کا آئی ڈی درج کریں تاکہ رینٹل آئٹمز کو واپس کلیکٹ شدہ نشان زد کیا جا سکے۔",
+    orderIdLabel: "آرڈر آئی ڈی",
+    orderIdPlaceholder: "TAJ-1053-VC2",
+    find: "آرڈر تلاش کریں",
+    finding: "تلاش جاری ہے...",
+    emptyTitle: "ڈیلیور شدہ آرڈر کلیکشن کے لیے تیار ہے",
+    emptyDesc: "کسٹمر والا آرڈر آئی ڈی تلاش کریں، خلاصہ دیکھیں، اور کلیکشن کے بعد انوینٹری ریلیز کریں۔",
+    lookupKicker: "کلیکشن تلاش",
+    searchTitle: "آرڈر تلاش کیا جا رہا ہے",
+    searchDesc: "{orderId} ابھی تلاش کیا جا رہا ہے۔",
+    driverLoadingTitle: "ڈرائیور پروفائل ابھی لوڈ ہو رہی ہے",
+    driverLoadingDesc: "براہ کرم تھوڑا انتظار کریں اور دوبارہ کوشش کریں۔",
+    enterOrderTitle: "آرڈر آئی ڈی درج کریں",
+    enterOrderDesc: "تلاش سے پہلے کسٹمر والا آرڈر آئی ڈی لکھیں۔",
+    notFoundTitle: "آرڈر نہیں ملا",
+    notFoundDesc: "اس آئی ڈی کا آرڈر نہیں ملا۔ براہ کرم آئی ڈی چیک کر کے دوبارہ کوشش کریں۔",
+    lookupFailedTitle: "تلاش ناکام ہو گئی",
+    lookupFailedDesc: "یہ آرڈر اس وقت لوڈ نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔",
+    readyTitle: "آرڈر کلیکشن کے لیے تیار ہے",
+    readyDesc: "نیچے دیا گیا خلاصہ دیکھیں، پھر تصدیق کریں کہ رینٹل آئٹمز واپس کلیکٹ ہو چکی ہیں۔",
+    alreadyCollectedTitle: "یہ آرڈر پہلے ہی کلیکٹ ہو چکا ہے",
+    alreadyCollectedDesc: "یہ رینٹل آرڈر پہلے ہی واپس ہو چکا ہے اور انوینٹری ریلیز ہو چکی ہے۔",
+    notReadyTitle: "یہ آرڈر کلیکشن کے لیے تیار نہیں",
+    notReadyDesc: "صرف {requiredStatus} اسٹیٹس والے آرڈرز کلیکٹ کیے جا سکتے ہیں۔ موجودہ اسٹیٹس: {currentStatus}۔",
+    itemsMarkedTitle: "آئٹمز کلیکٹ شدہ نشان زد ہو گئیں",
+    itemsMarkedDesc: "یہ آرڈر کامیابی سے واپس ہو گیا ہے اور محفوظ انوینٹری اب ریلیز ہو چکی ہے۔",
+    orderMissingTitle: "آرڈر اب موجود نہیں",
+    orderMissingDesc: "یہ آرڈر مزید دستیاب نہیں ہے۔",
+    updateFailedTitle: "کلیکشن اپ ڈیٹ ناکام ہو گئی",
+    updateFailedDesc: "آرڈر اب بھی کلیکشن کے لیے اہل ہے، مگر اپ ڈیٹ مکمل نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔",
+    confirm: "آئٹمز کلیکٹ شدہ نشان زد کریں",
+    confirming: "آئٹمز کلیکٹ شدہ نشان زد کی جا رہی ہیں...",
+    openMap: "نقشہ کھولیں",
+    fields: {
+      orderId: "آرڈر آئی ڈی",
+      customer: "کسٹمر",
+      eventDate: "ایونٹ کی تاریخ",
+      rentalDays: "رینٹل دن",
+      pickupDate: "پک اپ تاریخ",
+      pickupTime: "پک اپ وقت",
+      eventLocation: "ایونٹ مقام",
+      items: "اس آرڈر کی آئٹمز",
+      deliveredBy: "ڈیلیور کیا گیا بذریعہ",
+      deliveredAt: "ڈیلیور ہونے کا وقت",
+      collectedBy: "کلیکٹ کیا گیا بذریعہ",
+      collectedAt: "کلیکٹ ہونے کا وقت"
+    }
+  },
+  completed: {
+    kicker: "ڈیلیوری ہسٹری",
+    title: "مکمل شدہ آرڈرز",
+    summaryEmpty: "ڈیلیور اور کلیکٹ شدہ آرڈرز یہاں خودکار طور پر ظاہر ہوں گے۔",
+    summaryWithCounts: "اس مہینے {monthCount} مکمل اور مجموعی طور پر {allCount} مکمل۔",
+    range: "مدت",
+    sort: "ترتیب",
+    search: "تلاش",
+    rangeMonth: "اس مہینے",
+    rangeAll: "تمام وقت",
+    sortRecent: "سب سے پہلے نئی",
+    sortOldest: "سب سے پہلے پرانی",
+    searchPlaceholder: "آرڈر آئی ڈی یا کسٹمر کا نام",
+    initialEmptyTitle: "ابھی تک کوئی مکمل شدہ آرڈر نہیں",
+    initialEmptyDesc: "ڈیلیور اور کلیکٹ شدہ آرڈرز خودکار طور پر یہاں منتقل ہو جائیں گے۔",
+    emptyTitle: "کوئی مکمل شدہ آرڈر نہیں ملا",
+    emptyDesc: "کوئی دوسرا فلٹر آزمائیں یا ڈیلیوری/کلیکشن مکمل کریں تاکہ وہ یہاں نظر آئے۔",
+    previous: "پچھلا",
+    next: "اگلا",
+    pageInfo: "صفحہ {current} از {total}",
+    completedDate: "مکمل ہونے کی تاریخ"
+  },
+  support: {
+    icon: "کال",
+    kicker: "مدد چاہیے",
+    title: "سپورٹ",
+    description: "ڈسپیچ یا تکنیکی مسئلے کے لیے براہ کرم MR Mohamad Daya سے رابطہ کریں۔"
+  },
+  statusBanner: {
+    connecting: "آپ کے تفویض کردہ آرڈرز سے کنیکٹ ہو رہا ہے...",
+    loadFailed: "اس وقت آپ کی ڈیلیوریز لوڈ نہیں ہو سکیں۔",
+    startSuccess: "آرڈر {orderId} کی ڈیلیوری شروع ہو گئی ہے۔ اب آپ لائیو لوکیشن شیئر کر سکتے ہیں۔",
+    startFailed: "اس وقت ڈیلیوری شروع نہیں ہو سکی۔",
+    geolocationUnsupported: "اس ڈیوائس پر جیو لوکیشن سپورٹ دستیاب نہیں ہے۔",
+    locationUpdateFailed: "لائیو لوکیشن اپ ڈیٹ نہیں ہو سکی۔ ہم بیک گراؤنڈ میں دوبارہ کوشش کرتے رہیں گے۔",
+    locationPermissionDenied: "لوکیشن پرمیشن مسترد ہو گئی۔ لائیو شیئرنگ جاری رکھنے کے لیے لوکیشن کی اجازت دیں۔",
+    locationTimeout: "لائیو لوکیشن متوقع وقت سے زیادہ لے رہی ہے۔ ہم بیک گراؤنڈ میں دوبارہ کوشش کرتے رہیں گے۔",
+    locationWeak: "اس وقت لائیو لوکیشن کا سگنل کمزور ہے۔ ہم بیک گراؤنڈ میں دوبارہ کوشش کرتے رہیں گے۔",
+    locationStarted: "فعال ڈیلیوریز کے لیے لائیو لوکیشن شیئرنگ شروع ہو گئی ہے۔",
+    locationActive: "آپ کی موجودہ ڈیلیوریز کے لیے لائیو لوکیشن شیئرنگ فعال ہے۔",
+    finishSuccess: "آرڈر {orderId} کامیابی سے مکمل ہو گیا۔",
+    finishFailed: "اس وقت یہ آرڈر مکمل نہیں ہو سکا۔",
+    startBeforeShare: "لائیو لوکیشن شیئر کرنے سے پہلے ڈیلیوری شروع کریں۔",
+    locationAlreadyActive: "فعال ڈیلیوریز کے لیے لائیو لوکیشن پہلے ہی اپ ڈیٹ ہو رہی ہے۔",
+    profileMissing: "آپ کی ڈرائیور پروفائل نہیں ملی۔ براہ کرم ایڈمن سے رابطہ کریں۔",
+    dashboardConnected: "ڈیش بورڈ کنیکٹ ہو گیا۔ تفویض کردہ آرڈرز ریئل ٹائم میں اپ ڈیٹ ہوں گے۔",
+    profileUnavailable: "آپ کی ڈرائیور پروفائل اس وقت دستیاب نہیں ہے۔",
+    alreadyCollected: "آرڈر {orderId} پہلے ہی کلیکٹ ہو چکا ہے۔",
+    notReadyForCollection: "یہ آرڈر کلیکشن کے لیے تیار نہیں ہے۔",
+    collectedSuccess: "آرڈر {orderId} کلیکٹ شدہ نشان زد ہو گیا۔",
+    collectedFailed: "اس وقت یہ آرڈر کلیکٹ شدہ نشان زد نہیں ہو سکا۔",
+    openFailed: "اس وقت آپ کا ڈیش بورڈ نہیں کھل سکا۔"
+  },
+  order: {
+    unknownCustomer: "نامعلوم کسٹمر",
+    noItems: "کوئی آئٹمز درج نہیں ہیں",
+    unnamedItem: "بغیر نام کی آئٹم",
+    priority: "ترجیح",
+    eventTime: "ایونٹ کا وقت",
+    rentalDays: "رینٹل دن",
+    setupTime: "سیٹ اپ وقت",
+    location: "مقام",
+    orderItems: "آرڈر آئٹمز",
+    noLocationYet: "ابھی لوکیشن دستیاب نہیں",
+    onTheWay: "راستے میں",
+    liveLocationOn: "لائیو لوکیشن آن ہے",
+    liveLocationOnDesc: "کسٹمر اب آپ کی حرکت دیکھ سکتا ہے",
+    liveLocationOff: "لائیو لوکیشن آف ہے",
+    liveLocationOffDesc: "کسٹمر کو آپ کی ٹریکنگ کے لیے \"Share Live Location\" دبائیں",
+    startDelivery: "ڈیلیوری شروع کریں",
+    startingDelivery: "ڈیلیوری شروع کی جا رہی ہے...",
+    shareLiveLocation: "لائیو لوکیشن شیئر کریں",
+    sharingLiveLocation: "لائیو لوکیشن شیئر ہو رہی ہے",
+    finishOrder: "آرڈر مکمل کریں",
+    finishingOrder: "آرڈر مکمل کیا جا رہا ہے...",
+    deliveryCompleted: "ڈیلیوری مکمل ہو گئی",
+    itemsCollectedBack: "آئٹمز واپس کلیکٹ ہو گئیں",
+    cancelled: "منسوخ",
+    completedPrefix: "{date} کو مکمل ہوا",
+    completedFallback: "مکمل",
+    callCustomer: "کسٹمر کو کال کریں",
+    sendWhatsApp: "واٹس ایپ پر پیغام بھیجیں",
+    openMap: "نقشہ کھولیں",
+    whatsappMessage: "السلام علیکم {customerName}، میں آپ کے آرڈر {orderId} کا ڈرائیور ہوں۔",
+    dateTbc: "تاریخ بعد میں طے ہوگی"
+  },
+  priority: {
+    normal: "نارمل",
+    urgent: "فوری",
+    vip: "وی آئی پی"
+  },
+  statuses: {
+    unknown: "نامعلوم",
+    confirmed: "تصدیق شدہ",
+    preparing: "تیاری میں",
+    "out-for-delivery": "ڈیلیوری کے لیے روانہ",
+    delivered: "ڈیلیور شدہ",
+    collected: "کلیکٹ شدہ",
+    cancelled: "منسوخ"
+  },
+  prompts: {
+    finishConfirmTitle: "کیا آپ واقعی آرڈر {orderId} مکمل کرنا چاہتے ہیں؟",
+    finishConfirmBody: "اس سے آرڈر {orderId} ڈیلیور شدہ نشان زد ہو جائے گا۔ کیا جاری رکھنا ہے؟"
+  },
+  scrollTop: {
+    text: "اوپر",
+    ariaLabel: "اوپر واپس جائیں",
+    title: "اوپر جائیں"
+  },
+  common: {
+    driver: "ڈرائیور",
+    customer: "کسٹمر",
+    notRecorded: "ریکارڈ نہیں ہوا",
+    noLocationRecorded: "لوکیشن ریکارڈ نہیں ہوئی",
+    na: "دستیاب نہیں"
+  }
+};
+
 function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
   const navLinks = document.querySelector(".nav-links");
@@ -821,6 +1060,26 @@ function escapeHtml(value){
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function renderActiveDeliveriesPill(orders = []){
+  if(!activeDeliveryPill){
+    return;
+  }
+
+  if(!orders.length){
+    activeDeliveryPill.textContent = t("hero.noActiveDeliveries");
+    return;
+  }
+
+  const orderList = orders
+    .map((order) => order.orderId || order.id || t("common.na"))
+    .join(", ");
+
+  activeDeliveryPill.textContent = t("hero.activeCountSummary", {
+    count: orders.length,
+    orders: orderList
+  });
 }
 
 function applyStaticTranslations(){
@@ -2208,23 +2467,16 @@ function updateDashboardSummary(){
       : t("completed.summaryEmpty");
   }
 
-  if(activeDeliveryPill){
-    const liveOrders = getLiveDeliveryOrders();
-    activeDeliveryPill.textContent = liveOrders.length
-      ? t("hero.activeSome", {
-        orders: liveOrders.map((order) => order.orderId || order.id).join(", ")
-      })
-      : t("hero.activeNone");
-  }
+  renderActiveDeliveriesPill(getLiveDeliveryOrders());
 
   if(locationSharingPill){
     const liveOrderCount = getLiveDeliveryOrders().length;
     const isSharingActive = isAnyLocationSharingActive();
     locationSharingPill.textContent = isSharingActive
-      ? t("hero.locationOn")
-      : t("hero.locationOff");
-    locationSharingPill.classList.toggle("is-on", isSharingActive);
-    locationSharingPill.classList.toggle("is-off", !isSharingActive || !liveOrderCount);
+      ? t("hero.locationOnShort")
+      : t("hero.locationOffShort");
+    locationSharingPill.classList.toggle("on", isSharingActive);
+    locationSharingPill.classList.toggle("off", !isSharingActive || !liveOrderCount);
   }
 }
 
@@ -2239,14 +2491,12 @@ function renderDriverPreHydrationState(){
     driverSummaryText.innerHTML = `<span class="driver-summary-empty">${escapeHtml(t("hero.summaryEmpty"))}</span>`;
   }
 
-  if(activeDeliveryPill){
-    activeDeliveryPill.textContent = t("hero.activeNone");
-  }
+  renderActiveDeliveriesPill();
 
   if(locationSharingPill){
-    locationSharingPill.textContent = t("hero.locationOff");
-    locationSharingPill.classList.remove("is-on");
-    locationSharingPill.classList.add("is-off");
+    locationSharingPill.textContent = t("hero.locationOffShort");
+    locationSharingPill.classList.remove("on");
+    locationSharingPill.classList.add("off");
   }
 
   if(driverOrdersGrid){
