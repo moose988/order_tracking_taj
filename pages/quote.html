@@ -86,15 +86,8 @@
             </div>
             
             <div class="form-group">
-              <label for="eventLocation">Event Location</label>
-              <input type="text" id="eventLocation" placeholder="Dubai, Business Bay" required />
-              <p class="help-text">Please enter the exact accurate location (street number, building name, and floor).</p>
-            </div>
-            
-            <div class="form-group">
               <label for="mapLink">Google Maps Link</label>
-              <input type="url" id="mapLink" placeholder="Paste Google Maps location link here" />
-              <p class="help-text">Optional. A confirmed map pin is used as the exact delivery destination.</p>
+              <input type="url" id="mapLink" placeholder="Paste Google Maps location link here" required />
             </div>
 
             <div class="form-group">
@@ -107,6 +100,15 @@
                 </button>
               </div>
               <p class="help-text">Search for a venue or tap directly on the map to lock the exact destination for delivery tracking.</p>
+            </div>
+
+            <div class="form-group">
+              <label for="eventLocation">Event Location</label>
+              <input type="text" id="eventLocation" placeholder="Dubai, Business Bay" required />
+              <p class="help-text">Please enter the exact accurate location (street number, building name, and floor).</p>
+            </div>
+
+            <div class="form-group">
               <div id="quoteLocationSummary" class="location-selection-shell"></div>
             </div>
             
@@ -114,7 +116,6 @@
             <div class="form-group">
               <label for="eventNotes">Notes</label>
               <textarea id="eventNotes" placeholder="Outdoor event, evening setup, special seating request, etc."></textarea>
-              <p class="help-text">Add any important details you want the team to know.</p>
             </div>
 
           </form>

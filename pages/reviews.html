@@ -6,7 +6,7 @@
   <title>Reviews | Al Taj Al Malaky</title>
   <link rel="stylesheet" href="../src/css/styles.css" />
 </head>
-<body>
+<body class="reviews-page">
   <header class="site-header">
     <div class="container navbar">
       <a href="index.html" class="brand">
@@ -32,18 +32,54 @@
     <section class="reviews-hero">
       <div class="container">
         <div class="section-head">
-          <div class="section-kicker">Customer Reviews</div>
-          <h1 class="section-title">What customers say about their experience.</h1>
-          <p class="section-text">
-            Real feedback from delivered events, updated automatically from customer submissions.
-          </p>
+          <div class="section-kicker">Client Experiences</div>
+          <h1 class="section-title">Trusted feedback from clients across the UAE</h1>
+        </div>
+
+        <div class="reviews-trust-strip">
+          <article class="reviews-trust-item">
+            <strong>5-star client satisfaction</strong>
+            <span>Shared after completed event setups and deliveries</span>
+          </article>
+          <article class="reviews-trust-item">
+            <strong>Delivered across the UAE</strong>
+            <span>Trusted for timely coordination and premium presentation</span>
+          </article>
+          <article class="reviews-trust-item">
+            <strong>Chosen for elegant occasions</strong>
+            <span>Weddings, private events, and refined gatherings</span>
+          </article>
         </div>
       </div>
     </section>
 
-    <section class="page-section" style="padding-top: 20px;">
+    <section class="page-section reviews-archive-section">
       <div class="container">
+        <div class="reviews-filter-bar" aria-label="Review filters">
+          <button class="reviews-filter-btn is-active" type="button" data-filter="all">All</button>
+          <button class="reviews-filter-btn" type="button" data-filter="recent">Most Recent</button>
+          <button class="reviews-filter-btn" type="button" data-filter="five-star">5 Stars</button>
+        </div>
+
         <div id="reviewsGrid" class="large-reviews-grid"></div>
+      </div>
+    </section>
+
+    <section class="page-section reviews-cta-section">
+      <div class="container">
+        <div class="reviews-cta-card">
+          <div>
+            <div class="section-kicker">Plan With Confidence</div>
+            <h2 class="section-title">Planning an event?</h2>
+            <p class="section-text">
+              Explore our collection or request your quote with confidence.
+            </p>
+          </div>
+
+          <div class="reviews-cta-actions">
+            <a href="order.html" class="btn btn-primary">Request a Quote</a>
+          </div>
+        </div>
       </div>
     </section>
   </main>

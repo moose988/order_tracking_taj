@@ -244,6 +244,97 @@ const LEGACY_CATALOG_PRODUCT_NAMES = new Map([
   ["rectangular table", "Rectangular Dining Table"]
 ]);
 
+function safeAdminRenderStep(step, renderStep, meta = {}){
+  try{
+    return renderStep();
+  }catch(error){
+    console.error(`[admin] Failed to render ${step}:`, {
+      ...meta,
+      error
+    });
+    return null;
+  }
+}
+
+function normalizeEventDateValue(value){
+  if(!value){
+    return "";
+  }
+
+  if(typeof value === "string"){
+    const trimmed = value.trim();
+
+    if(!trimmed){
+      return "";
+    }
+
+    const isoDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+    if(isoDateMatch){
+      return `${isoDateMatch[1]}-${isoDateMatch[2]}-${isoDateMatch[3]}`;
+    }
+
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? trimmed : formatLocalDate(parsed);
+  }
+
+  if(typeof value?.toDate === "function"){
+    const parsed = value.toDate();
+    return Number.isNaN(parsed?.getTime?.()) ? "" : formatLocalDate(parsed);
+  }
+
+  if(value instanceof Date){
+    return Number.isNaN(value.getTime()) ? "" : formatLocalDate(value);
+  }
+
+  if(typeof value?.seconds === "number"){
+    const parsed = new Date(value.seconds * 1000);
+    return Number.isNaN(parsed.getTime()) ? "" : formatLocalDate(parsed);
+  }
+
+  return "";
+}
+
+function normalizeOrderRecord(order = {}, id = ""){
+  return {
+    ...order,
+    id: id || order.id || "",
+    orderId: String(order.orderId || id || "").trim(),
+    customerName: String(order.customerName || "").trim(),
+    phone: String(order.phone || "").trim(),
+    eventDate: normalizeEventDateValue(order.eventDate),
+    eventTime: String(order.eventTime || "").trim(),
+    setupTime: String(order.setupTime || "").trim(),
+    eventLocation: String(order.eventLocation || "").trim(),
+    status: normalizeOrderStatusValue(order.status || "quote-requested"),
+    priority: getPriorityValue(order.priority),
+    items: Array.isArray(order.items) ? order.items : []
+  };
+}
+
+function normalizeDriverRecord(driver = {}, id = ""){
+  return {
+    ...driver,
+    id: id || driver.id || "",
+    uid: String(driver.uid || "").trim(),
+    name: String(driver.name || "").trim(),
+    email: normalizeEmail(driver.email),
+    phone: String(driver.phone || "").trim()
+  };
+}
+
+function normalizeInventoryRecord(item = {}, id = ""){
+  return {
+    ...item,
+    id: id || item.id || "",
+    name: String(item.name || "").trim(),
+    category: String(item.category || "").trim(),
+    variant: String(item.variant || "").trim(),
+    sourceType: String(item.sourceType || (item.productId ? "catalog" : "custom")).trim() || "custom",
+    productId: String(item.productId || "").trim()
+  };
+}
+
 const STATUS_META = {
   "quote-requested": { label: "Quote Requested", className: "is-quote-requested" },
   "quote-sent": { label: "Quote Sent", className: "is-quote-sent" },
@@ -286,35 +377,58 @@ function subscribeToOrders(){
   ordersUnsubscribe?.();
   hasLoadedOrdersSnapshot = false;
   ordersUnsubscribe = onSnapshot(collection(db, "orders"), async (snapshot) => {
-    allOrders = snapshot.docs.map((orderDoc) => ({
-      id: orderDoc.id,
-      ...orderDoc.data()
-    }));
-    hasLoadedOrdersSnapshot = true;
-
-    console.debug("[admin] orders snapshot received", {
-      allOrdersLength: allOrders.length
-    });
-
-    console.debug("[collection] orders loaded from Firestore", {
-      totalOrders: allOrders.length,
-      deliveredOrders: allOrders.filter((order) => normalizeOrderStatusValue(order.status) === "delivered").length
-    });
-
-    syncCurrentEditingOrder();
-    syncCurrentQuoteOrder();
-    syncOpenOrderModal();
-    syncOpenDriverPerformanceModal();
-    renderAdminDashboardAfterOrdersSnapshot("orders-snapshot");
-
     try{
-      await syncMissingInventoryForReservableOrderItems();
-      renderInventoryDashboard();
+      allOrders = snapshot.docs.map((orderDoc) => normalizeOrderRecord(orderDoc.data(), orderDoc.id));
+      hasLoadedOrdersSnapshot = true;
+
+      console.debug("[admin] orders snapshot received", {
+        allOrdersLength: allOrders.length
+      });
+
+      console.debug("[collection] orders loaded from Firestore", {
+        totalOrders: allOrders.length,
+        deliveredOrders: allOrders.filter((order) => normalizeOrderStatusValue(order.status) === "delivered").length
+      });
+
+      safeAdminRenderStep("sync-current-edit-order", () => syncCurrentEditingOrder(), { source: "orders-snapshot" });
+      safeAdminRenderStep("sync-current-quote-order", () => syncCurrentQuoteOrder(), { source: "orders-snapshot" });
+      safeAdminRenderStep("sync-open-order-modal", () => syncOpenOrderModal(), { source: "orders-snapshot" });
+      safeAdminRenderStep("sync-open-driver-performance-modal", () => syncOpenDriverPerformanceModal(), { source: "orders-snapshot" });
+      safeAdminRenderStep("dashboard-after-orders-snapshot", () => renderAdminDashboardAfterOrdersSnapshot("orders-snapshot"), { source: "orders-snapshot" });
+
+      try{
+        await syncMissingInventoryForReservableOrderItems();
+        safeAdminRenderStep("inventory-dashboard-post-order-sync", () => renderInventoryDashboard(), { source: "orders-snapshot" });
+      }catch(error){
+        console.error("Failed to sync order inventory items:", error);
+      }
     }catch(error){
-      console.error("Failed to sync order inventory items:", error);
+      console.error("[admin] Failed to process orders snapshot:", error);
+      hasLoadedOrdersSnapshot = true;
+
+      if(tableBody){
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="9" style="text-align:center;padding:20px;">
+              Could not render orders.
+            </td>
+          </tr>
+        `;
+      }
     }
   }, (error) => {
     console.error("Failed to subscribe to orders:", error);
+    hasLoadedOrdersSnapshot = true;
+
+    if(tableBody){
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center;padding:20px;">
+            Could not load orders.
+          </td>
+        </tr>
+      `;
+    }
   });
 }
 
@@ -408,21 +522,27 @@ function initAdminSidebarNavigation(){
 function subscribeToInventory(){
   inventoryUnsubscribe?.();
   inventoryUnsubscribe = onSnapshot(collection(db, "inventory"), async (snapshot) => {
-    allInventoryItems = snapshot.docs.map((inventoryDoc) => ({
-      id: inventoryDoc.id,
-      ...inventoryDoc.data()
-    }));
-    hasLoadedInventorySnapshot = true;
-
     try{
-      await seedCatalogInventoryIfNeeded();
-      await syncMissingInventoryForReservableOrderItems();
+      allInventoryItems = snapshot.docs.map((inventoryDoc) => normalizeInventoryRecord(inventoryDoc.data(), inventoryDoc.id));
+      hasLoadedInventorySnapshot = true;
+
+      console.debug("[admin] inventory snapshot received", {
+        inventoryCount: allInventoryItems.length
+      });
+
+      try{
+        await seedCatalogInventoryIfNeeded();
+        await syncMissingInventoryForReservableOrderItems();
+      }catch(error){
+        console.error("Failed to prepare inventory data:", error);
+      }
+
+      safeAdminRenderStep("inventory-dashboard", () => renderInventoryDashboard(), { source: "inventory-snapshot" });
+      safeAdminRenderStep("create-order-inventory-warnings", () => updateOrderInventoryWarnings("create"), { source: "inventory-snapshot" });
+      safeAdminRenderStep("edit-order-inventory-warnings", () => updateOrderInventoryWarnings("edit"), { source: "inventory-snapshot" });
     }catch(error){
-      console.error("Failed to prepare inventory data:", error);
+      console.error("[admin] Failed to process inventory snapshot:", error);
     }
-    renderInventoryDashboard();
-    updateOrderInventoryWarnings("create");
-    updateOrderInventoryWarnings("edit");
   }, (error) => {
     console.error("Failed to subscribe to inventory:", error);
     if(inventoryTableBody){
@@ -438,26 +558,31 @@ function subscribeToInventory(){
 function subscribeToDrivers(){
   driversUnsubscribe?.();
   driversUnsubscribe = onSnapshot(collection(db, "drivers"), (snapshot) => {
-    driversList = snapshot.docs.map((driverDoc) => ({
-      id: driverDoc.id,
-      ...driverDoc.data()
-    }));
+    try{
+      driversList = snapshot.docs.map((driverDoc) => normalizeDriverRecord(driverDoc.data(), driverDoc.id));
 
-    populateDriverFilter();
-    renderDriverPanel();
-    syncOpenDriverPerformanceModal();
-    renderOperationsMapSection();
-    renderCollectionAssignmentSection();
+      console.debug("[admin] drivers snapshot received", {
+        driversCount: driversList.length
+      });
 
-    if(hasLoadedOrdersSnapshot){
-      applyFilters(false, "drivers-snapshot");
-      return;
+      safeAdminRenderStep("populate-driver-filter", () => populateDriverFilter(), { source: "drivers-snapshot" });
+      safeAdminRenderStep("driver-panel", () => renderDriverPanel(), { source: "drivers-snapshot" });
+      safeAdminRenderStep("sync-open-driver-performance-modal", () => syncOpenDriverPerformanceModal(), { source: "drivers-snapshot" });
+      safeAdminRenderStep("operations-map", () => renderOperationsMapSection(), { source: "drivers-snapshot" });
+      safeAdminRenderStep("collection-assignment", () => renderCollectionAssignmentSection(), { source: "drivers-snapshot" });
+
+      if(hasLoadedOrdersSnapshot){
+        safeAdminRenderStep("orders-table-after-drivers", () => applyFilters(false, "drivers-snapshot"), { source: "drivers-snapshot" });
+        return;
+      }
+
+      console.debug("[admin] deferring applyFilters until orders snapshot", {
+        source: "drivers-snapshot",
+        allOrdersLength: allOrders.length
+      });
+    }catch(error){
+      console.error("[admin] Failed to process drivers snapshot:", error);
     }
-
-    console.debug("[admin] deferring applyFilters until orders snapshot", {
-      source: "drivers-snapshot",
-      allOrdersLength: allOrders.length
-    });
   }, (error) => {
     console.error("Failed to subscribe to drivers:", error);
   });
@@ -478,6 +603,10 @@ function startInventoryClockRefresh(){
 /* RENDER TABLE */
 
 function renderOrders(orders, source = "general"){
+  if(!tableBody){
+    return;
+  }
+
   if(hasLoadedOrdersSnapshot && !hasLoggedInitialAdminRenderOrders){
     console.debug("[admin] renderOrders call on first load", {
       source,
@@ -508,6 +637,8 @@ function renderOrders(orders, source = "general"){
 
   paginatedOrders.forEach(order => {
     const priority = getPriorityValue(order.priority);
+    const eventDateLabel = normalizeEventDateValue(order.eventDate) || "N/A";
+    const statusValue = normalizeOrderStatusValue(order.status);
 
     const row = document.createElement("tr");
     row.classList.add("order-row");
@@ -515,7 +646,7 @@ function renderOrders(orders, source = "general"){
     row.innerHTML = `
     <td class="admin-order-id-cell"><span class="admin-cell-nowrap">${order.orderId}</span></td>
     <td>${order.customerName}</td>
-    <td class="admin-date-cell"><span class="admin-cell-nowrap">${order.eventDate}</span></td>
+    <td class="admin-date-cell"><span class="admin-cell-nowrap">${eventDateLabel}</span></td>
     <td>${getOrderRentalDays(order)}</td>
     <td>${order.eventTime || "N/A"}</td>
     <td>${order.eventLocation}</td>
@@ -540,9 +671,9 @@ function renderOrders(orders, source = "general"){
             Edit
           </button>
 
-          ${order.status === "quote-requested" || order.status === "quote-sent" ? `
+          ${statusValue === "quote-requested" || statusValue === "quote-sent" ? `
             <button class="btn btn-secondary quote-builder-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
-              ${order.status === "quote-requested" ? "Prepare Quote" : "Open Quote"}
+              ${statusValue === "quote-requested" ? "Prepare Quote" : "Open Quote"}
             </button>
           ` : ""}
 
@@ -554,13 +685,13 @@ function renderOrders(orders, source = "general"){
             ? `<button class="btn btn-secondary driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
                 Driver: ${order.driver.name}
               </button>`
-            : order.status === "preparing"
+            : statusValue === "preparing"
               ? `<button class="btn btn-secondary assign-driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
                   Assign Driver
                 </button>`
               : ""}
 
-          ${order.status === "delivered" || order.status === "collected" ? `
+          ${statusValue === "delivered" || statusValue === "collected" ? `
             <button class="btn btn-dark review-request-btn admin-order-action-btn admin-order-action-btn-dark no-modal" data-id="${order.id}">
               Send Review Request
             </button>
@@ -688,11 +819,13 @@ function isWithinNextHours(dateStr, timeStr, hours = 3){
 }
 
 function parseEventDate(dateStr){
-  if(!dateStr){
+  const normalizedDate = normalizeEventDateValue(dateStr);
+
+  if(!normalizedDate){
     return null;
   }
 
-  const parts = String(dateStr).split("-");
+  const parts = String(normalizedDate).split("-");
 
   if(parts.length === 3){
     const [year, month, day] = parts.map(Number);
@@ -701,7 +834,7 @@ function parseEventDate(dateStr){
     return Number.isNaN(date.getTime()) ? null : date;
   }
 
-  const fallback = new Date(dateStr);
+  const fallback = new Date(normalizedDate);
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
@@ -2472,10 +2605,10 @@ function renderOperationsMapSection(){
   }
 
   const operationsData = getOperationsMapData();
-  renderOperationsMapMetrics(operationsData);
-  renderOperationsMapDriverList(operationsData);
-  renderOperationsMapCanvas(operationsData);
-  attachOperationsMapDriverEvents();
+  safeAdminRenderStep("operations-map-metrics", () => renderOperationsMapMetrics(operationsData), { source: "operations-map-section" });
+  safeAdminRenderStep("operations-map-driver-list", () => renderOperationsMapDriverList(operationsData), { source: "operations-map-section" });
+  safeAdminRenderStep("operations-map-canvas", () => renderOperationsMapCanvas(operationsData), { source: "operations-map-section" });
+  safeAdminRenderStep("operations-map-driver-events", () => attachOperationsMapDriverEvents(), { source: "operations-map-section" });
 }
 
 function getOrdersAwaitingCollection(){
@@ -5087,9 +5220,9 @@ function getFilteredInventoryItems(){
 }
 
 function renderInventoryDashboard(){
-  renderInventorySummary();
-  renderInventoryTable();
-  renderUpcomingReservations();
+  safeAdminRenderStep("inventory-summary", () => renderInventorySummary(), { source: "inventory-dashboard" });
+  safeAdminRenderStep("inventory-table", () => renderInventoryTable(), { source: "inventory-dashboard" });
+  safeAdminRenderStep("inventory-upcoming-reservations", () => renderUpcomingReservations(), { source: "inventory-dashboard" });
 }
 
 function renderInventorySummary(){
@@ -6074,27 +6207,31 @@ function generateAnalytics(){
       : "N/A";
   }
 
-  renderCharts({
+  safeAdminRenderStep("analytics-charts", () => renderCharts({
     ordersPerDay,
     ordersByStatus,
     topProducts
+  }), {
+    source: "generate-analytics"
   });
 }
 
 function getOrdersPerDay(){
   return allOrders.reduce((accumulator, order) => {
-    if(!order.eventDate){
+    const eventDate = normalizeEventDateValue(order.eventDate);
+
+    if(!eventDate){
       return accumulator;
     }
 
-    accumulator[order.eventDate] = (accumulator[order.eventDate] || 0) + 1;
+    accumulator[eventDate] = (accumulator[eventDate] || 0) + 1;
     return accumulator;
   }, {});
 }
 
 function getOrdersByStatus(){
   return allOrders.reduce((accumulator, order) => {
-    const status = order.status || "unknown";
+    const status = normalizeOrderStatusValue(order.status) || "unknown";
     accumulator[status] = (accumulator[status] || 0) + 1;
     return accumulator;
   }, {});
@@ -6231,7 +6368,7 @@ function renderCharts(analytics){
 }
 
 function getOrdersByDate(dateString){
-  return allOrders.filter(order => order.eventDate === dateString);
+  return allOrders.filter((order) => normalizeEventDateValue(order.eventDate) === dateString);
 }
 
 function renderCalendar(){
@@ -6488,6 +6625,13 @@ function ensureValidAdminFilterState(){
 function renderAdminDashboardAfterOrdersSnapshot(source = "orders-snapshot"){
   ensureValidAdminFilterState();
 
+  console.debug("[admin] dashboard render start", {
+    source,
+    ordersCount: allOrders.length,
+    driversCount: driversList.length,
+    inventoryCount: allInventoryItems.length
+  });
+
   console.debug("[admin] initial filter state", {
     source,
     ...getAdminInitialFilterState()
@@ -6506,32 +6650,35 @@ function renderAdminDashboardAfterOrdersSnapshot(source = "orders-snapshot"){
   ];
 
   renderSteps.forEach(([step, renderStep]) => {
-    try{
-      renderStep();
-    }catch(error){
-      console.error(`[admin] Failed to render ${step}:`, error);
-    }
+    safeAdminRenderStep(step, renderStep, { source });
   });
 
   updateActiveAdminSidebarLink();
+
+  console.debug("[admin] dashboard render end", {
+    source,
+    ordersCount: allOrders.length,
+    driversCount: driversList.length,
+    inventoryCount: allInventoryItems.length
+  });
 }
 
 /* STATS */
 
 function updateStats(orders){
+  const summaryCards = document.querySelectorAll(".admin-card");
 
-  const pending = orders.filter(o=>o.status==="quote-requested").length;
-  const preparing = orders.filter(o=>o.status==="preparing").length;
-  const delivered = orders.filter(o=>o.status==="delivered").length;
+  if(summaryCards.length < 3){
+    return;
+  }
 
-  document.querySelectorAll(".admin-card")[0].querySelector("p").textContent =
-    `${pending} incoming quote requests`;
+  const pending = orders.filter((order) => normalizeOrderStatusValue(order.status) === "quote-requested").length;
+  const preparing = orders.filter((order) => normalizeOrderStatusValue(order.status) === "preparing").length;
+  const delivered = orders.filter((order) => normalizeOrderStatusValue(order.status) === "delivered").length;
 
-  document.querySelectorAll(".admin-card")[1].querySelector("p").textContent =
-    `${preparing} orders in preparation`;
-
-  document.querySelectorAll(".admin-card")[2].querySelector("p").textContent =
-    `${delivered} delivered orders`;
+  summaryCards[0].querySelector("p").textContent = `${pending} incoming quote requests`;
+  summaryCards[1].querySelector("p").textContent = `${preparing} orders in preparation`;
+  summaryCards[2].querySelector("p").textContent = `${delivered} delivered orders`;
 }
 
 function syncAdminSummaryCardState(){
@@ -6588,11 +6735,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     hasLoadedOrdersSnapshot
   });
 
-  initMobileMenu();
-  initAdminSidebarNavigation();
-  initScrollTopButton();
-  initAdminLocationBindings();
-  document.getElementById("closeModalBtn").addEventListener("click", closeOrderModal);
+  safeAdminRenderStep("init-mobile-menu", () => initMobileMenu(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("init-admin-sidebar-navigation", () => initAdminSidebarNavigation(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("init-scroll-top-button", () => initScrollTopButton(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("init-admin-location-bindings", () => initAdminLocationBindings(), { source: "dom-content-loaded" });
+  document.getElementById("closeModalBtn")?.addEventListener("click", closeOrderModal);
   closeDriverPerformanceModalBtn?.addEventListener("click", () => closeDriverPerformanceModal());
   closeEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
   cancelEditOrderBtn?.addEventListener("click", () => closeEditOrderModal());
@@ -6635,9 +6782,9 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   document.getElementById("nextPage")?.addEventListener("click", () => handlePageChange(1));
   prevMonthBtn?.addEventListener("click", ()=> changeMonth(-1));
   nextMonthBtn?.addEventListener("click", ()=> changeMonth(1));
-  subscribeToDrivers();
-  subscribeToInventory();
-  subscribeToOrders();
+  safeAdminRenderStep("subscribe-drivers", () => subscribeToDrivers(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("subscribe-inventory", () => subscribeToInventory(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("subscribe-orders", () => subscribeToOrders(), { source: "dom-content-loaded" });
   startInventoryClockRefresh();
   attachAdminSummaryCardEvents();
 
@@ -6655,11 +6802,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     applyFilters(true);
     searchInput.focus();
   });
-  document.getElementById("statusFilter").addEventListener("change", () => {
+  document.getElementById("statusFilter")?.addEventListener("change", () => {
     syncAdminSummaryCardState();
     applyFilters(true);
   });
-  document.getElementById("priorityFilter").addEventListener("change", () => applyFilters(true));
+  document.getElementById("priorityFilter")?.addEventListener("change", () => applyFilters(true));
   driverFilter?.addEventListener("change", () => applyFilters(true));
   if(collectionOrderSelect && collectionOrderSelect.dataset.collectionBound !== "true"){
     collectionOrderSelect.addEventListener("change", handleCollectionOrderSelectionChange);
@@ -6691,8 +6838,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   reservationDateFilter?.addEventListener("change", renderInventoryDashboard);
   syncSearchClearButton();
   updateActiveAdminSidebarLink();
-  renderOperationsMapSection();
-  renderCollectionAssignmentSection();
+  safeAdminRenderStep("initial-operations-map", () => renderOperationsMapSection(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("initial-collection-section", () => renderCollectionAssignmentSection(), { source: "dom-content-loaded" });
   document.querySelectorAll(".inventory-sort-btn").forEach((button) => {
     button.addEventListener("click", () => {
       const key = button.dataset.sortKey || "name";
@@ -6820,15 +6967,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     markQuoteDraftDirty();
   });
   quoteHistoryList?.addEventListener("click", handleQuoteHistoryAction);
-  renderCreateItems();
-  populateQuoteBankPresetOptions();
-  wrapInputWithCurrency(quoteDeliveryChargeInput);
-  wrapInputWithSuffix(quoteDiscountInput, "%");
-  syncQuoteModalActionState();
+  safeAdminRenderStep("initial-create-items", () => renderCreateItems(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("populate-quote-bank-presets", () => populateQuoteBankPresetOptions(), { source: "dom-content-loaded" });
+  safeAdminRenderStep("wrap-quote-delivery-charge", () => wrapInputWithCurrency(quoteDeliveryChargeInput), { source: "dom-content-loaded" });
+  safeAdminRenderStep("wrap-quote-discount", () => wrapInputWithSuffix(quoteDiscountInput, "%"), { source: "dom-content-loaded" });
+  safeAdminRenderStep("sync-quote-modal-actions", () => syncQuoteModalActionState(), { source: "dom-content-loaded" });
 });
 
 
-document.getElementById("orderModal").addEventListener("click", (e)=>{
+document.getElementById("orderModal")?.addEventListener("click", (e)=>{
   if(e.target.id === "orderModal"){
     closeOrderModal();
   }

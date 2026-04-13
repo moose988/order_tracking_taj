@@ -1,4 +1,5 @@
 import { db } from "./firebase.js";
+import { CATALOG_PLACEHOLDER_IMAGE, PRODUCTS } from "../data/products.js";
 import {
   collection,
   doc,
@@ -78,12 +79,17 @@ async function loadHomepageReviews(){
     }
 
     reviewsGrid.innerHTML = reviews.map(review => `
-      <article class="review-card">
+      <article class="review-card" data-home-reveal>
         <div class="stars">${"&#9733;".repeat(Number(review.rating) || 0)}</div>
-        <p>${escapeHtml(review.comment || "")}</p>
-        <div class="review-author">${escapeHtml(review.name || "Anonymous")}</div>
+        <p class="review-comment">${escapeHtml(review.comment || "")}</p>
+        <div class="review-meta">
+          <div class="review-author">${escapeHtml(review.name || "Anonymous")}</div>
+          <div class="review-date">${escapeHtml(formatReviewDate(review.createdAt))}</div>
+        </div>
       </article>
     `).join("");
+
+    initHomepageRevealAnimations();
   }catch(error){
     console.error("Failed to load homepage reviews:", error);
     reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
@@ -102,6 +108,20 @@ function getTimestampValue(timestamp){
   return new Date(timestamp).getTime() || 0;
 }
 
+function formatReviewDate(timestamp){
+  const timestampValue = getTimestampValue(timestamp);
+
+  if(!timestampValue){
+    return "Recent review";
+  }
+
+  return new Date(timestampValue).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+}
+
 function escapeHtml(value){
   return String(value)
     .replaceAll("&", "&amp;")
@@ -109,6 +129,190 @@ function escapeHtml(value){
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value){
+  return escapeHtml(value).replaceAll("`", "&#96;");
+}
+
+function normalizeHomeText(value){
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getPreferredCollectionImage(product){
+  const images = Array.isArray(product?.images) ? product.images : [];
+  const preferredImage = images.find((image) => String(image || "").trim() && !String(image).startsWith("data:image/svg+xml"))
+    || images.find((image) => String(image || "").trim())
+    || CATALOG_PLACEHOLDER_IMAGE;
+
+  return preferredImage;
+}
+
+function getHomepageCollectionDefinitions(){
+  return [
+    {
+      category: "Dining Tables",
+      description: "Formal table foundations for weddings, receptions, and elevated dining layouts."
+    },
+    {
+      category: "Chairs",
+      description: "Guest seating selected to feel elegant, polished, and visually balanced across the room."
+    },
+    {
+      category: "Coffee Table",
+      description: "Low-profile accent pieces for lounge scenes, bridal moments, and welcome areas."
+    },
+    {
+      category: "Cocktail Table",
+      description: "Reception-ready standing tables for mingling, hospitality moments, and refined gatherings."
+    },
+    {
+      category: "Bridal Sofa",
+      description: "Statement seating for bridal stages and VIP focal points with graceful presence."
+    },
+    {
+      category: "Majlis Sofa",
+      description: "Majlis-inspired seating for warm hospitality spaces and culturally rich event settings."
+    }
+  ];
+}
+
+function renderHomepageCollections(){
+  const collectionsGrid = document.getElementById("homeCollectionsGrid");
+
+  if(!collectionsGrid){
+    return;
+  }
+
+  const cards = getHomepageCollectionDefinitions().map((definition) => {
+    const matchingProducts = PRODUCTS.filter((product) => normalizeHomeText(product.category) === normalizeHomeText(definition.category));
+    const featuredProduct = matchingProducts[0] || null;
+    const image = getPreferredCollectionImage(featuredProduct);
+    const itemsCount = matchingProducts.length;
+    const collectionHref = `order.html?category=${encodeURIComponent(definition.category)}`;
+    const altText = featuredProduct?.name
+      ? `${featuredProduct.name} from the ${definition.category} collection`
+      : `${definition.category} collection preview`;
+
+    return `
+      <a class="home-collection-card" href="${escapeAttribute(collectionHref)}" aria-label="${escapeAttribute(`Explore ${definition.category}`)}" data-home-reveal>
+        <div class="home-collection-media">
+          <img
+            src="${escapeAttribute(image)}"
+            alt="${escapeAttribute(altText)}"
+            loading="lazy"
+            onerror="this.onerror=null;this.src='${escapeAttribute(CATALOG_PLACEHOLDER_IMAGE)}';"
+          />
+        </div>
+        <div class="home-collection-copy">
+          <h3>${escapeHtml(definition.category)}</h3>
+          <p>${escapeHtml(definition.description)}</p>
+          <span class="home-collection-link">View Collection</span>
+        </div>
+      </a>
+    `;
+  });
+
+  collectionsGrid.innerHTML = cards.join("");
+}
+
+function initHomepageRevealAnimations(){
+  const revealItems = Array.from(document.querySelectorAll("[data-home-reveal]"));
+
+  if(!revealItems.length){
+    return;
+  }
+
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+    revealItems.forEach((item) => item.classList.add("home-is-visible"));
+    return;
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if(entry.isIntersecting){
+        entry.target.classList.add("home-is-visible");
+        observer.unobserve(entry.target);
+      }
+    });
+  }, {
+    threshold: 0.16,
+    rootMargin: "0px 0px -8% 0px"
+  });
+
+  revealItems.forEach((item, index) => {
+    item.style.transitionDelay = `${Math.min(index * 45, 180)}ms`;
+    observer.observe(item);
+  });
+}
+
+function initHomepageHeroScrollEffect(){
+  if(!document.body.classList.contains("home-page")){
+    return;
+  }
+
+  let isTicking = false;
+
+  const updateHeroProgress = () => {
+    const maxScroll = Math.max(window.innerHeight * 0.92, 1);
+    const progress = Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+    document.body.style.setProperty("--home-hero-progress", progress.toFixed(3));
+    isTicking = false;
+  };
+
+  updateHeroProgress();
+
+  window.addEventListener("scroll", () => {
+    if(isTicking){
+      return;
+    }
+
+    isTicking = true;
+    window.requestAnimationFrame(updateHeroProgress);
+  }, { passive: true });
+
+  window.addEventListener("resize", updateHeroProgress);
+}
+
+function initHomepageHeaderScrollState(){
+  if(!document.body.classList.contains("home-page")){
+    return;
+  }
+
+  const header = document.querySelector(".site-header");
+
+  if(!header){
+    return;
+  }
+
+  let isTicking = false;
+
+  const syncHeaderState = () => {
+    header.classList.toggle("scrolled", window.scrollY > 80);
+    isTicking = false;
+  };
+
+  syncHeaderState();
+
+  window.addEventListener("scroll", () => {
+    if(isTicking){
+      return;
+    }
+
+    isTicking = true;
+    window.requestAnimationFrame(syncHeaderState);
+  }, { passive: true });
+}
+
+function initHomepageExperience(){
+  if(!document.body.classList.contains("home-page")){
+    return;
+  }
+
+  renderHomepageCollections();
+  initHomepageRevealAnimations();
+  initHomepageHeroScrollEffect();
+  initHomepageHeaderScrollState();
 }
 
 let order = [];
@@ -121,19 +325,27 @@ function initMobileMenu(){
     return;
   }
 
+  const syncMenuState = (isOpen) => {
+    navLinks.classList.toggle("active", isOpen);
+    menuBtn.setAttribute("aria-expanded", String(isOpen));
+    document.body.classList.toggle("mobile-nav-open", isOpen && window.innerWidth <= 760);
+  };
+
+  menuBtn.setAttribute("aria-expanded", "false");
+
   menuBtn.addEventListener("click", () => {
-    navLinks.classList.toggle("active");
+    syncMenuState(!navLinks.classList.contains("active"));
   });
 
   navLinks.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => {
-      navLinks.classList.remove("active");
+      syncMenuState(false);
     });
   });
 
   window.addEventListener("resize", () => {
     if(window.innerWidth > 760){
-      navLinks.classList.remove("active");
+      syncMenuState(false);
     }
   });
 }
@@ -248,6 +460,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initMobileMenu();
   loadHomepageReviews();
+  initHomepageExperience();
 
   const list = document.getElementById("quoteItemsList");
   const clearButton = document.getElementById("quoteClearAllBtn");
@@ -366,6 +579,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const notes = document.getElementById("eventNotes").value;
     const destinationLocation = quoteLocationBinding?.getDestinationLocation() || null;
 
+    if(!mapLink){
+      alert("Please provide the Google Maps link for the event location.");
+      document.getElementById("mapLink")?.focus();
+      return;
+    }
+
     const orderId = await generateOrderId();
 
     await setDoc(doc(db, "orders", orderId), {
@@ -377,7 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
       eventTime: time,
       setupTime,
       eventLocation: location,
-      mapLink: mapLink || "",
+      mapLink,
       notes: notes || "",
       items: order,
       priority: "normal",
@@ -401,7 +620,7 @@ Event Time: ${time}
 Setup Time: ${setupTime}
 
 Location: ${location}
-Map: ${mapLink || "Not provided"}
+Map: ${mapLink}
 
 Items:
 ${itemsText}

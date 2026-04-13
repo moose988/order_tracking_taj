@@ -2,6 +2,9 @@ import { db } from "./firebase.js";
 import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const reviewsGrid = document.getElementById("reviewsGrid");
+const filterButtons = Array.from(document.querySelectorAll(".reviews-filter-btn"));
+let allReviews = [];
+let activeFilter = "all";
 
 function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
@@ -11,19 +14,27 @@ function initMobileMenu(){
     return;
   }
 
+  const syncMenuState = (isOpen) => {
+    navLinks.classList.toggle("active", isOpen);
+    menuBtn.setAttribute("aria-expanded", String(isOpen));
+    document.body.classList.toggle("mobile-nav-open", isOpen && window.innerWidth <= 760);
+  };
+
+  menuBtn.setAttribute("aria-expanded", "false");
+
   menuBtn.addEventListener("click", () => {
-    navLinks.classList.toggle("active");
+    syncMenuState(!navLinks.classList.contains("active"));
   });
 
   navLinks.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => {
-      navLinks.classList.remove("active");
+      syncMenuState(false);
     });
   });
 
   window.addEventListener("resize", () => {
     if(window.innerWidth > 760){
-      navLinks.classList.remove("active");
+      syncMenuState(false);
     }
   });
 }
@@ -37,11 +48,11 @@ async function loadReviews(){
 
   try{
     const snapshot = await getDocs(collection(db, "reviews"));
-    const reviews = snapshot.docs
+    allReviews = snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .sort((first, second) => getTimestampValue(second.createdAt) - getTimestampValue(first.createdAt));
 
-    renderReviews(reviews);
+    applyActiveFilter();
   }catch(error){
     console.error("Failed to load reviews:", error);
     reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
@@ -65,6 +76,35 @@ function renderReviews(reviews){
       </div>
     </article>
   `).join("");
+}
+
+function applyActiveFilter(){
+  let reviews = [...allReviews];
+
+  if(activeFilter === "five-star"){
+    reviews = reviews.filter((review) => Number(review.rating) === 5);
+  }else if(activeFilter === "recent"){
+    reviews = reviews
+      .filter((review) => getTimestampValue(review.createdAt) > 0)
+      .sort((first, second) => getTimestampValue(second.createdAt) - getTimestampValue(first.createdAt));
+  }
+
+  renderReviews(reviews);
+}
+
+function initReviewFilters(){
+  if(!filterButtons.length){
+    return;
+  }
+
+  filterButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      activeFilter = button.dataset.filter || "all";
+
+      filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+      applyActiveFilter();
+    });
+  });
 }
 
 function getTimestampValue(timestamp){
@@ -106,5 +146,6 @@ function escapeHtml(value){
 
 document.addEventListener("DOMContentLoaded", () => {
   initMobileMenu();
+  initReviewFilters();
   loadReviews();
 });

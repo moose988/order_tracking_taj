@@ -63,19 +63,27 @@ function initMobileMenu(){
     return;
   }
 
+  const syncMenuState = (isOpen) => {
+    navLinks.classList.toggle("active", isOpen);
+    menuBtn.setAttribute("aria-expanded", String(isOpen));
+    document.body.classList.toggle("mobile-nav-open", isOpen && window.innerWidth <= 760);
+  };
+
+  menuBtn.setAttribute("aria-expanded", "false");
+
   menuBtn.addEventListener("click", () => {
-    navLinks.classList.toggle("active");
+    syncMenuState(!navLinks.classList.contains("active"));
   });
 
   navLinks.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => {
-      navLinks.classList.remove("active");
+      syncMenuState(false);
     });
   });
 
   window.addEventListener("resize", () => {
     if(window.innerWidth > 760){
-      navLinks.classList.remove("active");
+      syncMenuState(false);
     }
   });
 }
