@@ -2611,10 +2611,15 @@ async function startDelivery(orderId){
   renderDriverDashboard();
 
   try{
+    const deliveryLifecyclePatch = getTimestampValue(order.outForDeliveryAt)
+      ? {}
+      : { outForDeliveryAt: serverTimestamp() };
+
     await updateDoc(doc(db, "orders", orderId), {
       status: "out-for-delivery",
       driver: getAssignedDriverMeta(order),
-      driverLocation: null
+      driverLocation: null,
+      ...deliveryLifecyclePatch
     });
 
     setDashboardMessage("statusBanner.startSuccess", "success", {
@@ -2825,11 +2830,15 @@ async function finishOrder(orderId){
   renderDriverDashboard();
 
   try{
+    const deliveredLifecyclePatch = getTimestampValue(order.deliveredAt)
+      ? {}
+      : { deliveredAt: serverTimestamp() };
+
     await updateDoc(doc(db, "orders", orderId), {
       status: "delivered",
       driver: getAssignedDriverMeta(order),
       driverLocation: null,
-      deliveredAt: new Date()
+      ...deliveredLifecyclePatch
     });
 
     setDashboardMessage("statusBanner.finishSuccess", "success", {

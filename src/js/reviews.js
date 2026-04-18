@@ -1,5 +1,5 @@
 import { db } from "./firebase.js";
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const reviewsGrid = document.getElementById("reviewsGrid");
 const filterButtons = Array.from(document.querySelectorAll(".reviews-filter-btn"));
@@ -47,10 +47,17 @@ async function loadReviews(){
   reviewsGrid.innerHTML = '<div class="empty-state">Loading reviews...</div>';
 
   try{
-    const snapshot = await getDocs(collection(db, "reviews"));
-    allReviews = snapshot.docs
-      .map(doc => ({ id: doc.id, ...doc.data() }))
-      .sort((first, second) => getTimestampValue(second.createdAt) - getTimestampValue(first.createdAt));
+    try{
+      const orderedReviewsQuery = query(collection(db, "reviews"), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(orderedReviewsQuery);
+      allReviews = snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }));
+    }catch(queryError){
+      console.warn("Falling back to client-side review sorting:", queryError);
+      const snapshot = await getDocs(collection(db, "reviews"));
+      allReviews = snapshot.docs
+        .map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }))
+        .sort((first, second) => getTimestampValue(second.createdAt) - getTimestampValue(first.createdAt));
+    }
 
     applyActiveFilter();
   }catch(error){
@@ -69,7 +76,7 @@ function renderReviews(reviews){
     <article class="review-card">
       <div class="stars">${"&#9733;".repeat(Number(review.rating) || 0)}</div>
       <p class="review-comment">${escapeHtml(review.comment || "")}</p>
-      ${review.imageUrl ? `<img class="review-image" src="${review.imageUrl}" alt="Customer review photo">` : ""}
+      ${review.imageUrl ? `<img class="review-image" src="${escapeAttribute(review.imageUrl)}" alt="Customer review photo" loading="lazy" decoding="async">` : ""}
       <div class="review-meta">
         <div class="review-author">${escapeHtml(review.name || "Anonymous")}</div>
         <div class="review-date">${formatReviewDate(review.createdAt)}</div>
@@ -84,9 +91,7 @@ function applyActiveFilter(){
   if(activeFilter === "five-star"){
     reviews = reviews.filter((review) => Number(review.rating) === 5);
   }else if(activeFilter === "recent"){
-    reviews = reviews
-      .filter((review) => getTimestampValue(review.createdAt) > 0)
-      .sort((first, second) => getTimestampValue(second.createdAt) - getTimestampValue(first.createdAt));
+    reviews = reviews.filter((review) => getTimestampValue(review.createdAt) > 0);
   }
 
   renderReviews(reviews);
@@ -142,6 +147,10 @@ function escapeHtml(value){
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value){
+  return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
 document.addEventListener("DOMContentLoaded", () => {

@@ -5,6 +5,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc
@@ -67,11 +70,24 @@ async function loadHomepageReviews(){
   reviewsGrid.innerHTML = '<div class="empty-state">Loading reviews...</div>';
 
   try{
-    const snapshot = await getDocs(collection(db, "reviews"));
-    const reviews = snapshot.docs
-      .map(item => ({ id: item.id, ...item.data() }))
-      .sort((first, second) => getTimestampValue(second.createdAt) - getTimestampValue(first.createdAt))
-      .slice(0, 3);
+    let reviews = [];
+
+    try{
+      const latestReviewsQuery = query(
+        collection(db, "reviews"),
+        orderBy("createdAt", "desc"),
+        limit(3)
+      );
+      const snapshot = await getDocs(latestReviewsQuery);
+      reviews = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    }catch(queryError){
+      console.warn("Falling back to full reviews fetch for homepage preview:", queryError);
+      const snapshot = await getDocs(collection(db, "reviews"));
+      reviews = snapshot.docs
+        .map((item) => ({ id: item.id, ...item.data() }))
+        .sort((first, second) => getTimestampValue(second.createdAt) - getTimestampValue(first.createdAt))
+        .slice(0, 3);
+    }
 
     if(reviews.length === 0){
       reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
@@ -148,6 +164,25 @@ function getPreferredCollectionImage(product){
   return preferredImage;
 }
 
+function getHomepageCollectionImageClasses(category){
+  const classes = ["home-collection-image"];
+  const normalizedCategory = normalizeHomeText(category);
+
+  if(normalizedCategory === normalizeHomeText("Dining Tables")){
+    classes.push("home-collection-image-dining");
+  }
+
+  if(normalizedCategory === normalizeHomeText("Bridal Sofa") || normalizedCategory === normalizeHomeText("Majlis Sofa")){
+    classes.push("home-collection-image-sofa");
+  }
+
+  if(normalizedCategory === normalizeHomeText("Chairs")){
+    classes.push("home-collection-image-chair");
+  }
+
+  return classes.join(" ");
+}
+
 function getHomepageCollectionDefinitions(){
   return [
     {
@@ -198,9 +233,12 @@ function renderHomepageCollections(){
       <a class="home-collection-card" href="${escapeAttribute(collectionHref)}" aria-label="${escapeAttribute(`Explore ${definition.category}`)}" data-home-reveal>
         <div class="home-collection-media">
           <img
+            class="${escapeAttribute(getHomepageCollectionImageClasses(definition.category))}"
             src="${escapeAttribute(image)}"
             alt="${escapeAttribute(altText)}"
             loading="lazy"
+            decoding="async"
+            fetchpriority="low"
             onerror="this.onerror=null;this.src='${escapeAttribute(CATALOG_PLACEHOLDER_IMAGE)}';"
           />
         </div>
@@ -316,6 +354,32 @@ function initHomepageExperience(){
 }
 
 let order = [];
+const QUOTE_SUCCESS_STORAGE_KEY = "tajQuoteSuccess";
+
+function buildQuoteSuccessUrl(orderId){
+  const params = new URLSearchParams();
+
+  if(orderId){
+    params.set("id", String(orderId));
+  }
+
+  return `quote-success.html${params.toString() ? `?${params.toString()}` : ""}`;
+}
+
+function saveQuoteSuccessState(payload){
+  if(typeof window === "undefined"){
+    return;
+  }
+
+  try{
+    sessionStorage.setItem(QUOTE_SUCCESS_STORAGE_KEY, JSON.stringify({
+      ...payload,
+      savedAt: Date.now()
+    }));
+  }catch(error){
+    console.warn("Unable to store quote success state:", error);
+  }
+}
 
 function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
@@ -559,55 +623,68 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
+    const submitButton = document.getElementById("quoteSubmitBtn");
+    const originalButtonText = submitButton?.textContent || "Submit Request";
+
+    if(submitButton){
+      submitButton.disabled = true;
+      submitButton.textContent = "Submitting...";
+    }
+
     const order = JSON.parse(localStorage.getItem("tajOrder")) || [];
 
     if(order.length === 0){
       alert("Add items first.");
+      if(submitButton){
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+      }
       return;
     }
 
-    const name = document.getElementById("customerName").value;
-    const phone = document.getElementById("customerPhone").value;
-    const date = document.getElementById("eventDate").value;
-    const rentalDays = getRentalDaysValue();
-    const rawTime = document.getElementById("eventTime").value;
-    const time = formatTimeTo12Hour(rawTime);
-    const rawSetupTime = document.getElementById("setupTime").value;
-    const setupTime = formatTimeTo12Hour(rawSetupTime);
-    const location = document.getElementById("eventLocation").value;
-    const mapLink = normalizeGoogleMapsLink(document.getElementById("mapLink").value);
-    const notes = document.getElementById("eventNotes").value;
-    const destinationLocation = quoteLocationBinding?.getDestinationLocation() || null;
+    try{
+      const name = document.getElementById("customerName").value;
+      const phone = document.getElementById("customerPhone").value;
+      const date = document.getElementById("eventDate").value;
+      const rentalDays = getRentalDaysValue();
+      const rawTime = document.getElementById("eventTime").value;
+      const time = formatTimeTo12Hour(rawTime);
+      const rawSetupTime = document.getElementById("setupTime").value;
+      const setupTime = formatTimeTo12Hour(rawSetupTime);
+      const location = document.getElementById("eventLocation").value;
+      const mapLink = normalizeGoogleMapsLink(document.getElementById("mapLink").value);
+      const notes = document.getElementById("eventNotes").value;
+      const destinationLocation = quoteLocationBinding?.getDestinationLocation() || null;
 
-    if(!mapLink){
-      alert("Please provide the Google Maps link for the event location.");
-      document.getElementById("mapLink")?.focus();
-      return;
-    }
+      if(!mapLink){
+        alert("Please provide the Google Maps link for the event location.");
+        document.getElementById("mapLink")?.focus();
+        return;
+      }
 
-    const orderId = await generateOrderId();
+      const orderId = await generateOrderId();
 
-    await setDoc(doc(db, "orders", orderId), {
-      orderId,
-      customerName: name,
-      phone,
-      eventDate: date,
-      rentalDays,
-      eventTime: time,
-      setupTime,
-      eventLocation: location,
-      mapLink,
-      notes: notes || "",
-      items: order,
-      priority: "normal",
-      status: "quote-requested",
-      createdAt: serverTimestamp(),
-      ...(destinationLocation ? { destinationLocation } : {})
-    });
+      await setDoc(doc(db, "orders", orderId), {
+        orderId,
+        customerName: name,
+        phone,
+        eventDate: date,
+        rentalDays,
+        eventTime: time,
+        setupTime,
+        eventLocation: location,
+        mapLink,
+        notes: notes || "",
+        items: order,
+        priority: "normal",
+        status: "quote-requested",
+        createdAt: serverTimestamp(),
+        ...(destinationLocation ? { destinationLocation } : {})
+      });
 
-    const itemsText = order.map(item => `${item.name} x${item.quantity}`).join("\n");
+      const itemsText = order.map(item => `${item.name} x${item.quantity}`).join("\n");
 
-    const message = `Quote Request - Al Taj Al Malaky
+      const message = `Quote Request - Al Taj Al Malaky
 
 Order ID: ${orderId}
 
@@ -629,7 +706,24 @@ Notes:
 ${notes || "None"}
 `;
 
-    const url = `https://wa.me/971505373383?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+      const whatsappUrl = `https://wa.me/971505373383?text=${encodeURIComponent(message)}`;
+      saveQuoteSuccessState({
+        orderId,
+        customerName: name,
+        whatsappUrl
+      });
+
+      localStorage.removeItem("tajOrder");
+      window.open(whatsappUrl, "_blank", "noopener");
+      window.location.href = buildQuoteSuccessUrl(orderId);
+    }catch(error){
+      console.error("Quote submission failed:", error);
+      alert("We couldn't submit your request right now. Please try again.");
+    }finally{
+      if(submitButton){
+        submitButton.disabled = false;
+        submitButton.textContent = originalButtonText;
+      }
+    }
   });
 });

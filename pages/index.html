@@ -4,13 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Al Taj Al Malaky Parties & Events Management</title>
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
   <link rel="stylesheet" href="../src/css/styles.css" />
 </head>
 <body class="home-page">
   <header class="site-header">
     <div class="container navbar">
       <a href="index.html" class="brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" />
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" width="54" height="54" decoding="async" />
         <div class="brand-copy">
           <h2>Al Taj Al Malaky</h2>
           <span>Luxury Event Setup & Rental</span>
@@ -105,15 +107,15 @@
 
         <div class="home-showcase-grid">
           <article class="home-showcase-card is-primary" data-home-reveal>
-            <img src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1400&q=80" alt="Formal event dining arrangement with luxury styling" loading="eager" />
+            <img src="https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&w=1400&q=80" alt="Formal event dining arrangement with luxury styling" loading="eager" decoding="async" fetchpriority="high" />
           </article>
 
           <article class="home-showcase-card" data-home-reveal>
-            <img src="https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=80" alt="Refined lounge event setup" loading="lazy" />
+            <img src="https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&w=1200&q=80" alt="Refined lounge event setup" loading="lazy" decoding="async" fetchpriority="low" />
           </article>
 
           <article class="home-showcase-card" data-home-reveal>
-            <img src="https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80" alt="Luxury celebration details and premium event atmosphere" loading="lazy" />
+            <img src="https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80" alt="Luxury celebration details and premium event atmosphere" loading="lazy" decoding="async" fetchpriority="low" />
           </article>
         </div>
       </div>
@@ -199,41 +201,27 @@
   </main>
 
   <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div>
-          <div class="footer-brand">
-            <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" />
-            <div>
-              <h4>Al Taj Al Malaky Parties & Events Management</h4>
-              <p>Luxury Event Setup & Rental</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h4>Explore</h4>
-          <div class="footer-links">
-            <a href="order.html">Browse Collection</a>
-            <a href="reviews.html">Client Reviews</a>
-            <a href="track.html">Track Your Order</a>
-          </div>
-        </div>
-
-        <div>
-          <h4>Contact</h4>
-          <div class="footer-links">
-            <a href="https://wa.me/971505373383" target="_blank">WhatsApp</a>
-            <a href="https://instagram.com/taj_almalaki" target="_blank">@taj_almalaki</a>
-          </div>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
+        <div class="footer-brand-copy">
+          <h4>Al Taj Al Malaky Parties &amp; Events Management</h4>
+          <p>Luxury Event Setup &amp; Rental</p>
         </div>
       </div>
 
-      <div class="copyright">
-        © <span class="current-year"></span> Al Taj Al Malaky Parties & Events Management. All rights reserved.
+      <div class="footer-links footer-links-inline">
+        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer">WhatsApp</a>
+        <a href="https://instagram.com/taj_almalaki" target="_blank" rel="noreferrer">@taj_almalaki</a>
       </div>
     </div>
-  </footer>
+
+    <div class="copyright">
+      &copy; <span class="current-year"></span> Al Taj Al Malaky Parties &amp; Events Management. All rights reserved.
+    </div>
+  </div>
+</footer>
 
   <script type="module" src="../src/js/main.js"></script>
 </body>

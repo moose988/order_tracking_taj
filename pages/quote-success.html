@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Request Received | Al Taj Al Malaky</title>
+  <link rel="stylesheet" href="../src/css/styles.css" />
+</head>
+<body class="quote-success-page">
+  <header class="site-header">
+    <div class="container navbar">
+      <a href="index.html" class="brand">
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" />
+        <div class="brand-copy">
+          <h2>Al Taj Al Malaky</h2>
+          <span>Luxury Event Setup & Rental</span>
+        </div>
+      </a>
+
+      <nav class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="order.html">Order</a>
+        <a href="track.html">Track Order</a>
+        <a href="reviews.html">Reviews</a>
+      </nav>
+
+      <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
+    </div>
+  </header>
+
+  <main class="page-section quote-success-main">
+    <div class="quote-success-ambience" aria-hidden="true"></div>
+    <div class="container">
+      <section class="quote-success-shell" aria-live="polite">
+        <article class="quote-success-primary">
+          <div class="quote-success-mark" aria-hidden="true">
+            <span></span>
+          </div>
+
+          <div class="quote-success-copy">
+            <p class="quote-success-kicker">Request Confirmed</p>
+            <h1>Your quote request has been received</h1>
+            <p>
+              Thank you for choosing Al Taj Al Malaky. Our team will review your request and contact you shortly to finalize the next steps.
+            </p>
+          </div>
+        </article>
+
+        <aside class="quote-success-secondary">
+          <div class="quote-success-order-id">
+            <span>Order ID</span>
+            <strong id="quoteSuccessOrderId">-</strong>
+          </div>
+
+          <div class="quote-success-next-steps">
+            <h2>What happens next</h2>
+            <ul>
+              <li>Save your order ID to track your request status.</li>
+              <li>Our team reviews your selected items and event details.</li>
+              <li>You can continue the conversation directly on WhatsApp anytime.</li>
+            </ul>
+          </div>
+
+          <div class="quote-success-actions">
+            <a id="quoteSuccessTrackBtn" class="btn btn-primary" href="track.html">Track Order</a>
+            <a class="btn btn-secondary" href="order.html">Browse Collection</a>
+            <a class="btn btn-secondary" href="index.html">Back to Home</a>
+          </div>
+
+          <div class="quote-success-whatsapp" id="quoteSuccessWhatsAppWrap" hidden>
+            <a id="quoteSuccessWhatsAppBtn" class="btn btn-dark" href="https://wa.me/971505373383" target="_blank" rel="noreferrer">
+              Continue to WhatsApp
+            </a>
+          </div>
+        </aside>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
+        <div class="footer-brand-copy">
+          <h4>Al Taj Al Malaky Parties &amp; Events Management</h4>
+          <p>Luxury Event Setup &amp; Rental</p>
+        </div>
+      </div>
+
+      <div class="footer-links footer-links-inline">
+        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer">WhatsApp</a>
+        <a href="https://instagram.com/taj_almalaki" target="_blank" rel="noreferrer">@taj_almalaki</a>
+      </div>
+    </div>
+
+    <div class="copyright">
+      &copy; <span class="current-year"></span> Al Taj Al Malaky Parties &amp; Events Management. All rights reserved.
+    </div>
+  </div>
+</footer>
+
+  <script>
+    (function(){
+      const storageKey = "tajQuoteSuccess";
+      const orderIdEl = document.getElementById("quoteSuccessOrderId");
+      const trackBtn = document.getElementById("quoteSuccessTrackBtn");
+      const whatsappWrap = document.getElementById("quoteSuccessWhatsAppWrap");
+      const whatsappBtn = document.getElementById("quoteSuccessWhatsAppBtn");
+      const params = new URLSearchParams(window.location.search);
+      const paramOrderId = (params.get("id") || "").trim();
+      let successState = null;
+
+      try{
+        successState = JSON.parse(sessionStorage.getItem(storageKey) || "null");
+      }catch(error){
+        successState = null;
+      }
+
+      const stateOrderId = String(successState?.orderId || "").trim();
+      const orderId = paramOrderId || stateOrderId;
+      const canUseStoredWhatsApp = Boolean(successState) && (!paramOrderId || stateOrderId === paramOrderId);
+      const whatsappUrl = canUseStoredWhatsApp ? String(successState?.whatsappUrl || "").trim() : "";
+
+      orderIdEl.textContent = orderId || "Not available";
+
+      if(orderId){
+        trackBtn.href = `track.html?id=${encodeURIComponent(orderId)}`;
+      }else{
+        trackBtn.href = "track.html";
+      }
+
+      if(whatsappUrl){
+        whatsappBtn.href = whatsappUrl;
+        whatsappWrap.hidden = false;
+      }else if(orderId){
+        const message = `Hello, I would like to continue with order ${orderId}.`;
+        whatsappBtn.href = `https://wa.me/971505373383?text=${encodeURIComponent(message)}`;
+        whatsappWrap.hidden = false;
+      }
+
+      if(successState){
+        sessionStorage.removeItem(storageKey);
+      }
+    })();
+  </script>
+  <script type="module" src="../src/js/main.js"></script>
+</body>
+</html>

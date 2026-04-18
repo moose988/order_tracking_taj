@@ -140,6 +140,9 @@ const inventoryTableBody = document.getElementById("inventoryTableBody");
 const inventorySearchInput = document.getElementById("inventorySearchInput");
 const inventorySourceFilter = document.getElementById("inventorySourceFilter");
 const inventoryStatusFilter = document.getElementById("inventoryStatusFilter");
+const inventoryPrevPageBtn = document.getElementById("inventoryPrevPage");
+const inventoryNextPageBtn = document.getElementById("inventoryNextPage");
+const inventoryPageInfo = document.getElementById("inventoryPageInfo");
 const addInventoryItemBtn = document.getElementById("addInventoryItemBtn");
 const reservationDateFilter = document.getElementById("reservationDateFilter");
 const upcomingReservationsBody = document.getElementById("upcomingReservationsBody");
@@ -219,6 +222,22 @@ let currentInventorySort = {
   key: "name",
   direction: "asc"
 };
+let inventoryCurrentPage = 1;
+const inventoryRowsPerPage = 10;
+const ORDER_LIFECYCLE_FIELD_BY_STATUS = Object.freeze({
+  "quote-sent": "quoteSentAt",
+  confirmed: "confirmedAt",
+  preparing: "preparingAt",
+  "out-for-delivery": "outForDeliveryAt",
+  delivered: "deliveredAt",
+  collected: "collectedAt",
+  cancelled: "cancelledAt"
+});
+const ORDER_LIFECYCLE_FIELD_BY_ACTION = Object.freeze({
+  "quote-sent": "quoteSentAt",
+  "driver-assigned": "driverAssignedAt",
+  "collection-requested": "collectionRequestedAt"
+});
 const PRODUCT_CATEGORIES = getProductCategories();
 const PRODUCTS_BY_CATEGORY = buildProductsByCategory();
 const PRODUCTS_BY_ID = buildProductsById();
@@ -230,18 +249,41 @@ const DRIVER_LOCATION_LIVE_THRESHOLD_MS = 5 * 60 * 1000;
 const DEFAULT_RENTAL_DAYS = 1;
 const DEFAULT_LOW_STOCK_THRESHOLD = 1;
 const CATALOG_INVENTORY_DEMO_STOCK = {
-  "Round Dining Table": { totalStock: 18, damagedStock: 1, lowStockThreshold: 4 },
-  "Rectangular Dining Table": { totalStock: 5, damagedStock: 1, lowStockThreshold: 4 },
+  "Dining Table 1": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 2": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 3": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 4": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 5": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 6": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 7": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 8": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 9": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 10": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 11": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 12": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 13": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 14": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 15": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 16": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 17": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 18": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Dining Table 19": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "White Chair": { totalStock: 72, damagedStock: 6, lowStockThreshold: 14 },
   "Gold Chair": { totalStock: 12, damagedStock: 3, lowStockThreshold: 9 },
-  "Bridal Sofa": { totalStock: 4, damagedStock: 0, lowStockThreshold: 1 },
-  "Coffee Table": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
-  "Cocktail Table": { totalStock: 12, damagedStock: 0, lowStockThreshold: 3 },
-  "Majlis Sofa": { totalStock: 6, damagedStock: 0, lowStockThreshold: 2 }
+  "Bridal Sofa 1": { totalStock: 4, damagedStock: 0, lowStockThreshold: 1 },
+  "Coffee Table 1": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
+  "Cocktail Table 1": { totalStock: 12, damagedStock: 0, lowStockThreshold: 3 },
+  "Sofa 1": { totalStock: 6, damagedStock: 0, lowStockThreshold: 2 }
 };
 const LEGACY_CATALOG_PRODUCT_NAMES = new Map([
-  ["round table", "Round Dining Table"],
-  ["rectangular table", "Rectangular Dining Table"]
+  ["round table", "Dining Table 1"],
+  ["round dining table", "Dining Table 1"],
+  ["rectangular table", "Dining Table 2"],
+  ["rectangular dining table", "Dining Table 2"],
+  ["bridal sofa", "Bridal Sofa 1"],
+  ["majlis sofa", "Sofa 1"],
+  ["coffee table", "Coffee Table 1"],
+  ["cocktail table", "Cocktail Table 1"]
 ]);
 
 function safeAdminRenderStep(step, renderStep, meta = {}){
@@ -1075,6 +1117,40 @@ function getCatalogInventoryDemoStock(product){
 
   if(explicitStock){
     return explicitStock;
+  }
+
+  const normalizedCategory = normalizeInventoryText(product.category);
+
+  if(normalizedCategory === normalizeInventoryText("Bridal Sofa")){
+    return {
+      totalStock: 4,
+      damagedStock: 0,
+      lowStockThreshold: 1
+    };
+  }
+
+  if(normalizedCategory === normalizeInventoryText("Majlis Sofa")){
+    return {
+      totalStock: 6,
+      damagedStock: 0,
+      lowStockThreshold: 2
+    };
+  }
+
+  if(normalizedCategory === normalizeInventoryText("Coffee Table")){
+    return {
+      totalStock: 10,
+      damagedStock: 0,
+      lowStockThreshold: 2
+    };
+  }
+
+  if(normalizedCategory === normalizeInventoryText("Cocktail Table")){
+    return {
+      totalStock: 12,
+      damagedStock: 0,
+      lowStockThreshold: 3
+    };
   }
 
   const isChair = normalizeInventoryText(product.category).includes("chair");
@@ -3097,6 +3173,9 @@ async function handleSendCollectionRequest(){
     const locationLink = getOrderMapUrl(latestOrder) || "";
     const message = buildCollectionRequestMessage(latestOrder, selectedDriver, requestNote);
     const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
+    const collectionLifecyclePatch = buildOrderLifecyclePatch(latestOrder, {
+      actionTypes: ["collection-requested"]
+    });
 
     await updateDoc(doc(db, "orders", latestOrder.id), {
       collectionRequest: {
@@ -3110,7 +3189,8 @@ async function handleSendCollectionRequest(){
         pickupTime,
         pickupTimeLabel,
         locationLink
-      }
+      },
+      ...collectionLifecyclePatch
     });
 
     const localOrderIndex = allOrders.findIndex((order) => order.id === latestOrder.id);
@@ -3129,7 +3209,8 @@ async function handleSendCollectionRequest(){
           pickupTime,
           pickupTimeLabel,
           locationLink
-        }
+        },
+        ...(collectionLifecyclePatch.collectionRequestedAt ? { collectionRequestedAt: new Date() } : {})
       };
     }
 
@@ -3222,8 +3303,13 @@ function attachEvents(){
         await ensureInventoryItemsForOrderItems(order?.items || []);
       }
 
-      await updateDoc(doc(db, "orders", orderId), {
+      const lifecyclePatch = buildOrderLifecyclePatch(order || {}, {
         status: newStatus
+      });
+
+      await updateDoc(doc(db, "orders", orderId), {
+        status: newStatus,
+        ...lifecyclePatch
       });
       showToast("Status updated");
     });
@@ -3748,7 +3834,7 @@ function getOrderTimelineConfig(order){
     { key: "collectedAt", label: "Collected" }
   ];
 
-  if(order?.cancelledAt){
+  if(order?.cancelledAt || normalizeOrderStatusValue(order?.status) === "cancelled"){
     timeline.push({ key: "cancelledAt", label: "Cancelled" });
   }
 
@@ -4586,6 +4672,7 @@ async function handleGenerateQuote(){
   setQuoteBuilderStatus("Generating PDF and saving quote version...", "loading");
 
   try{
+    const latestQuoteOrder = await getLatestOrderData(currentQuoteOrder) || currentQuoteOrder;
     const version = getNextQuoteVersion();
     const quoteRecord = buildQuoteRecord(draft, version);
     const pdfBlob = await generateQuotePdfBlob(quoteRecord);
@@ -4598,13 +4685,17 @@ async function handleGenerateQuote(){
         generatedLocally: true
       }
     };
+    const lifecyclePatch = buildOrderLifecyclePatch(latestQuoteOrder || {}, {
+      status: "quote-sent",
+      actionTypes: ["quote-sent"]
+    });
 
     await Promise.all([
-      setDoc(doc(db, "orders", currentQuoteOrder.id, "quotes", `v${version}`), {
+      setDoc(doc(db, "orders", latestQuoteOrder.id, "quotes", `v${version}`), {
         ...quotePayload,
         generatedAt: serverTimestamp()
       }),
-      updateDoc(doc(db, "orders", currentQuoteOrder.id), {
+      updateDoc(doc(db, "orders", latestQuoteOrder.id), {
         status: "quote-sent",
         rentalDays: quotePayload.rentalDays,
         quoteVersionCounter: version,
@@ -4616,7 +4707,8 @@ async function handleGenerateQuote(){
         latestQuoteGrandTotal: quotePayload.grandTotal,
         latestQuoteBankPresetId: quotePayload.bankPresetId,
         latestQuoteDiscountPercentage: quotePayload.discountPercentage,
-        latestQuoteDiscountAmount: quotePayload.discountAmount
+        latestQuoteDiscountAmount: quotePayload.discountAmount,
+        ...lifecyclePatch
       })
     ]);
 
@@ -4906,6 +4998,34 @@ function normalizeInventoryText(value){
 
 function normalizeOrderStatusValue(value){
   return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function addLifecycleTimestampIfMissing(patch, order, fieldName){
+  if(!fieldName || patch[fieldName] !== undefined){
+    return;
+  }
+
+  if(getTimestampValue(order?.[fieldName])){
+    return;
+  }
+
+  patch[fieldName] = serverTimestamp();
+}
+
+function buildOrderLifecyclePatch(order = {}, options = {}){
+  const patch = {};
+  const nextStatus = normalizeOrderStatusValue(options.status || order?.status);
+  const actionTypes = Array.isArray(options.actionTypes) ? options.actionTypes : [];
+  const statusField = ORDER_LIFECYCLE_FIELD_BY_STATUS[nextStatus];
+
+  addLifecycleTimestampIfMissing(patch, order, statusField);
+
+  actionTypes.forEach((actionType) => {
+    const actionField = ORDER_LIFECYCLE_FIELD_BY_ACTION[actionType];
+    addLifecycleTimestampIfMissing(patch, order, actionField);
+  });
+
+  return patch;
 }
 
 function getInventoryItemKey(name, variant = ""){
@@ -5256,6 +5376,15 @@ function renderInventoryTable(){
   }
 
   const items = getFilteredInventoryItems();
+  const totalPages = Math.max(1, Math.ceil(items.length / inventoryRowsPerPage));
+  inventoryCurrentPage = Math.min(Math.max(1, inventoryCurrentPage), totalPages);
+  const pageStartIndex = (inventoryCurrentPage - 1) * inventoryRowsPerPage;
+  const paginatedItems = items.slice(pageStartIndex, pageStartIndex + inventoryRowsPerPage);
+
+  syncInventoryPaginationControls({
+    totalItems: items.length,
+    totalPages
+  });
 
   if(!items.length){
     inventoryTableBody.innerHTML = `
@@ -5266,7 +5395,7 @@ function renderInventoryTable(){
     return;
   }
 
-  inventoryTableBody.innerHTML = items.map((item) => {
+  inventoryTableBody.innerHTML = paginatedItems.map((item) => {
     const state = getInventoryComputedState(item);
     const status = getInventoryStatusCopy(item, state);
 
@@ -5279,11 +5408,11 @@ function renderInventoryTable(){
         <td>${escapeHtml(item.variant || "-")}</td>
         <td>${escapeHtml(item.category || "Uncategorized")}</td>
         <td><span class="inventory-source-pill">${escapeHtml(item.sourceType || "custom")}</span></td>
-        <td>${state.totalStock}</td>
-        <td>${state.availableStock}</td>
-        <td>${state.reservedStock}</td>
-        <td>${state.damagedStock}</td>
-        <td>${state.lowStockThreshold}</td>
+        <td class="inventory-cell-number">${state.totalStock}</td>
+        <td class="inventory-cell-number">${state.availableStock}</td>
+        <td class="inventory-cell-number">${state.reservedStock}</td>
+        <td class="inventory-cell-number">${state.damagedStock}</td>
+        <td class="inventory-cell-number">${state.lowStockThreshold}</td>
         <td><span class="inventory-status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
         <td>
           <div class="inventory-row-actions">
@@ -5296,6 +5425,47 @@ function renderInventoryTable(){
   }).join("");
 
   attachInventoryTableEvents();
+}
+
+function syncInventoryPaginationControls({
+  totalItems = 0,
+  totalPages = 1
+} = {}){
+  if(inventoryPageInfo){
+    if(totalItems <= 0){
+      inventoryPageInfo.textContent = "No inventory items to display";
+    }else{
+      const start = ((inventoryCurrentPage - 1) * inventoryRowsPerPage) + 1;
+      const end = Math.min(totalItems, inventoryCurrentPage * inventoryRowsPerPage);
+      inventoryPageInfo.textContent = `Page ${inventoryCurrentPage} of ${totalPages} - showing ${start}-${end} of ${totalItems}`;
+    }
+  }
+
+  if(inventoryPrevPageBtn){
+    inventoryPrevPageBtn.disabled = inventoryCurrentPage <= 1 || totalItems <= 0;
+  }
+
+  if(inventoryNextPageBtn){
+    inventoryNextPageBtn.disabled = inventoryCurrentPage >= totalPages || totalItems <= 0;
+  }
+}
+
+function resetInventoryPaginationAndRender(){
+  inventoryCurrentPage = 1;
+  renderInventoryTable();
+}
+
+function handleInventoryPageChange(direction){
+  const totalItems = getFilteredInventoryItems().length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / inventoryRowsPerPage));
+  const nextPage = inventoryCurrentPage + direction;
+
+  if(nextPage < 1 || nextPage > totalPages){
+    return;
+  }
+
+  inventoryCurrentPage = nextPage;
+  renderInventoryTable();
 }
 
 function attachInventoryTableEvents(){
@@ -6075,6 +6245,9 @@ async function handleCreateOrderSubmit(event){
   try{
     await ensureInventoryItemsForOrderItems(items);
     const orderId = await generateOrderId();
+    const lifecyclePatch = buildOrderLifecyclePatch({}, {
+      status
+    });
     const orderPayload = {
       orderId,
       customerName,
@@ -6090,7 +6263,8 @@ async function handleCreateOrderSubmit(event){
       items,
       priority,
       status,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      ...lifecyclePatch
     };
 
     await setDoc(doc(db, "orders", orderId), orderPayload);
@@ -6177,13 +6351,33 @@ async function assignDriverToOrder(){
     return;
   }
 
-  await updateDoc(doc(db, "orders", selectedOrderId), {
+  const orderRef = doc(db, "orders", selectedOrderId);
+  let latestOrderForLifecycle = allOrders.find((item) => item.id === selectedOrderId) || {};
+
+  try{
+    const latestOrderSnapshot = await getDoc(orderRef);
+    if(latestOrderSnapshot.exists()){
+      latestOrderForLifecycle = {
+        id: latestOrderSnapshot.id,
+        ...latestOrderSnapshot.data()
+      };
+    }
+  }catch(error){
+    console.error("Failed to load latest order before assigning driver:", error);
+  }
+
+  const driverLifecyclePatch = buildOrderLifecyclePatch(latestOrderForLifecycle, {
+    actionTypes: ["driver-assigned"]
+  });
+
+  await updateDoc(orderRef, {
     driver: {
       name: driver.name,
       phone: driver.phone,
       email: normalizeEmail(driver.email),
       uid: driver.uid || ""
-    }
+    },
+    ...driverLifecyclePatch
   });
 
   closeDriverModal();
@@ -6832,9 +7026,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     collectionRequestNote.dataset.collectionBound = "true";
   }
   sendCollectionRequestBtn?.addEventListener("click", handleSendCollectionRequest);
-  inventorySearchInput?.addEventListener("input", renderInventoryTable);
-  inventorySourceFilter?.addEventListener("change", renderInventoryTable);
-  inventoryStatusFilter?.addEventListener("change", renderInventoryTable);
+  inventorySearchInput?.addEventListener("input", resetInventoryPaginationAndRender);
+  inventorySourceFilter?.addEventListener("change", resetInventoryPaginationAndRender);
+  inventoryStatusFilter?.addEventListener("change", resetInventoryPaginationAndRender);
+  inventoryPrevPageBtn?.addEventListener("click", () => handleInventoryPageChange(-1));
+  inventoryNextPageBtn?.addEventListener("click", () => handleInventoryPageChange(1));
   reservationDateFilter?.addEventListener("change", renderInventoryDashboard);
   syncSearchClearButton();
   updateActiveAdminSidebarLink();
@@ -6847,7 +7043,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
         key,
         direction: currentInventorySort.key === key && currentInventorySort.direction === "asc" ? "desc" : "asc"
       };
-      renderInventoryTable();
+      resetInventoryPaginationAndRender();
     });
   });
   inventoryProductSelect?.addEventListener("change", () => {
