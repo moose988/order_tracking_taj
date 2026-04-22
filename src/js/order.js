@@ -28,17 +28,25 @@ function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
   const navLinks = document.querySelector(".nav-links");
 
-  if(!menuBtn || !navLinks){
+  if(!menuBtn || !navLinks || menuBtn.dataset.menuBound === "true"){
     return;
   }
+
+  menuBtn.dataset.menuBound = "true";
+  menuBtn.setAttribute("type", "button");
+  menuBtn.setAttribute("aria-expanded", "false");
+
+  if(!navLinks.id){
+    navLinks.id = "primary-navigation";
+  }
+
+  menuBtn.setAttribute("aria-controls", navLinks.id);
 
   const syncMenuState = (isOpen) => {
     navLinks.classList.toggle("active", isOpen);
     menuBtn.setAttribute("aria-expanded", String(isOpen));
     document.body.classList.toggle("mobile-nav-open", isOpen && window.innerWidth <= 760);
   };
-
-  menuBtn.setAttribute("aria-expanded", "false");
 
   menuBtn.addEventListener("click", () => {
     syncMenuState(!navLinks.classList.contains("active"));
@@ -55,6 +63,24 @@ function initMobileMenu(){
       syncMenuState(false);
     }
   });
+
+  window.addEventListener("keydown", (event) => {
+    if(event.key === "Escape"){
+      syncMenuState(false);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if(!navLinks.classList.contains("active")){
+      return;
+    }
+
+    if(menuBtn.contains(event.target) || navLinks.contains(event.target)){
+      return;
+    }
+
+    syncMenuState(false);
+  });
 }
 
 function escapeHtml(value){
@@ -64,6 +90,34 @@ function escapeHtml(value){
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function normalizeCatalogImageUrl(imagePath){
+  const rawValue = String(imagePath || "").trim();
+
+  if(!rawValue){
+    return "";
+  }
+
+  if(/^(https?:|data:|blob:)/i.test(rawValue)){
+    return rawValue;
+  }
+
+  let normalizedPath = rawValue.replaceAll("\\", "/");
+
+  while(normalizedPath.startsWith("../")){
+    normalizedPath = normalizedPath.slice(3);
+  }
+
+  if(normalizedPath.startsWith("./")){
+    normalizedPath = normalizedPath.slice(2);
+  }
+
+  if(!normalizedPath.startsWith("/")){
+    normalizedPath = `/${normalizedPath}`;
+  }
+
+  return encodeURI(normalizedPath);
 }
 
 function saveOrder(){
@@ -109,7 +163,9 @@ function applyInitialCategoryFromUrl(){
 
 function getProductImages(product){
   const images = Array.isArray(product?.images)
-    ? product.images.filter((image) => String(image || "").trim())
+    ? product.images
+      .map((image) => normalizeCatalogImageUrl(image))
+      .filter((image) => String(image || "").trim())
     : [];
 
   return images.length ? images : [CATALOG_PLACEHOLDER_IMAGE];
@@ -125,6 +181,10 @@ function getProductThumbClasses(product){
 
   if(category === "Dining Tables"){
     classes.push("product-thumb-dining");
+  }
+
+  if(category === "Dining Tables" || category === "Coffee Table" || category === "Cocktail Table"){
+    classes.push("product-thumb-table");
   }
 
   if(category === "Chairs"){
@@ -325,9 +385,10 @@ function renderProducts(){
           class="${getProductThumbClasses(product)}"
           src="${escapeHtml(getPrimaryProductImage(product))}"
           alt="${escapeHtml(product.name)}"
-          loading="${index < 6 ? "eager" : "lazy"}"
+          loading="${index < 2 ? "eager" : "lazy"}"
           decoding="async"
-          fetchpriority="${index < 2 ? "high" : "low"}"
+          fetchpriority="${index === 0 ? "high" : "low"}"
+          sizes="(max-width: 760px) 100vw, (max-width: 1280px) 33vw, 24vw"
           onerror="${getImageFallbackAttribute()}"
         >
         <span class="badge product-badge">${escapeHtml(product.category)}</span>
@@ -590,13 +651,17 @@ function openProductModal(id){
   updateQuantityDisplay();
   renderModalGallery();
 
-  document.getElementById("productModal").classList.add("active");
+  document.getElementById("productModal")?.classList.add("active");
+  document.body.classList.add("product-modal-open");
+  document.body.dataset.previousOverflow = document.body.style.overflow;
   document.body.style.overflow = "hidden";
 }
 
 function closeProductModal(){
   document.getElementById("productModal")?.classList.remove("active");
-  document.body.style.overflow = "auto";
+  document.body.classList.remove("product-modal-open");
+  document.body.style.overflow = document.body.dataset.previousOverflow || "";
+  delete document.body.dataset.previousOverflow;
   resetModalZoom();
 }
 
@@ -718,6 +783,12 @@ function attachOrderEvents(){
 
   modal?.addEventListener("click", (event) => {
     if(event.target === modal){
+      closeProductModal();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if(event.key === "Escape" && modal?.classList.contains("active")){
       closeProductModal();
     }
   });

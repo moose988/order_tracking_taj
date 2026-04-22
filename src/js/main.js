@@ -151,14 +151,45 @@ function escapeAttribute(value){
   return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
+function normalizeCatalogImageUrl(imagePath){
+  const rawValue = String(imagePath || "").trim();
+
+  if(!rawValue){
+    return "";
+  }
+
+  if(/^(https?:|data:|blob:)/i.test(rawValue)){
+    return rawValue;
+  }
+
+  let normalizedPath = rawValue.replaceAll("\\", "/");
+
+  while(normalizedPath.startsWith("../")){
+    normalizedPath = normalizedPath.slice(3);
+  }
+
+  if(normalizedPath.startsWith("./")){
+    normalizedPath = normalizedPath.slice(2);
+  }
+
+  if(!normalizedPath.startsWith("/")){
+    normalizedPath = `/${normalizedPath}`;
+  }
+
+  return encodeURI(normalizedPath);
+}
+
 function normalizeHomeText(value){
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function getPreferredCollectionImage(product){
   const images = Array.isArray(product?.images) ? product.images : [];
-  const preferredImage = images.find((image) => String(image || "").trim() && !String(image).startsWith("data:image/svg+xml"))
-    || images.find((image) => String(image || "").trim())
+  const normalizedImages = images
+    .map((image) => normalizeCatalogImageUrl(image))
+    .filter((image) => String(image || "").trim());
+  const preferredImage = normalizedImages.find((image) => !String(image).startsWith("data:image/svg+xml"))
+    || normalizedImages.find((image) => String(image || "").trim())
     || CATALOG_PLACEHOLDER_IMAGE;
 
   return preferredImage;
@@ -261,6 +292,11 @@ function initHomepageRevealAnimations(){
     return;
   }
 
+  if(typeof window.IntersectionObserver !== "function"){
+    revealItems.forEach((item) => item.classList.add("home-is-visible"));
+    return;
+  }
+
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches){
     revealItems.forEach((item) => item.classList.add("home-is-visible"));
     return;
@@ -347,6 +383,7 @@ function initHomepageExperience(){
     return;
   }
 
+  document.body.classList.add("home-animations-ready");
   renderHomepageCollections();
   initHomepageRevealAnimations();
   initHomepageHeroScrollEffect();
@@ -385,17 +422,25 @@ function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
   const navLinks = document.querySelector(".nav-links");
 
-  if(!menuBtn || !navLinks){
+  if(!menuBtn || !navLinks || menuBtn.dataset.menuBound === "true"){
     return;
   }
+
+  menuBtn.dataset.menuBound = "true";
+  menuBtn.setAttribute("type", "button");
+  menuBtn.setAttribute("aria-expanded", "false");
+
+  if(!navLinks.id){
+    navLinks.id = "primary-navigation";
+  }
+
+  menuBtn.setAttribute("aria-controls", navLinks.id);
 
   const syncMenuState = (isOpen) => {
     navLinks.classList.toggle("active", isOpen);
     menuBtn.setAttribute("aria-expanded", String(isOpen));
     document.body.classList.toggle("mobile-nav-open", isOpen && window.innerWidth <= 760);
   };
-
-  menuBtn.setAttribute("aria-expanded", "false");
 
   menuBtn.addEventListener("click", () => {
     syncMenuState(!navLinks.classList.contains("active"));
@@ -411,6 +456,24 @@ function initMobileMenu(){
     if(window.innerWidth > 760){
       syncMenuState(false);
     }
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if(event.key === "Escape"){
+      syncMenuState(false);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if(!navLinks.classList.contains("active")){
+      return;
+    }
+
+    if(menuBtn.contains(event.target) || navLinks.contains(event.target)){
+      return;
+    }
+
+    syncMenuState(false);
   });
 }
 
@@ -646,11 +709,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const name = document.getElementById("customerName").value;
       const phone = document.getElementById("customerPhone").value;
       const date = document.getElementById("eventDate").value;
-      const rentalDays = getRentalDaysValue();
       const rawTime = document.getElementById("eventTime").value;
       const time = formatTimeTo12Hour(rawTime);
       const rawSetupTime = document.getElementById("setupTime").value;
       const setupTime = formatTimeTo12Hour(rawSetupTime);
+      const rentalDays = getRentalDaysValue();
       const location = document.getElementById("eventLocation").value;
       const mapLink = normalizeGoogleMapsLink(document.getElementById("mapLink").value);
       const notes = document.getElementById("eventNotes").value;
@@ -692,9 +755,9 @@ Name: ${name}
 Phone: ${phone}
 
 Event Date: ${date}
-Rental Days: ${rentalDays}
 Event Time: ${time}
 Setup Time: ${setupTime}
+Rental Days: ${rentalDays}
 
 Location: ${location}
 Map: ${mapLink}

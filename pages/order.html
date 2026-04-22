@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -140,24 +140,26 @@
           </div>
         </div>
 
-        <div class="qty-box">
-          <button type="button" onclick="decreaseQty()" aria-label="Decrease quantity">-</button>
-          <input
-            type="number"
-            id="modalQuantity"
-            min="1"
-            value="1"
-            inputmode="numeric"
-            oninput="handleManualQtyInput()"
-            onblur="handleManualQtyInput()"
-            onfocus="this.select()"
-            aria-label="Quantity"
-          >
-          <button type="button" onclick="increaseQty()" aria-label="Increase quantity">+</button>
-        </div>
+        <div class="order-modal-purchase">
+          <div class="qty-box">
+            <button type="button" onclick="decreaseQty()" aria-label="Decrease quantity">-</button>
+            <input
+              type="number"
+              id="modalQuantity"
+              min="1"
+              value="1"
+              inputmode="numeric"
+              oninput="handleManualQtyInput()"
+              onblur="handleManualQtyInput()"
+              onfocus="this.select()"
+              aria-label="Quantity"
+            >
+            <button type="button" onclick="increaseQty()" aria-label="Increase quantity">+</button>
+          </div>
 
-        <div class="modal-actions order-modal-actions">
-          <button class="btn btn-primary" type="button" onclick="addToOrder()">Add to Order</button>
+          <div class="modal-actions order-modal-actions">
+            <button class="btn btn-primary" type="button" onclick="addToOrder()">Add to Order</button>
+          </div>
         </div>
       </div>
     </div>
@@ -182,7 +184,7 @@
       <div class="footer-brand">
         <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
         <div class="footer-brand-copy">
-          <h4>Al Taj Al Malaky Parties &amp; Events Management</h4>
+          <h4>Al Taj Al Malaky</h4>
           <p>Luxury Event Setup &amp; Rental</p>
         </div>
       </div>
@@ -194,12 +196,14 @@
     </div>
 
     <div class="copyright">
-      &copy; <span class="current-year"></span> Al Taj Al Malaky Parties &amp; Events Management. All rights reserved.
+      &copy; <span class="current-year"></span> Al Taj Al Malaky. All rights reserved.
     </div>
   </div>
 </footer>
 
+<script src="../src/js/mobile-menu.js" defer></script>
 <script type="module" src="../src/js/order.js"></script>
 
 </body>
 </html>
+
