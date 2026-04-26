@@ -214,23 +214,626 @@ export const PRODUCTS = [
   },
   {
     id: 3,
-    name: "White Chair",
+    name: "Chair 1",
     category: "Chairs",
-    shortDescription: "Clean, refined chairs for formal ceremonies and elevated guest comfort.",
-    measurements: "Standard event size",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
     images: [
-      "../images/IN9A9418.JPG",
-      "../images/IN9A9423.jpg"
+      "../images/chairs/11360308/1- new chair\uf028/CW4A4321 copy-.jpg",
+      "../images/chairs/11360308/1- new chair\uf028/CW4A4325 copy.jpg",
+      "../images/chairs/11360308/1- new chair\uf028/CW4A4323 copy.jpg"
     ]
   },
   {
     id: 4,
-    name: "Gold Chair",
+    name: "Chair 2",
     category: "Chairs",
-    shortDescription: "Statement gold chairs for luxe celebrations and sophisticated seating moments.",
-    measurements: "Standard event size",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
     images: [
-      "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80"
+      "../images/chairs/11360308/2\uf028/CW4A4333 copy.jpg",
+      "../images/chairs/11360308/2\uf028/CW4A4335 copy.jpg",
+      "../images/chairs/11360308/2\uf028/CW4A4332 copy.jpg"
+    ]
+  },
+  {
+    id: 136,
+    name: "Chair 3",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/3/CW4A4336 copy.jpg",
+      "../images/chairs/11360308/3/CW4A4339 copy.jpg",
+      "../images/chairs/11360308/3/CW4A4340 copy.jpg"
+    ]
+  },
+  {
+    id: 137,
+    name: "Chair 4",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/4/CW4A4341 copy.jpg",
+      "../images/chairs/11360308/4/CW4A4346 copy.jpg",
+      "../images/chairs/11360308/4/CW4A4345-2 copy.jpg"
+    ]
+  },
+  {
+    id: 138,
+    name: "Chair 5",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/5/CW4A4347 copy.jpg",
+      "../images/chairs/11360308/5/CW4A4349 copy.jpg",
+      "../images/chairs/11360308/5/CW4A4351 copy.jpg"
+    ]
+  },
+  {
+    id: 139,
+    name: "Chair 6",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0666/CW4A4352-2 copy.jpg",
+      "../images/chairs/11360308/\u0666/CW4A4358.jpg",
+      "../images/chairs/11360308/\u0666/CW4A4357 copy.jpg"
+    ]
+  },
+  {
+    id: 140,
+    name: "Chair 7",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/7/CW4A4360 copy.jpg",
+      "../images/chairs/11360308/7/CW4A4362 copy.jpg",
+      "../images/chairs/11360308/7/CW4A4363.jpg"
+    ]
+  },
+  {
+    id: 141,
+    name: "Chair 8",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/8/CW4A4367 copy.jpg",
+      "../images/chairs/11360308/8/CW4A4368 copy.jpg",
+      "../images/chairs/11360308/8/CW4A4370 copy.jpg"
+    ]
+  },
+  {
+    id: 142,
+    name: "Chair 9",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0669/CW4A4377 copy.jpg",
+      "../images/chairs/11360308/\u0669/CW4A4378 copy.jpg",
+      "../images/chairs/11360308/\u0669/CW4A4379 copy.jpg"
+    ]
+  },
+  {
+    id: 143,
+    name: "Chair 10",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0661\u0660/CW4A4396 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0660/CW4A4397 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0660/CW4A4399 copy.jpg"
+    ]
+  },
+  {
+    id: 144,
+    name: "Chair 11",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/11/CW4A4390 copy.jpg",
+      "../images/chairs/11360308/11/CW4A4391 copy.jpg",
+      "../images/chairs/11360308/11/CW4A4392 copy.jpg"
+    ]
+  },
+  {
+    id: 145,
+    name: "Chair 12",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/12/CW4A4402 copy.jpg",
+      "../images/chairs/11360308/12/CW4A4406 copy.jpg",
+      "../images/chairs/11360308/12/CW4A4409 copy.jpg"
+    ]
+  },
+  {
+    id: 146,
+    name: "Chair 13",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/13/CW4A4605 copy.jpg",
+      "../images/chairs/11360308/13/CW4A4607 copy.jpg",
+      "../images/chairs/11360308/13/CW4A4609 copy.jpg"
+    ]
+  },
+  {
+    id: 147,
+    name: "Chair 14",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/14/CW4A4612.jpg",
+      "../images/chairs/11360308/14/CW4A4613 copy.jpg",
+      "../images/chairs/11360308/14/CW4A4614 copy.jpg"
+    ]
+  },
+  {
+    id: 148,
+    name: "Chair 15",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0661\u0665/CW4A4383.jpg",
+      "../images/chairs/11360308/\u0661\u0665/CW4A4384 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0665/CW4A4388 copy.jpg"
+    ]
+  },
+  {
+    id: 149,
+    name: "Chair 16",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0661\u0666/CW4A4410 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0666/CW4A4411 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0666/CW4A4412 copy.jpg"
+    ]
+  },
+  {
+    id: 150,
+    name: "Chair 17",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0661\u0667/CW4A4415 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0667/CW4A4416 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0667/CW4A4417 copy.jpg"
+    ]
+  },
+  {
+    id: 151,
+    name: "Chair 18",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0661\u0668/CW4A4424.jpg",
+      "../images/chairs/11360308/\u0661\u0668/CW4A4426 copy.jpg",
+      "../images/chairs/11360308/\u0661\u0668/CW4A4427 copy.jpg"
+    ]
+  },
+  {
+    id: 152,
+    name: "Chair 19",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0661\u0669/CW4A4458.jpg",
+      "../images/chairs/11360308/\u0661\u0669/CW4A4460 -copy.jpg",
+      "../images/chairs/11360308/\u0661\u0669/CW4A4462 copy.jpg"
+    ]
+  },
+  {
+    id: 153,
+    name: "Chair 20",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0660/CW4A4475 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0660/CW4A4476 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0660/CW4A4477-Recovered copy.jpg"
+    ]
+  },
+  {
+    id: 154,
+    name: "Chair 21",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0661/CW4A4465 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0661/CW4A4467 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0661/CW4A4468 copy.jpg"
+    ]
+  },
+  {
+    id: 155,
+    name: "Chair 22",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0662/CW4A4479 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0662/CW4A4480 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0662/CW4A4481 copy.jpg"
+    ]
+  },
+  {
+    id: 156,
+    name: "Chair 23",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0663/CW4A4470 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0663/CW4A4472.jpg",
+      "../images/chairs/11360308/\u0662\u0663/CW4A4473 copy.jpg"
+    ]
+  },
+  {
+    id: 157,
+    name: "Chair 24",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0664/CW4A4484 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0664/CW4A4486.jpg",
+      "../images/chairs/11360308/\u0662\u0664/CW4A4488.jpg"
+    ]
+  },
+  {
+    id: 158,
+    name: "Chair 25",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0665/CW4A4490 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0665/CW4A4492 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0665/CW4A4493 copy.jpg"
+    ]
+  },
+  {
+    id: 159,
+    name: "Chair 26",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0666/CW4A4449 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0666/CW4A4452 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0666/CW4A4453 copy.jpg"
+    ]
+  },
+  {
+    id: 160,
+    name: "Chair 27",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0667/CW4A4503-2 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0667/CW4A4505 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0667/CW4A4507 copy.jpg"
+    ]
+  },
+  {
+    id: 161,
+    name: "Chair 28",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0668/CW4A4532 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0668/CW4A4534 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0668/CW4A4535 copy.jpg"
+    ]
+  },
+  {
+    id: 162,
+    name: "Chair 29",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0662\u0669/CW4A4518 copy.jpg",
+      "../images/chairs/11360308/\u0662\u0669/CW4A4519.jpg",
+      "../images/chairs/11360308/\u0662\u0669/CW4A4520.jpg"
+    ]
+  },
+  {
+    id: 163,
+    name: "Chair 30",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0660/CW4A4522-2 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0660/CW4A4524 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0660/CW4A4525 copy.jpg"
+    ]
+  },
+  {
+    id: 164,
+    name: "Chair 31",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0661/CW4A4632 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0661/CW4A4633 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0661/CW4A4634 copy.jpg"
+    ]
+  },
+  {
+    id: 165,
+    name: "Chair 32",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0662/CW4A4616 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0662/CW4A4617 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0662/CW4A4618 copy.jpg"
+    ]
+  },
+  {
+    id: 166,
+    name: "Chair 33",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0663/CW4A4546 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0663/CW4A4547 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0663/CW4A4548 copy.jpg"
+    ]
+  },
+  {
+    id: 167,
+    name: "Chair 34",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0664/CW4A4601 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0664/CW4A4602 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0664/CW4A4603 copy.jpg"
+    ]
+  },
+  {
+    id: 168,
+    name: "Chair 35",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0665/CW4A4597 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0665/CW4A4598 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0665/CW4A4599 copy.jpg"
+    ]
+  },
+  {
+    id: 169,
+    name: "Chair 36",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0666/CW4A4591 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0666/CW4A4592 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0666/CW4A4593 copy.jpg"
+    ]
+  },
+  {
+    id: 170,
+    name: "Chair 37",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0667/CW4A4586 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0667/CW4A4587 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0667/CW4A4588 copy.jpg"
+    ]
+  },
+  {
+    id: 171,
+    name: "Chair 38",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0668/CW4A4563 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0668/CW4A4566 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0668/CW4A4565 copy.jpg"
+    ]
+  },
+  {
+    id: 172,
+    name: "Chair 39",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0663\u0669/CW4A4557 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0669/CW4A4560 copy.jpg",
+      "../images/chairs/11360308/\u0663\u0669/CW4A4561 copy.jpg"
+    ]
+  },
+  {
+    id: 173,
+    name: "Chair 40",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0660/CW4A4576 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0660/CW4A4577 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0660/CW4A4579 copy.jpg"
+    ]
+  },
+  {
+    id: 174,
+    name: "Chair 41",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0661/CW4A4551 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0661/CW4A4552 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0661/CW4A4555 copy.jpg"
+    ]
+  },
+  {
+    id: 175,
+    name: "Chair 42",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0662/CW4A4567 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0662/CW4A4569 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0662/CW4A4571 copy.jpg"
+    ]
+  },
+  {
+    id: 176,
+    name: "Chair 43",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0663/\u0661.jpg",
+      "../images/chairs/11360308/\u0664\u0663/CW4A4444 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0663/CW4A4447.jpg"
+    ]
+  },
+  {
+    id: 177,
+    name: "Chair 44",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0664/CW4A4434.jpg",
+      "../images/chairs/11360308/\u0664\u0664/CW4A4436-2 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0664/CW4A4439-2 copy.jpg"
+    ]
+  },
+  {
+    id: 178,
+    name: "Chair 45",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0665/CW4A4581 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0665/CW4A4582 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0665/CW4A4583 copy.jpg"
+    ]
+  },
+  {
+    id: 179,
+    name: "Chair 46",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0666/CW4A4496 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0666/CW4A4497.jpg",
+      "../images/chairs/11360308/\u0664\u0666/CW4A4498 copy.jpg"
+    ]
+  },
+  {
+    id: 180,
+    name: "Chair 47",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0667/CW4A4539 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0667/CW4A4541-2 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0667/CW4A4542 copy 2.jpg"
+    ]
+  },
+  {
+    id: 181,
+    name: "Chair 48",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0668/CW4A4419 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0668/CW4A4421 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0668/CW4A4422 copy.jpg"
+    ]
+  },
+  {
+    id: 182,
+    name: "Chair 49",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0664\u0669/CW4A4626 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0669/CW4A4628 copy.jpg",
+      "../images/chairs/11360308/\u0664\u0669/CW4A4629.jpg"
+    ]
+  },
+  {
+    id: 183,
+    name: "Chair 50",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0665\u0660/CW4A4622 copy.jpg",
+      "../images/chairs/11360308/\u0665\u0660/CW4A4623 copy.jpg",
+      "../images/chairs/11360308/\u0665\u0660/CW4A4624 copy--.jpg"
+    ]
+  },
+  {
+    id: 184,
+    name: "Chair 51",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0665\u0661/---.jpg",
+      "../images/chairs/11360308/\u0665\u0661/\u0661 copy.jpg",
+      "../images/chairs/11360308/\u0665\u0661/\u0661-.jpg"
+    ]
+  },
+  {
+    id: 185,
+    name: "Chair 52",
+    category: "Chairs",
+    shortDescription: "Refined seating for elegant events and premium guest arrangements.",
+    measurements: "Standard event chair size",
+    images: [
+      "../images/chairs/11360308/\u0665\u0662/CW4A4314 copy.jpg",
+      "../images/chairs/11360308/\u0665\u0662/CW4A4318.jpg",
+      "../images/chairs/11360308/\u0665\u0662/CW4A4319 copy.jpg"
     ]
   },
   {
@@ -694,16 +1297,6 @@ export const PRODUCTS = [
     ]
   },
   {
-    id: 92,
-    name: "Coffee Table 3",
-    category: "Coffee Table",
-    shortDescription: "Elegant coffee tables for lounge styling and premium hospitality scenes.",
-    measurements: "Standard event coffee table size",
-    images: [
-      "../images/coffe tables/IN9A0004.JPG"
-    ]
-  },
-  {
     id: 93,
     name: "Coffee Table 4",
     category: "Coffee Table",
@@ -971,16 +1564,6 @@ export const PRODUCTS = [
     measurements: "Standard event coffee table size",
     images: [
       "../images/coffe tables/IN9A9970.JPG"
-    ]
-  },
-  {
-    id: 121,
-    name: "Coffee Table 32",
-    category: "Coffee Table",
-    shortDescription: "Elegant coffee tables for lounge styling and premium hospitality scenes.",
-    measurements: "Standard event coffee table size",
-    images: [
-      "../images/coffe tables/IN9A9972.JPG"
     ]
   },
   {

@@ -40,31 +40,87 @@
 
 <div class="section-head">
 <div class="section-kicker">Track Your Order</div>
-<h1 class="section-title">Check your current order status.</h1>
-<p class="section-text">
-Enter your order ID to see the latest update.
-</p>
 </div>
 
 
 <div class="track-grid">
 
-<section class="track-card">
+<section class="track-card track-lookup-card">
 
-<h3>Enter Order ID</h3>
+<div class="track-lookup-head">
+<div>
+<span class="track-section-kicker">Order Lookup</span>
+<h3>Enter your order ID</h3>
+</div>
+</div>
 
-<div class="form-group" style="margin-top:12px;">
+<div class="track-lookup-form">
+<div class="form-group">
 <input type="text" id="orderIdInput" placeholder="Example: TAJ-1024">
 </div>
 
-<div style="margin-top:14px;">
 <button class="btn btn-primary" onclick="trackOrder()">Track Order</button>
 </div>
 
-<div id="trackResult" style="margin-top:20px;"></div>
+<div id="trackResult" class="track-result-message"></div>
+
+</section>
+
+<div class="track-results-stack">
+
+<section class="track-card track-status-card-shell">
+<div class="track-section-head">
+<span class="track-section-kicker">Current Status</span>
+</div>
 <div id="statusSummary" class="track-status-summary"></div>
-<div id="orderInfo" class="track-order-info"></div>
-<div id="orderItems" class="track-order-items"></div>
+</section>
+
+<section id="reviewSection" class="track-card review-section review-section--inline" style="display:none;">
+<div class="review-section-head">
+<span class="track-section-kicker">Review</span>
+<h3>Rate your experience</h3>
+<p>Your feedback helps us continue delivering refined event experiences.</p>
+</div>
+
+<p id="reviewStatusMessage" class="review-status-message" style="display:none;"></p>
+
+<form id="reviewForm" class="review-form">
+<div class="form-group">
+<label for="reviewName">Name (optional)</label>
+<input type="text" id="reviewName" placeholder="Your name">
+</div>
+
+<div class="form-group">
+<label for="reviewStars">Rating</label>
+<div class="review-star-field" data-review-stars="inline">
+<input type="hidden" id="reviewStars" value="5">
+<div class="review-star-group" role="radiogroup" aria-label="Rate your experience">
+<button type="button" class="review-star-btn" data-rating="1" aria-label="1 star">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="2" aria-label="2 stars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="3" aria-label="3 stars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="4" aria-label="4 stars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="5" aria-label="5 stars">&#9733;</button>
+</div>
+<p class="review-star-caption">Tap a star to rate your delivery experience.</p>
+</div>
+</div>
+
+<div class="form-group">
+<label for="reviewComment">Comment (optional)</label>
+<textarea id="reviewComment" placeholder="Share a few words about your experience"></textarea>
+</div>
+
+<button id="reviewSubmitBtn" class="btn btn-primary review-submit-btn" type="submit">
+Submit Review
+</button>
+</form>
+</section>
+
+<section class="track-card track-timeline-card">
+<div class="track-section-head">
+<span class="track-section-kicker">Progress Timeline</span>
+<h3>Follow each step of your order journey</h3>
+</div>
 
 <div class="status-list">
 <div class="status-step">
@@ -115,53 +171,13 @@ Enter your order ID to see the latest update.
 </div>
 </div>
 </div>
-
-<section id="reviewSection" class="review-section" style="margin-top:30px; display:none;">
-<div class="review-section-head">
-<h3>Rate Your Experience</h3>
-<p>We would love to hear how everything looked for your event.</p>
-</div>
-
-<p id="reviewStatusMessage" class="review-status-message" style="display:none;"></p>
-
-<form id="reviewForm" class="review-form">
-<div class="form-group">
-<label for="reviewStars">Rating</label>
-<select id="reviewStars">
-<option value="5">Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦</option>
-<option value="4">Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦</option>
-<option value="3">Ã¢Ëœâ€¦Ã¢Ëœâ€¦Ã¢Ëœâ€¦</option>
-<option value="2">Ã¢Ëœâ€¦Ã¢Ëœâ€¦</option>
-<option value="1">Ã¢Ëœâ€¦</option>
-</select>
-</div>
-
-<div class="form-group">
-<label for="reviewComment">Comment</label>
-<textarea id="reviewComment" placeholder="Share your experience" required></textarea>
-</div>
-
-<div class="form-group">
-<label for="reviewName">Name (optional)</label>
-<input type="text" id="reviewName" placeholder="Your name">
-</div>
-
-<button id="reviewSubmitBtn" class="btn btn-primary review-submit-btn" type="submit">
-Submit Review
-</button>
-</form>
 </section>
 
-</section>
+<section class="track-card track-map-card">
 
-
-<section class="track-card">
-
-<h3>Delivery Location</h3>
-
-<p style="color:var(--text-soft);margin-bottom:14px;">
-The event location is shown below.
-</p>
+<div class="track-section-head">
+<span class="track-section-kicker">Live Map</span>
+</div>
 
 <div class="track-map-status-shell">
 <div id="etaInfo" class="track-map-status-hero"></div>
@@ -171,23 +187,37 @@ The event location is shown below.
 </div>
 </div>
 
-<div id="mapContainer" style="height:350px;border-radius:12px;"></div>
+<div id="mapContainer"></div>
 
-<div id="driverInfoBox" class="track-card" style="display:none;">
+<div id="driverInfoBox" class="track-driver-info-card" style="display:none;">
 <h3>Driver Details</h3>
 
 <p><strong>Name:</strong> <span id="driverName"></span></p>
 <p><strong>Phone:</strong> <span id="driverPhone"></span></p>
 
-<div style="margin-top:12px;">
+<div class="track-driver-action">
 <a id="driverWhatsappBtn" class="btn btn-primary" target="_blank">
 Contact Driver on WhatsApp
 </a>
 </div>
 </div>
 
-<div id="supportBox" class="support-box">
-<h4>Need Help?</h4>
+</section>
+
+<section id="orderDetailsBlock" class="track-card track-order-details-block" style="display:none;">
+<div class="track-section-head">
+<span class="track-section-kicker">Order Details</span>
+<h3>Your booking information</h3>
+</div>
+<div id="orderInfo" class="track-order-info"></div>
+<div id="orderItems" class="track-order-items"></div>
+</section>
+
+<section id="supportBox" class="track-card support-box">
+<div class="track-section-head">
+<span class="track-section-kicker">Need Help</span>
+<h3>Get support for this order</h3>
+</div>
 
 <select id="supportReason" class="support-select">
 <option value="general">General Inquiry</option>
@@ -200,9 +230,9 @@ Contact Driver on WhatsApp
 <button id="supportBtn" class="btn btn-primary support-btn">
 Contact Support on WhatsApp
 </button>
-</div>
-
 </section>
+
+</div>
 
 </div>
 
@@ -232,6 +262,64 @@ Contact Support on WhatsApp
     </div>
   </div>
 </footer>
+
+<div id="reviewModal" class="review-modal" aria-hidden="true">
+<div class="review-modal__backdrop" data-review-close="backdrop"></div>
+<div class="review-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
+<button id="reviewModalClose" class="review-modal__close" type="button" aria-label="Close review prompt">
+&times;
+</button>
+
+<div class="review-modal__head">
+<span class="track-section-kicker">Review</span>
+<h2 id="reviewModalTitle">How was your experience?</h2>
+<p>Your feedback helps us continue delivering refined event experiences.</p>
+</div>
+
+<p id="reviewModalStatusMessage" class="review-status-message" style="display:none;"></p>
+
+<form id="reviewModalForm" class="review-form review-form--modal">
+<div class="form-group">
+<label for="reviewModalName">Name (optional)</label>
+<input type="text" id="reviewModalName" placeholder="Your name">
+</div>
+
+<div class="form-group">
+<label for="reviewModalStars">Rating</label>
+<div class="review-star-field" data-review-stars="modal">
+<input type="hidden" id="reviewModalStars" value="5">
+<div class="review-star-group" role="radiogroup" aria-label="Rate your experience">
+<button type="button" class="review-star-btn" data-rating="1" aria-label="1 star">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="2" aria-label="2 stars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="3" aria-label="3 stars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="4" aria-label="4 stars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="5" aria-label="5 stars">&#9733;</button>
+</div>
+<p class="review-star-caption">Select a rating that reflects your overall experience.</p>
+</div>
+</div>
+
+<div class="form-group">
+<label for="reviewModalComment">Comment (optional)</label>
+<textarea id="reviewModalComment" placeholder="Share a few words about your experience"></textarea>
+</div>
+
+<div class="review-modal__actions">
+<button id="reviewMaybeLaterBtn" class="btn btn-secondary" type="button">
+Maybe later
+</button>
+<button id="reviewModalSubmitBtn" class="btn btn-primary review-submit-btn" type="submit">
+Submit Review
+</button>
+</div>
+</form>
+</div>
+</div>
+
+<div id="reviewStickyBar" class="review-sticky-bar" style="display:none;">
+<span>Rate your experience</span>
+<button id="reviewStickyOpenBtn" class="btn btn-primary" type="button">Leave Review</button>
+</div>
 
 <script src="../src/js/mobile-menu.js" defer></script>
 <script type="module" src="../src/js/tracking.js"></script>

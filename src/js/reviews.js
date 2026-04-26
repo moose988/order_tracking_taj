@@ -2,9 +2,12 @@ import { db } from "./firebase.js";
 import { collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const reviewsGrid = document.getElementById("reviewsGrid");
+const reviewsPagination = document.getElementById("reviewsPagination");
 const filterButtons = Array.from(document.querySelectorAll(".reviews-filter-btn"));
 let allReviews = [];
 let activeFilter = "all";
+let currentPage = 1;
+const REVIEWS_PER_PAGE = 6;
 
 function initMobileMenu(){
   const menuBtn = document.querySelector(".mobile-menu-btn");
@@ -66,11 +69,13 @@ function initMobileMenu(){
 }
 
 async function loadReviews(){
-  if(!reviewsGrid){
+  if(!reviewsGrid || !reviewsPagination){
     return;
   }
 
   reviewsGrid.innerHTML = '<div class="empty-state">Loading reviews...</div>';
+  reviewsPagination.innerHTML = "";
+  reviewsPagination.style.display = "none";
 
   try{
     try{
@@ -89,12 +94,15 @@ async function loadReviews(){
   }catch(error){
     console.error("Failed to load reviews:", error);
     reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
+    reviewsPagination.innerHTML = "";
+    reviewsPagination.style.display = "none";
   }
 }
 
 function renderReviews(reviews){
   if(!reviews.length){
     reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
+    renderPagination(0, 0);
     return;
   }
 
@@ -120,7 +128,20 @@ function applyActiveFilter(){
     reviews = reviews.filter((review) => getTimestampValue(review.createdAt) > 0);
   }
 
-  renderReviews(reviews);
+  const totalPages = Math.ceil(reviews.length / REVIEWS_PER_PAGE);
+
+  if(!reviews.length){
+    currentPage = 1;
+    renderReviews([]);
+    return;
+  }
+
+  currentPage = Math.min(currentPage, totalPages);
+  const startIndex = (currentPage - 1) * REVIEWS_PER_PAGE;
+  const paginatedReviews = reviews.slice(startIndex, startIndex + REVIEWS_PER_PAGE);
+
+  renderReviews(paginatedReviews);
+  renderPagination(currentPage, totalPages);
 }
 
 function initReviewFilters(){
@@ -131,10 +152,93 @@ function initReviewFilters(){
   filterButtons.forEach((button) => {
     button.addEventListener("click", () => {
       activeFilter = button.dataset.filter || "all";
+      currentPage = 1;
 
       filterButtons.forEach((item) => item.classList.toggle("is-active", item === button));
       applyActiveFilter();
     });
+  });
+}
+
+function renderPagination(activePage, totalPages){
+  if(!reviewsPagination){
+    return;
+  }
+
+  if(totalPages <= 1){
+    reviewsPagination.innerHTML = "";
+    reviewsPagination.style.display = "none";
+    return;
+  }
+
+  const pageButtons = Array.from({ length: totalPages }, (_, index) => {
+    const pageNumber = index + 1;
+    return `
+      <button
+        class="reviews-pagination-btn ${pageNumber === activePage ? "is-active" : ""}"
+        type="button"
+        data-page="${pageNumber}"
+        aria-label="Go to page ${pageNumber}"
+        ${pageNumber === activePage ? 'aria-current="page"' : ""}
+      >
+        ${pageNumber}
+      </button>
+    `;
+  }).join("");
+
+  reviewsPagination.innerHTML = `
+    <button
+      class="reviews-pagination-btn reviews-pagination-btn--nav"
+      type="button"
+      data-page-nav="prev"
+      ${activePage === 1 ? "disabled" : ""}
+    >
+      Previous
+    </button>
+    <div class="reviews-pagination-pages">
+      ${pageButtons}
+    </div>
+    <button
+      class="reviews-pagination-btn reviews-pagination-btn--nav"
+      type="button"
+      data-page-nav="next"
+      ${activePage === totalPages ? "disabled" : ""}
+    >
+      Next
+    </button>
+  `;
+
+  reviewsPagination.style.display = "flex";
+
+  reviewsPagination.querySelectorAll("[data-page]").forEach((button) => {
+    button.addEventListener("click", () => {
+      currentPage = Number(button.dataset.page) || 1;
+      applyActiveFilter();
+      scrollReviewsToTop();
+    });
+  });
+
+  reviewsPagination.querySelector("[data-page-nav=\"prev\"]")?.addEventListener("click", () => {
+    if(currentPage > 1){
+      currentPage -= 1;
+      applyActiveFilter();
+      scrollReviewsToTop();
+    }
+  });
+
+  reviewsPagination.querySelector("[data-page-nav=\"next\"]")?.addEventListener("click", () => {
+    if(currentPage < totalPages){
+      currentPage += 1;
+      applyActiveFilter();
+      scrollReviewsToTop();
+    }
+  });
+}
+
+function scrollReviewsToTop(){
+  reviewsGrid?.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
   });
 }
 

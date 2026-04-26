@@ -12,6 +12,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, u
 
 const driverWelcomeTitle = document.getElementById("driverWelcomeTitle");
 const driverSummaryText = document.getElementById("driverSummaryText");
+const driverSummaryTextMobile = document.getElementById("driverSummaryTextMobile");
 const driverDashboardStatus = document.getElementById("driverDashboardStatus");
 const driverOrdersGrid = document.getElementById("driverOrders") || document.getElementById("driverOrdersGrid");
 const driverCompletedOrdersGrid = document.getElementById("driverCompletedOrders");
@@ -50,6 +51,7 @@ let currentCollectionLookupOrder = null;
 let isFindingCollectionOrder = false;
 let isMarkingCollected = false;
 let hasDashboardHydrated = false;
+let isResolvingDriverAccess = false;
 
 const GEOLOCATION_OPTIONS = {
   enableHighAccuracy: true,
@@ -71,15 +73,7 @@ const DRIVER_LANGUAGE_CONFIG = {
 };
 const DRIVER_I18N = {};
 
-const storedUid = localStorage.getItem("driverUid");
-
-if(!storedUid){
-  window.location.href = "driver-login.html";
-}
-
-const LOCATION_SHARING_PREFERENCE_KEY = storedUid
-  ? `tajDriverLocationSharingEnabled:${storedUid}`
-  : "tajDriverLocationSharingEnabled";
+const LOCATION_SHARING_PREFERENCE_KEY = "tajDriverLocationSharingEnabled";
 
 let currentDriverLanguage = getStoredDriverLanguage();
 let dashboardMessageState = {
@@ -1502,13 +1496,56 @@ function getAssignedDriverMeta(order){
 
 async function resolveDriverProfile(user){
   const email = normalizeEmail(user.email);
-  const driverDocs = await getDocs(collection(db, "drivers"));
-  const driverDoc = driverDocs.docs.find((docSnapshot) => {
-    const driver = docSnapshot.data();
-    return driver.uid === user.uid || normalizeEmail(driver.email) === email;
-  }) || null;
+  console.debug("[driver-dashboard] resolving driver profile", {
+    uid: user?.uid || "",
+    email
+  });
+
+  const uidDocRef = doc(db, "drivers", user.uid);
+  const uidDocSnapshot = await getDoc(uidDocRef);
+
+  console.debug("[driver-dashboard] driver doc by document ID", {
+    uid: user?.uid || "",
+    exists: uidDocSnapshot.exists()
+  });
+
+  let driverDoc = uidDocSnapshot.exists() ? uidDocSnapshot : null;
 
   if(!driverDoc){
+    const uidQuerySnapshot = await getDocs(
+      query(collection(db, "drivers"), where("uid", "==", user.uid))
+    );
+
+    console.debug("[driver-dashboard] driver fallback by uid field", {
+      uid: user?.uid || "",
+      found: !uidQuerySnapshot.empty
+    });
+
+    if(!uidQuerySnapshot.empty){
+      driverDoc = uidQuerySnapshot.docs[0];
+    }
+  }
+
+  if(!driverDoc && email){
+    const emailQuerySnapshot = await getDocs(
+      query(collection(db, "drivers"), where("email", "==", email))
+    );
+
+    console.debug("[driver-dashboard] driver fallback by email", {
+      email,
+      found: !emailQuerySnapshot.empty
+    });
+
+    if(!emailQuerySnapshot.empty){
+      driverDoc = emailQuerySnapshot.docs[0];
+    }
+  }
+
+  if(!driverDoc){
+    console.debug("[driver-dashboard] no driver profile found", {
+      uid: user?.uid || "",
+      email
+    });
     return null;
   }
 
@@ -1525,6 +1562,10 @@ async function resolveDriverProfile(user){
 
   if(Object.keys(nextData).length){
     await updateDoc(driverDoc.ref, nextData);
+    console.debug("[driver-dashboard] driver profile synced", {
+      driverDocId: driverDoc.id,
+      updates: nextData
+    });
   }
 
   return {
@@ -1662,6 +1703,24 @@ function getEventDateTimeValue(order){
 
 function getCompletedOrdersRangeValue(order){
   return getTimestampValue(order.collectedAt) || getTimestampValue(order.deliveredAt) || getEventDateTimeValue(order) || getTimestampValue(order.createdAt);
+}
+
+async function redirectUnauthorizedDriver(reason){
+  console.debug("[driver-dashboard] redirecting unauthorized driver", { reason });
+  stopLocationSharing();
+  ordersUnsubscribe?.();
+  currentDriver = null;
+  localStorage.removeItem("driverUid");
+
+  try{
+    if(auth.currentUser){
+      await signOut(auth);
+    }
+  }catch(error){
+    console.error("Failed to sign out unauthorized driver:", error);
+  }finally{
+    window.location.replace("driver-login.html");
+  }
 }
 
 function isOrderInCurrentMonth(order){
@@ -2451,11 +2510,17 @@ function updateDashboardSummary(){
     });
   }
 
+  const liveDeliveryCount = getLiveDeliveryOrders().length;
+  const summaryMarkup = currentOrders.length
+    ? getDriverSummaryMarkup(activeOrders.length, completedOrders.length, liveDeliveryCount)
+    : `<span class="driver-summary-empty">${escapeHtml(t("hero.summaryEmpty"))}</span>`;
+
   if(driverSummaryText){
-    const liveDeliveryCount = getLiveDeliveryOrders().length;
-    driverSummaryText.innerHTML = currentOrders.length
-      ? getDriverSummaryMarkup(activeOrders.length, completedOrders.length, liveDeliveryCount)
-      : `<span class="driver-summary-empty">${escapeHtml(t("hero.summaryEmpty"))}</span>`;
+    driverSummaryText.innerHTML = summaryMarkup;
+  }
+
+  if(driverSummaryTextMobile){
+    driverSummaryTextMobile.innerHTML = summaryMarkup;
   }
 
   if(driverCompletedOrdersSummary){
@@ -2487,8 +2552,14 @@ function renderDriverPreHydrationState(){
     });
   }
 
+  const emptySummaryMarkup = `<span class="driver-summary-empty">${escapeHtml(t("hero.summaryEmpty"))}</span>`;
+
   if(driverSummaryText){
-    driverSummaryText.innerHTML = `<span class="driver-summary-empty">${escapeHtml(t("hero.summaryEmpty"))}</span>`;
+    driverSummaryText.innerHTML = emptySummaryMarkup;
+  }
+
+  if(driverSummaryTextMobile){
+    driverSummaryTextMobile.innerHTML = emptySummaryMarkup;
   }
 
   renderActiveDeliveriesPill();
@@ -2881,10 +2952,10 @@ function startLocationSharing(orderId){
   ensureLocationSharingWatch("share");
 }
 
-async function initializeDriverDashboard(user){
+async function initializeDriverDashboard(user, resolvedDriverProfile = null){
   localStorage.setItem("driverUid", user.uid);
   hydrateLocationSharingPreference();
-  currentDriver = await resolveDriverProfile(user);
+  currentDriver = resolvedDriverProfile || await resolveDriverProfile(user);
 
   if(!currentDriver){
     setDashboardMessage("statusBanner.profileMissing", "error");
@@ -2992,18 +3063,37 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   onAuthStateChanged(auth, async (user) => {
-    if(!user || user.uid !== storedUid){
-      localStorage.removeItem("driverUid");
-      window.location.href = "driver-login.html";
+    if(isResolvingDriverAccess){
       return;
     }
 
+    if(!user){
+      await redirectUnauthorizedDriver("no-auth-user");
+      return;
+    }
+
+    isResolvingDriverAccess = true;
+
     try{
-      await initializeDriverDashboard(user);
+      console.debug("[driver-dashboard] auth state resolved", {
+        uid: user.uid,
+        email: normalizeEmail(user.email)
+      });
+
+      const driverProfile = await resolveDriverProfile(user);
+
+      if(!driverProfile){
+        await redirectUnauthorizedDriver("driver-profile-not-found");
+        return;
+      }
+
+      await initializeDriverDashboard(user, driverProfile);
       syncCollectionControls();
     }catch(error){
       console.error("Driver dashboard init failed:", error);
       setDashboardMessage("statusBanner.openFailed", "error");
+    }finally{
+      isResolvingDriverAccess = false;
     }
   });
 });

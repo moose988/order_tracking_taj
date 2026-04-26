@@ -12,17 +12,7 @@ import {
 } from "./location-utils.js";
 import { WAREHOUSE_LOCATION } from "./app-config.js";
 import { initScrollTopButton } from "./scroll-top.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-/* PROTECT ADMIN PAGE */
-onAuthStateChanged(auth, (user) => {
-
-  if(!user){
-    window.location.href = "admin-login.html";
-  }
-
-});
-
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import { db } from "./firebase.js";
 import {
@@ -30,13 +20,99 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
-  updateDoc
+  updateDoc,
+  where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+let hasVerifiedAdminAccess = false;
+let isHandlingAdminUnauthorized = false;
+
+async function getAuthorizedAdminDoc(user){
+  if(!user?.uid){
+    return null;
+  }
+
+  const adminDocRef = doc(db, "admins", user.uid);
+  const adminSnapshot = await getDoc(adminDocRef);
+
+  if(adminSnapshot.exists()){
+    const adminData = adminSnapshot.data() || {};
+    const role = typeof adminData.role === "string" ? adminData.role.trim().toLowerCase() : "";
+    const roleAllowed = !role || role === "admin";
+
+    return adminData.active === true && roleAllowed
+      ? { id: adminSnapshot.id, ...adminData }
+      : null;
+  }
+
+  const email = String(user.email || "").trim().toLowerCase();
+
+  if(!email){
+    return null;
+  }
+
+  const fallbackQuery = query(collection(db, "admins"), where("email", "==", email));
+  const fallbackSnapshot = await getDocs(fallbackQuery);
+
+  if(fallbackSnapshot.empty){
+    return null;
+  }
+
+  const fallbackDoc = fallbackSnapshot.docs[0];
+  const fallbackData = fallbackDoc.data() || {};
+  const role = typeof fallbackData.role === "string" ? fallbackData.role.trim().toLowerCase() : "";
+  const roleAllowed = !role || role === "admin";
+
+  return fallbackData.active === true && roleAllowed
+    ? { id: fallbackDoc.id, ...fallbackData }
+    : null;
+}
+
+async function redirectUnauthorizedAdmin(){
+  if(isHandlingAdminUnauthorized){
+    return;
+  }
+
+  isHandlingAdminUnauthorized = true;
+
+  try{
+    if(auth.currentUser){
+      await signOut(auth);
+    }
+  }catch(error){
+    console.error("Failed to sign out unauthorized admin session:", error);
+  }finally{
+    window.location.replace("admin-login.html");
+  }
+}
+
+/* PROTECT ADMIN PAGE */
+onAuthStateChanged(auth, async (user) => {
+  if(!user){
+    window.location.replace("admin-login.html");
+    return;
+  }
+
+  try{
+    const authorizedAdmin = await getAuthorizedAdminDoc(user);
+
+    if(!authorizedAdmin){
+      await redirectUnauthorizedAdmin();
+      return;
+    }
+
+    hasVerifiedAdminAccess = true;
+  }catch(error){
+    console.error("Admin authorization guard failed:", error);
+    await redirectUnauthorizedAdmin();
+  }
+});
 
 const tableBody = document.getElementById("ordersTableBody");
 const adminSidebarNav = document.getElementById("adminSidebarNav");
@@ -268,8 +344,6 @@ const CATALOG_INVENTORY_DEMO_STOCK = {
   "Dining Table 17": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 18": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 19": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
-  "White Chair": { totalStock: 72, damagedStock: 6, lowStockThreshold: 14 },
-  "Gold Chair": { totalStock: 12, damagedStock: 3, lowStockThreshold: 9 },
   "Bridal Sofa 1": { totalStock: 4, damagedStock: 0, lowStockThreshold: 1 },
   "Coffee Table 1": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Cocktail Table 1": { totalStock: 12, damagedStock: 0, lowStockThreshold: 3 },
@@ -495,6 +569,33 @@ function setActiveAdminSidebarLink(targetId = ""){
   });
 }
 
+function keepAdminSidebarLinkVisibleOnMobile(link, behavior = "smooth"){
+  if(!link || !adminSidebarNav || window.matchMedia("(min-width: 1025px)").matches){
+    return;
+  }
+
+  const navRect = adminSidebarNav.getBoundingClientRect();
+  const linkRect = link.getBoundingClientRect();
+  const edgePadding = 12;
+
+  if(linkRect.left < navRect.left + edgePadding){
+    const delta = (navRect.left + edgePadding) - linkRect.left;
+    adminSidebarNav.scrollBy({
+      left: -delta,
+      behavior
+    });
+    return;
+  }
+
+  if(linkRect.right > navRect.right - edgePadding){
+    const delta = linkRect.right - (navRect.right - edgePadding);
+    adminSidebarNav.scrollBy({
+      left: delta,
+      behavior
+    });
+  }
+}
+
 function scrollToAdminSection(targetId){
   const targetSection = document.getElementById(targetId);
 
@@ -552,6 +653,8 @@ function initAdminSidebarNavigation(){
     }
 
     setActiveAdminSidebarLink(targetId);
+    // Keep only the horizontal tabs in view on mobile; never force page scroll.
+    keepAdminSidebarLinkVisibleOnMobile(sidebarLink);
     scrollToAdminSection(targetId);
   });
 
@@ -7182,8 +7285,6 @@ document.getElementById("driverModal")?.addEventListener("click", (e)=>{
     closeDriverModal();
   }
 });
-
-import { signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 window.logout = function(){
   signOut(auth);

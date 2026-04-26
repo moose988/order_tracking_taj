@@ -129,9 +129,9 @@ function getFilterCategories(){
     "Chairs",
     "Dining Tables",
     "Coffee Table",
-    "Cocktail Table",
     "Majlis Sofa",
-    "Bridal Sofa"
+    "Bridal Sofa",
+    "Cocktail Table"
   ];
   const availableCategories = [...new Set(PRODUCTS.map((product) => product.category).filter(Boolean))];
   const orderedCategories = preferredOrder.filter((category) => availableCategories.includes(category));

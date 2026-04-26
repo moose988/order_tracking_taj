@@ -218,27 +218,33 @@ function getHomepageCollectionDefinitions(){
   return [
     {
       category: "Dining Tables",
+      featuredProductName: "Dining Table 15",
       description: "Formal table foundations for weddings, receptions, and elevated dining layouts."
     },
     {
       category: "Chairs",
+      featuredProductName: "Chair 19",
       description: "Guest seating selected to feel elegant, polished, and visually balanced across the room."
     },
     {
       category: "Coffee Table",
+      featuredProductName: "Coffee Table 18",
       description: "Low-profile accent pieces for lounge scenes, bridal moments, and welcome areas."
     },
     {
-      category: "Cocktail Table",
-      description: "Reception-ready standing tables for mingling, hospitality moments, and refined gatherings."
-    },
-    {
       category: "Bridal Sofa",
+      featuredProductName: "Bridal Sofa 35",
       description: "Statement seating for bridal stages and VIP focal points with graceful presence."
     },
     {
       category: "Majlis Sofa",
+      featuredProductName: "Sofa 23",
       description: "Majlis-inspired seating for warm hospitality spaces and culturally rich event settings."
+    },
+    {
+      category: "Cocktail Table",
+      featuredProductName: "Cocktail Table 2",
+      description: "Reception-ready standing tables for mingling, hospitality moments, and refined gatherings."
     }
   ];
 }
@@ -252,7 +258,9 @@ function renderHomepageCollections(){
 
   const cards = getHomepageCollectionDefinitions().map((definition) => {
     const matchingProducts = PRODUCTS.filter((product) => normalizeHomeText(product.category) === normalizeHomeText(definition.category));
-    const featuredProduct = matchingProducts[0] || null;
+    const featuredProduct = matchingProducts.find((product) => product.name === definition.featuredProductName)
+      || matchingProducts[0]
+      || null;
     const image = getPreferredCollectionImage(featuredProduct);
     const itemsCount = matchingProducts.length;
     const collectionHref = `order.html?category=${encodeURIComponent(definition.category)}`;

@@ -23,11 +23,19 @@ let destinationMarkerIcon = null;
 let destinationMarkerIconLoadPromise = null;
 let leafletAssetsLoadPromise = null;
 let lastMapViewportKey = "";
+let activeReviewSurface = "inline";
+let reviewPromptState = {
+  orderId: "",
+  submitted: false,
+  dismissed: false
+};
 const reviewThanksMessage = `Thank you for your feedback ${String.fromCodePoint(0x1F64C)}`;
 const DEFAULT_MAP_CENTER = [25.2048, 55.2708];
 const APPROX_CITY_SPEED_KMH = 32;
 const MAX_REASONABLE_DELIVERY_DISTANCE_KM = 120;
 const DEFAULT_RENTAL_DAYS = 1;
+const REVIEW_DISMISSED_STORAGE_KEY = "taj-track-review-dismissed";
+const REVIEW_SUBMITTED_STORAGE_KEY = "taj-track-review-submitted";
 const DRIVER_MARKER_ICON_CANDIDATES = [
   "../images/icons/drivericon.png",
   "../images/icons/drivericon.svg",
@@ -187,6 +195,16 @@ function initMobileMenu(){
     }
 
     syncMenuState(false);
+  });
+}
+
+function syncTrackResultLayoutOrder(){
+  if(!trackingMap){
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    trackingMap?.invalidateSize();
   });
 }
 
@@ -965,7 +983,10 @@ async function resolveOrderRef(orderId){
 }
 
 async function renderOrder(order){
+  syncTrackResultLayoutOrder();
+
   const info = document.getElementById("orderInfo");
+  const orderDetailsBlock = document.getElementById("orderDetailsBlock");
   const normalizedStatus = normalizeStatus(order.status);
   const destinationResolution = resolveDestinationCoordinates(order);
   const destinationCoordinates = destinationResolution.coordinates;
@@ -987,6 +1008,10 @@ async function renderOrder(order){
   <p><strong>Map:</strong> <a href="${openLocationUrl}" target="_blank" rel="noreferrer" class="track-inline-link">Open Location</a></p>
 </div>
 `;
+
+  if(orderDetailsBlock){
+    orderDetailsBlock.style.display = "block";
+  }
 
   bindSupportButton(order);
 
@@ -1051,9 +1076,8 @@ ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.
     etaInfo.innerHTML = normalizedStatus === "out-for-delivery"
       ? hasSaneRoute
         ? `
-<article class="track-status-hero-card is-active">
+<article class="track-status-hero-card is-active ${etaEstimate.minutes > 60 ? "is-delayed" : "is-on-time"}">
   <div>
-    <span class="track-status-eyebrow">Estimated Arrival</span>
     <strong>${formatEta(etaEstimate.minutes)}</strong>
   </div>
 </article>
@@ -1061,7 +1085,6 @@ ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.
         : `
 <article class="track-status-hero-card is-muted">
   <div>
-    <span class="track-status-eyebrow">Estimated Arrival</span>
     <strong>ETA unavailable</strong>
     <p>Live ETA needs reliable destination coordinates and a sane delivery distance.</p>
   </div>
@@ -1099,11 +1122,11 @@ function renderStatusSummary(status){
   }
 
   const normalizedStatus = normalizeStatus(status);
+  const statusToneClass = getStatusToneClass(normalizedStatus);
 
   if(normalizedStatus === "cancelled"){
     summary.innerHTML = `
-      <article class="track-status-summary-card is-cancelled">
-        <span class="track-status-summary-label">Current Status</span>
+      <article class="track-status-summary-card is-cancelled ${statusToneClass}">
         <strong>Order Cancelled</strong>
         <p>This order is marked as cancelled. Please contact support if you need help.</p>
       </article>
@@ -1112,12 +1135,383 @@ function renderStatusSummary(status){
   }
 
   summary.innerHTML = `
-    <article class="track-status-summary-card is-${normalizedStatus || "unknown"}">
-      <span class="track-status-summary-label">Current Status</span>
+    <article class="track-status-summary-card is-${normalizedStatus || "unknown"} ${statusToneClass}">
       <strong>${formatStatusLabel(normalizedStatus || status)}</strong>
       <p>Your latest order progress is shown here in real time.</p>
     </article>
   `;
+}
+
+function getStatusToneClass(status){
+  const toneClassMap = {
+    "quote-requested": "status-quote",
+    "quote-sent": "status-sent",
+    confirmed: "status-confirmed",
+    preparing: "status-preparing",
+    "out-for-delivery": "status-delivery",
+    delivered: "status-delivered",
+    cancelled: "status-cancelled"
+  };
+
+  return toneClassMap[status] || "status-quote";
+}
+
+function getReviewStorageBucket(key){
+  if(typeof window === "undefined"){
+    return {};
+  }
+
+  try{
+    return JSON.parse(window.localStorage.getItem(key) || "{}");
+  }catch{
+    return {};
+  }
+}
+
+function setReviewStorageBucket(key, nextBucket){
+  if(typeof window === "undefined"){
+    return;
+  }
+
+  try{
+    window.localStorage.setItem(key, JSON.stringify(nextBucket));
+  }catch{
+    // Ignore storage failures and fall back to Firestore checks.
+  }
+}
+
+function getReviewDismissedFlag(orderId){
+  return Boolean(getReviewStorageBucket(REVIEW_DISMISSED_STORAGE_KEY)[orderId]);
+}
+
+function setReviewDismissedFlag(orderId, value){
+  if(!orderId){
+    return;
+  }
+
+  const bucket = getReviewStorageBucket(REVIEW_DISMISSED_STORAGE_KEY);
+
+  if(value){
+    bucket[orderId] = true;
+  }else{
+    delete bucket[orderId];
+  }
+
+  setReviewStorageBucket(REVIEW_DISMISSED_STORAGE_KEY, bucket);
+}
+
+function getReviewSubmittedFlag(orderId){
+  return Boolean(getReviewStorageBucket(REVIEW_SUBMITTED_STORAGE_KEY)[orderId]);
+}
+
+function setReviewSubmittedFlag(orderId, value){
+  if(!orderId){
+    return;
+  }
+
+  const bucket = getReviewStorageBucket(REVIEW_SUBMITTED_STORAGE_KEY);
+
+  if(value){
+    bucket[orderId] = true;
+  }else{
+    delete bucket[orderId];
+  }
+
+  setReviewStorageBucket(REVIEW_SUBMITTED_STORAGE_KEY, bucket);
+}
+
+function getReviewFieldMap(surface = "inline"){
+  if(surface === "modal"){
+    return {
+      form: document.getElementById("reviewModalForm"),
+      stars: document.getElementById("reviewModalStars"),
+      comment: document.getElementById("reviewModalComment"),
+      name: document.getElementById("reviewModalName"),
+      submit: document.getElementById("reviewModalSubmitBtn"),
+      message: document.getElementById("reviewModalStatusMessage")
+    };
+  }
+
+  return {
+    form: document.getElementById("reviewForm"),
+    stars: document.getElementById("reviewStars"),
+    comment: document.getElementById("reviewComment"),
+    name: document.getElementById("reviewName"),
+    submit: document.getElementById("reviewSubmitBtn"),
+    message: document.getElementById("reviewStatusMessage")
+  };
+}
+
+function resetReviewForm(surface = "inline"){
+  const fields = getReviewFieldMap(surface);
+
+  if(!fields.form){
+    return;
+  }
+
+  fields.form.reset();
+
+  if(fields.stars){
+    fields.stars.value = "5";
+    syncReviewStarField(surface);
+  }
+}
+
+function syncReviewFormValues(sourceSurface, targetSurface){
+  const sourceFields = getReviewFieldMap(sourceSurface);
+  const targetFields = getReviewFieldMap(targetSurface);
+
+  if(!sourceFields.form || !targetFields.form){
+    return;
+  }
+
+  if(sourceFields.stars && targetFields.stars){
+    targetFields.stars.value = sourceFields.stars.value || "5";
+    syncReviewStarField(targetSurface);
+  }
+
+  if(sourceFields.comment && targetFields.comment){
+    targetFields.comment.value = sourceFields.comment.value;
+  }
+
+  if(sourceFields.name && targetFields.name){
+    targetFields.name.value = sourceFields.name.value;
+  }
+}
+
+function setActiveReviewSurface(surface){
+  activeReviewSurface = surface;
+}
+
+function getReviewStarField(surface = "inline"){
+  return document.querySelector(`.review-star-field[data-review-stars="${surface}"]`);
+}
+
+function paintReviewStars(starField, ratingValue = 0, previewValue = 0){
+  if(!starField){
+    return;
+  }
+
+  const activeValue = Number(previewValue || ratingValue || 0);
+  const starButtons = starField.querySelectorAll(".review-star-btn");
+
+  starButtons.forEach((button) => {
+    const buttonValue = Number(button.dataset.rating);
+    const isActive = buttonValue <= activeValue;
+
+    button.classList.toggle("is-active", isActive);
+    button.classList.toggle("is-idle", !isActive);
+    button.setAttribute("aria-pressed", String(buttonValue === Number(ratingValue || 0)));
+  });
+}
+
+function syncReviewStarField(surface = "inline"){
+  const starField = getReviewStarField(surface);
+  const fields = getReviewFieldMap(surface);
+
+  if(!starField || !fields.stars){
+    return;
+  }
+
+  starField.dataset.rating = fields.stars.value || "5";
+  paintReviewStars(starField, Number(fields.stars.value || 5));
+}
+
+function setReviewStarValue(surface, rating){
+  const fields = getReviewFieldMap(surface);
+
+  if(!fields.stars){
+    return;
+  }
+
+  fields.stars.value = String(rating);
+  syncReviewStarField(surface);
+}
+
+function initReviewStarControls(){
+  document.querySelectorAll(".review-star-field").forEach((starField) => {
+    const surface = starField.dataset.reviewStars;
+    const starButtons = starField.querySelectorAll(".review-star-btn");
+
+    paintReviewStars(starField, Number(getReviewFieldMap(surface)?.stars?.value || 5));
+
+    starButtons.forEach((button) => {
+      const buttonValue = Number(button.dataset.rating);
+
+      button.addEventListener("mouseenter", () => {
+        paintReviewStars(starField, Number(getReviewFieldMap(surface)?.stars?.value || 0), buttonValue);
+      });
+
+      button.addEventListener("focus", () => {
+        paintReviewStars(starField, Number(getReviewFieldMap(surface)?.stars?.value || 0), buttonValue);
+      });
+
+      button.addEventListener("click", () => {
+        setReviewStarValue(surface, buttonValue);
+      });
+    });
+
+    starField.addEventListener("mouseleave", () => {
+      syncReviewStarField(surface);
+    });
+
+    starField.addEventListener("focusout", (event) => {
+      if(!starField.contains(event.relatedTarget)){
+        syncReviewStarField(surface);
+      }
+    });
+  });
+}
+
+function openReviewModal(){
+  const reviewModal = document.getElementById("reviewModal");
+
+  if(!reviewModal){
+    return;
+  }
+
+  syncReviewFormValues("inline", "modal");
+  setActiveReviewSurface("modal");
+  reviewModal.classList.add("is-visible");
+  reviewModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("review-modal-open");
+}
+
+function closeReviewModal(options = {}){
+  const { dismissed = false } = options;
+  const reviewModal = document.getElementById("reviewModal");
+
+  if(!reviewModal){
+    return;
+  }
+
+  if(dismissed && reviewPromptState.orderId && !reviewPromptState.submitted){
+    reviewPromptState.dismissed = true;
+    setReviewDismissedFlag(reviewPromptState.orderId, true);
+  }
+
+  reviewModal.classList.remove("is-visible");
+  reviewModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("review-modal-open");
+  setActiveReviewSurface("inline");
+  syncReviewFormValues("modal", "inline");
+  syncReviewPrompts();
+}
+
+function hideReviewModal(){
+  const reviewModal = document.getElementById("reviewModal");
+
+  if(!reviewModal){
+    return;
+  }
+
+  reviewModal.classList.remove("is-visible");
+  reviewModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("review-modal-open");
+}
+
+function setReviewPromptSubmitted(orderId){
+  reviewPromptState = {
+    orderId,
+    submitted: true,
+    dismissed: true
+  };
+  setReviewSubmittedFlag(orderId, true);
+  setReviewDismissedFlag(orderId, true);
+}
+
+function setReviewSurfaceMessage(surface, message, type){
+  const fields = getReviewFieldMap(surface);
+  const messageBox = fields.message;
+
+  if(!messageBox){
+    return;
+  }
+
+  messageBox.textContent = message;
+  messageBox.className = "review-status-message";
+
+  if(message){
+    messageBox.classList.add(type === "success" ? "is-success" : "is-error");
+    messageBox.style.display = "block";
+  }else{
+    messageBox.style.display = "none";
+  }
+}
+
+function setReviewMessage(message, type){
+  setReviewSurfaceMessage("inline", message, type);
+  setReviewSurfaceMessage("modal", message, type);
+}
+
+function setReviewFormsVisibility(showInlineForm, showModalForm){
+  const inlineFields = getReviewFieldMap("inline");
+  const modalFields = getReviewFieldMap("modal");
+
+  if(inlineFields.form){
+    inlineFields.form.style.display = showInlineForm ? "grid" : "none";
+  }
+
+  if(modalFields.form){
+    modalFields.form.style.display = showModalForm ? "grid" : "none";
+  }
+}
+
+function syncReviewPrompts(){
+  const reviewSection = document.getElementById("reviewSection");
+  const reviewStickyBar = document.getElementById("reviewStickyBar");
+
+  if(!reviewSection || !reviewStickyBar || !reviewPromptState.orderId){
+    return;
+  }
+
+  if(reviewPromptState.submitted){
+    reviewSection.style.display = "none";
+    hideReviewModal();
+    reviewStickyBar.style.display = "none";
+    document.body.classList.remove("track-review-sticky-visible");
+    return;
+  }
+
+  reviewSection.style.display = reviewPromptState.dismissed ? "block" : "none";
+  reviewSection.classList.toggle("is-inline-active", reviewPromptState.dismissed);
+
+  reviewStickyBar.style.display = reviewPromptState.dismissed ? "flex" : "none";
+  document.body.classList.toggle("track-review-sticky-visible", reviewPromptState.dismissed);
+
+  if(!reviewPromptState.dismissed){
+    openReviewModal();
+  }else{
+    hideReviewModal();
+  }
+}
+
+function initReviewInteractions(){
+  initReviewStarControls();
+  document.getElementById("reviewForm")?.addEventListener("submit", submitReview);
+  document.getElementById("reviewModalForm")?.addEventListener("submit", submitReview);
+
+  document.getElementById("reviewMaybeLaterBtn")?.addEventListener("click", () => {
+    closeReviewModal({ dismissed: true });
+  });
+
+  document.getElementById("reviewModalClose")?.addEventListener("click", () => {
+    closeReviewModal({ dismissed: true });
+  });
+
+  document.querySelector("#reviewModal [data-review-close=\"backdrop\"]")?.addEventListener("click", () => {
+    closeReviewModal({ dismissed: true });
+  });
+
+  document.getElementById("reviewStickyOpenBtn")?.addEventListener("click", () => {
+    openReviewModal();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if(event.key === "Escape"){
+      closeReviewModal({ dismissed: true });
+    }
+  });
 }
 
 function bindSupportButton(order){
@@ -1179,32 +1573,49 @@ function renderStatus(status){
 
 async function updateReviewUI(order){
   const reviewSection = document.getElementById("reviewSection");
-  const reviewForm = document.getElementById("reviewForm");
+  const reviewStickyBar = document.getElementById("reviewStickyBar");
 
-  if(!reviewSection || !reviewForm){
+  if(!reviewSection || !reviewStickyBar){
     return;
   }
 
   reviewSection.style.display = "none";
-  reviewForm.style.display = "none";
+  reviewStickyBar.style.display = "none";
+  document.body.classList.remove("track-review-sticky-visible");
+  hideReviewModal();
+  setReviewFormsVisibility(false, false);
   setReviewMessage("", "");
 
-  if(normalizeStatus(order.status) !== "delivered"){
+  if(normalizeStatus(order.status) !== "delivered" || !order?.orderId){
+    reviewPromptState = {
+      orderId: "",
+      submitted: false,
+      dismissed: false
+    };
     return;
   }
 
-  reviewSection.style.display = "block";
-
   const existingReview = await getExistingReview(order.orderId);
+  const submitted = Boolean(existingReview || getReviewSubmittedFlag(order.orderId));
+  const dismissed = submitted ? true : getReviewDismissedFlag(order.orderId);
 
-  if(existingReview){
+  reviewPromptState = {
+    orderId: order.orderId,
+    submitted,
+    dismissed
+  };
+
+  if(submitted){
+    setReviewPromptSubmitted(order.orderId);
+    setReviewFormsVisibility(false, false);
     setReviewMessage(reviewThanksMessage, "success");
     return;
   }
 
-  reviewForm.reset();
-  document.getElementById("reviewStars").value = "5";
-  reviewForm.style.display = "grid";
+  resetReviewForm("inline");
+  resetReviewForm("modal");
+  setReviewFormsVisibility(true, true);
+  syncReviewPrompts();
 }
 
 async function getExistingReview(orderId){
@@ -1224,17 +1635,21 @@ async function submitReview(event){
     return;
   }
 
-  const reviewForm = document.getElementById("reviewForm");
-  const submitButton = document.getElementById("reviewSubmitBtn");
-  const rating = Number(document.getElementById("reviewStars").value);
-  const comment = document.getElementById("reviewComment").value.trim();
-  const name = document.getElementById("reviewName").value.trim();
+  const formId = event.currentTarget?.id;
+  const sourceSurface = formId === "reviewModalForm" ? "modal" : "inline";
+  const targetSurface = sourceSurface === "modal" ? "inline" : "modal";
+  const fields = getReviewFieldMap(sourceSurface);
+  const submitButton = fields.submit;
+  const rating = Number(fields.stars?.value);
+  const comment = fields.comment?.value.trim() || "";
+  const name = fields.name?.value.trim() || "";
 
-  if(!rating || rating < 1 || rating > 5 || !comment){
-    setReviewMessage("Please add a rating and comment before submitting.", "error");
+  if(!rating || rating < 1 || rating > 5){
+    setReviewMessage("Please choose a rating before submitting your review.", "error");
     return;
   }
 
+  syncReviewFormValues(sourceSurface, targetSurface);
   submitButton.disabled = true;
   submitButton.textContent = "Submitting...";
   setReviewMessage("", "");
@@ -1243,8 +1658,11 @@ async function submitReview(event){
     const existingReview = await getExistingReview(currentOrder.orderId);
 
     if(existingReview){
-      reviewForm.style.display = "none";
+      setReviewPromptSubmitted(currentOrder.orderId);
+      setReviewFormsVisibility(false, false);
+      hideReviewModal();
       setReviewMessage(reviewThanksMessage, "success");
+      syncReviewPrompts();
       return;
     }
 
@@ -1256,9 +1674,13 @@ async function submitReview(event){
       createdAt: new Date()
     });
 
-    reviewForm.reset();
-    reviewForm.style.display = "none";
+    setReviewPromptSubmitted(currentOrder.orderId);
+    resetReviewForm("inline");
+    resetReviewForm("modal");
+    setReviewFormsVisibility(false, false);
+    hideReviewModal();
     setReviewMessage(reviewThanksMessage, "success");
+    syncReviewPrompts();
   }catch(error){
     console.error("Review submission failed:", error);
     setReviewMessage("We could not submit your review right now. Please try again.", "error");
@@ -1268,30 +1690,16 @@ async function submitReview(event){
   }
 }
 
-function setReviewMessage(message, type){
-  const messageBox = document.getElementById("reviewStatusMessage");
-
-  if(!messageBox){
-    return;
-  }
-
-  messageBox.textContent = message;
-  messageBox.className = "review-status-message";
-
-  if(message){
-    messageBox.classList.add(type === "success" ? "is-success" : "is-error");
-    messageBox.style.display = "block";
-  }else{
-    messageBox.style.display = "none";
-  }
-}
-
 function resetTrackState(){
   currentOrder = null;
   destroyTrackingMap();
   document.getElementById("statusSummary").innerHTML = "";
   document.getElementById("orderInfo").innerHTML = "";
   document.getElementById("orderItems").innerHTML = "";
+  const orderDetailsBlock = document.getElementById("orderDetailsBlock");
+  if(orderDetailsBlock){
+    orderDetailsBlock.style.display = "none";
+  }
   document.getElementById("locationInfo").innerHTML = "";
   document.getElementById("etaInfo").innerHTML = "";
   document.getElementById("mapLegend").innerHTML = "";
@@ -1300,17 +1708,26 @@ function resetTrackState(){
   renderStatus("quote-requested");
 
   const reviewSection = document.getElementById("reviewSection");
-  const reviewForm = document.getElementById("reviewForm");
+  const reviewStickyBar = document.getElementById("reviewStickyBar");
 
   if(reviewSection){
     reviewSection.style.display = "none";
   }
 
-  if(reviewForm){
-    reviewForm.reset();
-    reviewForm.style.display = "none";
+  if(reviewStickyBar){
+    reviewStickyBar.style.display = "none";
   }
 
+  document.body.classList.remove("track-review-sticky-visible");
+  reviewPromptState = {
+    orderId: "",
+    submitted: false,
+    dismissed: false
+  };
+  resetReviewForm("inline");
+  resetReviewForm("modal");
+  setReviewFormsVisibility(false, false);
+  hideReviewModal();
   setReviewMessage("", "");
 }
 
@@ -1378,7 +1795,9 @@ async function trackOrder(){
 
 document.addEventListener("DOMContentLoaded", async () => {
   initMobileMenu();
-  document.getElementById("reviewForm")?.addEventListener("submit", submitReview);
+  initReviewInteractions();
+  syncTrackResultLayoutOrder();
+  window.addEventListener("resize", syncTrackResultLayoutOrder, { passive: true });
 
   const urlOrderId = getOrderIdFromURL();
 
