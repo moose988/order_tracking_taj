@@ -4568,15 +4568,9 @@ function redirectToWhatsApp(phone, generatedMessage){
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   const whatsappURL = isMobile
     ? `https://wa.me/${phone}?text=${message}`
-    : `https://web.whatsapp.com/send?phone=${phone}&text=${message}`;
+    : `whatsapp://send?phone=${phone}&text=${message}`;
 
   window.location.href = whatsappURL;
-
-  setTimeout(() => {
-    if(!isMobile){
-      window.location.href = `https://wa.me/${phone}?text=${message}`;
-    }
-  }, 1000);
 }
 
 function validateQuoteDraft(){

@@ -1411,7 +1411,7 @@ function buildWhatsAppUrl(phone, generatedMessage){
 
   return isMobile
     ? `https://wa.me/${phone}?text=${message}`
-    : `https://web.whatsapp.com/send?phone=${phone}&text=${message}`;
+    : `whatsapp://send?phone=${phone}&text=${message}`;
 }
 
 function getPhoneForCall(phone){
