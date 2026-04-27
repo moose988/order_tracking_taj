@@ -141,7 +141,7 @@ loginForm?.addEventListener("submit", async (event) => {
     }
 
     localStorage.setItem("driverUid", userCredential.user.uid);
-    window.location.href = "driver.html";
+    window.location.href = "/driver";
   }catch(error){
     console.error("Driver login failed:", error);
     setError(error.message || "Unable to sign in right now.");

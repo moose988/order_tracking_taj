@@ -88,14 +88,14 @@ async function redirectUnauthorizedAdmin(){
   }catch(error){
     console.error("Failed to sign out unauthorized admin session:", error);
   }finally{
-    window.location.replace("admin-login.html");
+    window.location.replace("/admin-login");
   }
 }
 
 /* PROTECT ADMIN PAGE */
 onAuthStateChanged(auth, async (user) => {
   if(!user){
-    window.location.replace("admin-login.html");
+    window.location.replace("/admin-login");
     return;
   }
 
@@ -3433,7 +3433,7 @@ document.querySelectorAll(".wa-btn").forEach(btn => {
   .join("\n");
 
 // 🔥 dynamic tracking link
-const trackingLink = `${window.location.origin}/pages/track.html?id=${encodeURIComponent(order.id)}`;
+const trackingLink = `${window.location.origin}/track?id=${encodeURIComponent(order.id)}`;
 
 const message = `
 Hello ${order.customerName},
@@ -3484,7 +3484,7 @@ ${trackingLink}
         formattedPhone = "971" + cleanPhone.slice(1);
       }
 
-      const reviewLink = `${window.location.origin}/pages/track.html?id=${encodeURIComponent(order.id)}`;
+      const reviewLink = `${window.location.origin}/track?id=${encodeURIComponent(order.id)}`;
       const message = `Hello ${order.customerName},
 
 We hope everything looked perfect for your event 🙌

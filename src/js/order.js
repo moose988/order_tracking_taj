@@ -711,7 +711,7 @@ function goToQuotePage(){
     return;
   }
 
-  window.location.href = "quote.html";
+  window.location.href = "/quote";
 }
 
 function attachOrderEvents(){

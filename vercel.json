@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/pages/index.html" },
+    { "source": "/order", "destination": "/pages/order.html" },
+    { "source": "/quote", "destination": "/pages/quote.html" },
+    { "source": "/quote-success", "destination": "/pages/quote-success.html" },
+    { "source": "/reviews", "destination": "/pages/reviews.html" },
+    { "source": "/track", "destination": "/pages/track.html" },
+    { "source": "/admin", "destination": "/pages/admin.html" },
+    { "source": "/admin-login", "destination": "/pages/admin-login.html" },
+    { "source": "/driver", "destination": "/pages/driver.html" },
+    { "source": "/driver-login", "destination": "/pages/driver-login.html" }
+  ],
+  "redirects": [
+    { "source": "/pages/index.html", "destination": "/", "permanent": true },
+    { "source": "/pages/:path*", "destination": "/:path*", "permanent": true }
+  ]
+}

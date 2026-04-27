@@ -9,7 +9,7 @@
 <body class="quote-success-page">
   <header class="site-header">
     <div class="container navbar">
-      <a href="index.html" class="brand">
+      <a href="/" class="brand">
         <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" />
         <div class="brand-copy">
           <h2>Al Taj Al Malaky</h2>
@@ -18,10 +18,10 @@
       </a>
 
       <nav class="nav-links">
-        <a href="index.html">Home</a>
-        <a href="order.html">Order</a>
-        <a href="track.html">Track Order</a>
-        <a href="reviews.html">Reviews</a>
+        <a href="/">Home</a>
+        <a href="/order">Order</a>
+        <a href="/track">Track Order</a>
+        <a href="/reviews">Reviews</a>
       </nav>
 
       <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
@@ -62,9 +62,9 @@
           </div>
 
           <div class="quote-success-actions">
-            <a id="quoteSuccessTrackBtn" class="btn btn-primary" href="track.html">Track Order</a>
-            <a class="btn btn-secondary" href="order.html">Browse Collection</a>
-            <a class="btn btn-secondary" href="index.html">Back to Home</a>
+            <a id="quoteSuccessTrackBtn" class="btn btn-primary" href="/track">Track Order</a>
+            <a class="btn btn-secondary" href="/order">Browse Collection</a>
+            <a class="btn btn-secondary" href="/">Back to Home</a>
           </div>
 
           <div class="quote-success-whatsapp" id="quoteSuccessWhatsAppWrap" hidden>
@@ -152,9 +152,9 @@
       orderIdEl.textContent = orderId || "Not available";
 
       if(orderId){
-        trackBtn.href = `track.html?id=${encodeURIComponent(orderId)}`;
+        trackBtn.href = `/track?id=${encodeURIComponent(orderId)}`;
       }else{
-        trackBtn.href = "track.html";
+        trackBtn.href = "/track";
       }
 
       if(whatsappUrl){

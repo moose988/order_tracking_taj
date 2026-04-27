@@ -80,7 +80,7 @@ window.login = async function(){
       return;
     }
 
-    window.location.href = "admin.html";
+    window.location.href = "/admin";
   }catch(error){
     console.error("Admin login failed:", error);
     setError(error?.code === "auth/invalid-credential" || error?.code === "auth/wrong-password" || error?.code === "auth/user-not-found"
@@ -123,7 +123,7 @@ onAuthStateChanged(auth, async (user) => {
     const authorizedAdmin = await getAuthorizedAdminDoc(user);
 
     if(authorizedAdmin){
-      window.location.href = "admin.html";
+      window.location.href = "/admin";
       return;
     }
 

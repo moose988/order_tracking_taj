@@ -1728,7 +1728,7 @@ async function redirectUnauthorizedDriver(reason){
   }catch(error){
     console.error("Failed to sign out unauthorized driver:", error);
   }finally{
-    window.location.replace("driver-login.html");
+    window.location.replace("/driver-login");
   }
 }
 
@@ -3036,7 +3036,7 @@ driverLogoutBtn?.addEventListener("click", async () => {
   ordersUnsubscribe?.();
   localStorage.removeItem("driverUid");
   await signOut(auth);
-  window.location.href = "driver-login.html";
+  window.location.href = "/driver-login";
 });
 
 document.addEventListener("DOMContentLoaded", () => {

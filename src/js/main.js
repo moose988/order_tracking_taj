@@ -272,7 +272,7 @@ function renderHomepageCollections(){
       || null;
     const image = getPreferredCollectionImage(featuredProduct);
     const itemsCount = matchingProducts.length;
-    const collectionHref = `order.html?category=${encodeURIComponent(definition.category)}`;
+    const collectionHref = `/order?category=${encodeURIComponent(definition.category)}`;
     const altText = featuredProduct?.name
       ? `${featuredProduct.name} from the ${definition.category} collection`
       : `${definition.category} collection preview`;
@@ -417,7 +417,7 @@ function buildQuoteSuccessUrl(orderId){
     params.set("id", String(orderId));
   }
 
-  return `quote-success.html${params.toString() ? `?${params.toString()}` : ""}`;
+  return `/quote-success${params.toString() ? `?${params.toString()}` : ""}`;
 }
 
 function saveQuoteSuccessState(payload){
