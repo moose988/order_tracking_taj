@@ -1405,6 +1405,15 @@ function getPhoneForWhatsApp(phone){
   return digits;
 }
 
+function buildWhatsAppUrl(phone, generatedMessage){
+  const message = encodeURIComponent(generatedMessage);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  return isMobile
+    ? `https://wa.me/${phone}?text=${message}`
+    : `https://web.whatsapp.com/send?phone=${phone}&text=${message}`;
+}
+
 function getPhoneForCall(phone){
   const rawPhone = String(phone || "").trim();
 
@@ -1472,7 +1481,7 @@ function getCustomerWhatsAppUrl(order){
   });
 
   return phone
-    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    ? buildWhatsAppUrl(phone, message)
     : "#";
 }
 
@@ -2296,7 +2305,7 @@ function getActionBlock(order, options){
         <a class="btn btn-secondary driver-action-link ${contactActionClass}" href="${customerPhoneAvailable ? getCustomerCallUrl(order) : "#"}">
           ${escapeHtml(t("order.callCustomer"))}
         </a>
-        <a class="btn btn-secondary driver-action-link ${contactActionClass}" href="${customerPhoneAvailable ? getCustomerWhatsAppUrl(order) : "#"}" target="_blank" rel="noreferrer">
+        <a class="btn btn-secondary driver-action-link ${contactActionClass}" href="${customerPhoneAvailable ? getCustomerWhatsAppUrl(order) : "#"}">
           ${escapeHtml(t("order.sendWhatsApp"))}
         </a>
       </div>

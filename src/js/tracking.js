@@ -415,6 +415,35 @@ function getPhoneForWhatsApp(phone){
   return digits;
 }
 
+function buildWhatsAppUrl(phone, generatedMessage){
+  const message = encodeURIComponent(generatedMessage);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  return isMobile
+    ? `https://wa.me/${phone}?text=${message}`
+    : `https://web.whatsapp.com/send?phone=${phone}&text=${message}`;
+}
+
+function redirectToWhatsApp(phone, generatedMessage){
+  if(!phone){
+    return;
+  }
+
+  const message = encodeURIComponent(generatedMessage);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const whatsappURL = isMobile
+    ? `https://wa.me/${phone}?text=${message}`
+    : `https://web.whatsapp.com/send?phone=${phone}&text=${message}`;
+
+  window.location.href = whatsappURL;
+
+  setTimeout(() => {
+    if(!isMobile){
+      window.location.href = `https://wa.me/${phone}?text=${message}`;
+    }
+  }, 1000);
+}
+
 function calculateDistanceInKm(start, end){
   if(!start || !end){
     return null;
@@ -1522,7 +1551,9 @@ function bindSupportButton(order){
     return;
   }
 
-  supportBtn.onclick = () => {
+  supportBtn.onclick = (e) => {
+    e.preventDefault();
+
     const reason = reasonSelect.value;
     let message = "";
 
@@ -1538,8 +1569,7 @@ function bindSupportButton(order){
       message = `Hello, I need help with my order ${order.orderId}`;
     }
 
-    const url = `https://wa.me/971505373383?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+    redirectToWhatsApp("971505373383", message);
   };
 }
 
@@ -1778,7 +1808,7 @@ I'm contacting you regarding my order ${order.orderId}.
   driverName.textContent = order.driver.name || "N/A";
   driverPhone.textContent = order.driver.phone || "N/A";
   driverWhatsappBtn.href = phone
-    ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    ? buildWhatsAppUrl(phone, message)
     : "#";
 }
 

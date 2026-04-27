@@ -3232,23 +3232,12 @@ async function handleSendCollectionRequest(){
   isSendingCollectionRequest = true;
   syncCollectionRequestActionState();
 
-  let whatsappWindow = null;
-
-  try{
-    whatsappWindow = window.open("about:blank", "_blank");
-  }catch{
-    whatsappWindow = null;
-  }
-
   try{
     const latestOrderSnapshot = await getDoc(doc(db, "orders", selectedOrder.id));
 
     if(!latestOrderSnapshot.exists()){
       showToast("This order no longer exists", "error");
       renderCollectionAssignmentSection();
-      if(whatsappWindow && !whatsappWindow.closed){
-        whatsappWindow.close();
-      }
       return;
     }
 
@@ -3260,9 +3249,6 @@ async function handleSendCollectionRequest(){
     if(normalizeOrderStatusValue(latestOrder.status) !== "delivered"){
       showToast("This order is no longer eligible for collection assignment", "warning");
       renderCollectionAssignmentSection();
-      if(whatsappWindow && !whatsappWindow.closed){
-        whatsappWindow.close();
-      }
       return;
     }
 
@@ -3275,7 +3261,6 @@ async function handleSendCollectionRequest(){
     const assignedDriver = getDriverAssignmentMeta(selectedDriver);
     const locationLink = getOrderMapUrl(latestOrder) || "";
     const message = buildCollectionRequestMessage(latestOrder, selectedDriver, requestNote);
-    const whatsappUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
     const collectionLifecyclePatch = buildOrderLifecyclePatch(latestOrder, {
       actionTypes: ["collection-requested"]
     });
@@ -3317,19 +3302,11 @@ async function handleSendCollectionRequest(){
       };
     }
 
-    if(whatsappWindow && !whatsappWindow.closed){
-      whatsappWindow.location.href = whatsappUrl;
-    }else{
-      window.open(whatsappUrl, "_blank");
-    }
-
     renderCollectionAssignmentSection();
     showToast("Collection request sent to driver", "success");
+    redirectToWhatsApp(whatsappPhone, message);
   }catch(error){
     console.error("Failed to send collection request:", error);
-    if(whatsappWindow && !whatsappWindow.closed){
-      whatsappWindow.close();
-    }
     showToast("Could not send collection request", "error");
   }finally{
     isSendingCollectionRequest = false;
@@ -3484,9 +3461,7 @@ ${trackingLink}
       formattedPhone = "971" + cleanPhone.slice(1);
     }
 
-    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-
-    window.open(url, "_blank");
+    redirectToWhatsApp(formattedPhone, message);
   });
 
 });
@@ -3521,8 +3496,7 @@ ${reviewLink}
 
 (It only takes 30 seconds)`;
 
-      const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-      window.open(url, "_blank");
+      redirectToWhatsApp(formattedPhone, message);
     });
   });
 
@@ -4585,6 +4559,26 @@ function getFormattedWhatsAppPhone(phone){
   return digits;
 }
 
+function redirectToWhatsApp(phone, generatedMessage){
+  if(!phone){
+    return;
+  }
+
+  const message = encodeURIComponent(generatedMessage);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const whatsappURL = isMobile
+    ? `https://wa.me/${phone}?text=${message}`
+    : `https://web.whatsapp.com/send?phone=${phone}&text=${message}`;
+
+  window.location.href = whatsappURL;
+
+  setTimeout(() => {
+    if(!isMobile){
+      window.location.href = `https://wa.me/${phone}?text=${message}`;
+    }
+  }, 1000);
+}
+
 function validateQuoteDraft(){
   if(!currentQuoteOrder){
     return null;
@@ -4756,7 +4750,7 @@ function openQuoteWhatsApp(quoteVersion = lastGeneratedQuoteData){
     ? `Hello ${quoteVersion.customerName || ""},\n\nYour Arabic quotation ${quoteVersion.quotationNumber} (version ${quoteVersion.version}) is ready.\nPlease see the attached PDF.\n\nGrand Total: ${formatCurrencyDisplay(quoteVersion.grandTotal)}`
     : `Hello ${quoteVersion.customerName || ""},\n\nYour quotation ${quoteVersion.quotationNumber} (version ${quoteVersion.version}) is ready.\nPlease see the attached PDF.\n\nGrand Total: ${formatCurrencyDisplay(quoteVersion.grandTotal)}`;
 
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, "_blank");
+  redirectToWhatsApp(phone, message);
 }
 
 async function handleGenerateQuote(){

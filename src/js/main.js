@@ -60,6 +60,15 @@ function getRentalDaysValue(){
     : 1;
 }
 
+function buildWhatsAppUrl(phone, generatedMessage){
+  const message = encodeURIComponent(generatedMessage);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  return isMobile
+    ? `https://wa.me/${phone}?text=${message}`
+    : `https://web.whatsapp.com/send?phone=${phone}&text=${message}`;
+}
+
 async function loadHomepageReviews(){
   const reviewsGrid = document.getElementById("homeReviewsGrid");
 
@@ -777,15 +786,16 @@ Notes:
 ${notes || "None"}
 `;
 
-      const whatsappUrl = `https://wa.me/971505373383?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = buildWhatsAppUrl("971505373383", message);
       saveQuoteSuccessState({
         orderId,
         customerName: name,
-        whatsappUrl
+        whatsappUrl,
+        whatsappMessage: message,
+        autoOpenWhatsApp: true
       });
 
       localStorage.removeItem("tajOrder");
-      window.open(whatsappUrl, "_blank", "noopener");
       window.location.href = buildQuoteSuccessUrl(orderId);
     }catch(error){
       console.error("Quote submission failed:", error);
