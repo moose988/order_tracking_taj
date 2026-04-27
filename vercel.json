@@ -1,17 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
-    { "src": "^/$", "dest": "/pages/index.html" },
-    { "src": "^/order/?$", "dest": "/pages/order.html" },
-    { "src": "^/quote/?$", "dest": "/pages/quote.html" },
-    { "src": "^/quote-success/?$", "dest": "/pages/quote-success.html" },
-    { "src": "^/reviews/?$", "dest": "/pages/reviews.html" },
-    { "src": "^/track/?$", "dest": "/pages/track.html" },
-    { "src": "^/admin/?$", "dest": "/pages/admin.html" },
-    { "src": "^/admin-login/?$", "dest": "/pages/admin-login.html" },
-    { "src": "^/driver/?$", "dest": "/pages/driver.html" },
-    { "src": "^/driver-login/?$", "dest": "/pages/driver-login.html" },
-    { "src": "^/images/(.*)$", "dest": "/images/$1" },
-    { "src": "^/src/(.*)$", "dest": "/src/$1" }
+    { "src": "/", "dest": "/pages/index.html" },
+    { "src": "/order/?", "dest": "/pages/order.html" },
+    { "src": "/quote/?", "dest": "/pages/quote.html" },
+    { "src": "/quote-success/?", "dest": "/pages/quote-success.html" },
+    { "src": "/reviews/?", "dest": "/pages/reviews.html" },
+    { "src": "/track/?", "dest": "/pages/track.html" },
+    { "src": "/admin/?", "dest": "/pages/admin.html" },
+    { "src": "/admin-login/?", "dest": "/pages/admin-login.html" },
+    { "src": "/driver/?", "dest": "/pages/driver.html" },
+    { "src": "/driver-login/?", "dest": "/pages/driver-login.html" },
+    { "src": "/images/(.*)", "dest": "/images/$1" },
+    { "src": "/src/(.*)", "dest": "/src/$1" }
   ]
 }
