@@ -4549,14 +4549,39 @@ function getNextQuoteVersion(){
   return Math.max(currentCounter, ...existingVersions, 0) + 1;
 }
 
-function getFormattedWhatsAppPhone(phone){
-  const digits = String(phone || "").replace(/\D/g, "");
+function normalizeUaePhone(phone){
+  let cleaned = String(phone || "").replace(/\D/g, "");
 
-  if(digits.startsWith("0")){
-    return `971${digits.slice(1)}`;
+  if(cleaned.startsWith("05")){
+    cleaned = `971${cleaned.slice(1)}`;
+  }else if(cleaned.startsWith("5")){
+    cleaned = `971${cleaned}`;
+  }else if(cleaned.startsWith("0")){
+    cleaned = `971${cleaned.slice(1)}`;
   }
 
-  return digits;
+  return cleaned;
+}
+
+function getFormattedWhatsAppPhone(phone){
+  return normalizeUaePhone(phone);
+}
+
+function openWhatsAppApp(phone, text){
+  const cleanPhone = normalizeUaePhone(phone);
+  const encodedText = encodeURIComponent(text || "");
+
+  if(!cleanPhone){
+    alert("Customer phone number is missing.");
+    return;
+  }
+
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const whatsappUrl = isMobile
+    ? `https://wa.me/${cleanPhone}?text=${encodedText}`
+    : `whatsapp://send?phone=${cleanPhone}&text=${encodedText}`;
+
+  window.location.href = whatsappUrl;
 }
 
 function redirectToWhatsApp(phone, generatedMessage){
@@ -4732,7 +4757,12 @@ function openQuoteWhatsApp(quoteVersion = lastGeneratedQuoteData){
     return;
   }
 
-  const phone = getFormattedWhatsAppPhone(quoteVersion.customerPhone);
+  const phone = normalizeUaePhone(
+    quoteVersion.customerPhone
+    || quoteVersion.phone
+    || quoteVersion.whatsapp
+    || quoteVersion.customer?.phone
+  );
 
   if(!phone){
     setQuoteBuilderStatus("Customer phone number is missing.", "warning");
@@ -4740,11 +4770,13 @@ function openQuoteWhatsApp(quoteVersion = lastGeneratedQuoteData){
     return;
   }
 
-  const message = quoteVersion.language === "ar"
+  const existingQuoteMessage = quoteVersion.whatsappMessage || quoteVersion.message || "";
+  const message = existingQuoteMessage || (quoteVersion.language === "ar"
     ? `Hello ${quoteVersion.customerName || ""},\n\nYour Arabic quotation ${quoteVersion.quotationNumber} (version ${quoteVersion.version}) is ready.\nPlease see the attached PDF.\n\nGrand Total: ${formatCurrencyDisplay(quoteVersion.grandTotal)}`
-    : `Hello ${quoteVersion.customerName || ""},\n\nYour quotation ${quoteVersion.quotationNumber} (version ${quoteVersion.version}) is ready.\nPlease see the attached PDF.\n\nGrand Total: ${formatCurrencyDisplay(quoteVersion.grandTotal)}`;
+    : `Hello ${quoteVersion.customerName || ""},\n\nYour quotation ${quoteVersion.quotationNumber} (version ${quoteVersion.version}) is ready.\nPlease see the attached PDF.\n\nGrand Total: ${formatCurrencyDisplay(quoteVersion.grandTotal)}`)
+    || "Hello, regarding your quote from Al Taj Al Malaky.";
 
-  redirectToWhatsApp(phone, message);
+  openWhatsAppApp(phone, message);
 }
 
 async function handleGenerateQuote(){
