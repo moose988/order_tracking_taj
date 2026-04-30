@@ -217,7 +217,7 @@ export const PRODUCTS = [
     name: "Chair 1",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "53 x 53 x 45 CM",
     images: [
       "../images/chairs/11360308/1- new chair\uf028/CW4A4321 copy-.jpg",
       "../images/chairs/11360308/1- new chair\uf028/CW4A4325 copy.jpg",
@@ -241,7 +241,7 @@ export const PRODUCTS = [
     name: "Chair 3",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "47 x 47 x 45 CM",
     images: [
       "../images/chairs/11360308/3/CW4A4336 copy.jpg",
       "../images/chairs/11360308/3/CW4A4339 copy.jpg",
@@ -253,7 +253,7 @@ export const PRODUCTS = [
     name: "Chair 4",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "53 x 53 x 49 CM",
     images: [
       "../images/chairs/11360308/4/CW4A4341 copy.jpg",
       "../images/chairs/11360308/4/CW4A4346 copy.jpg",
@@ -265,7 +265,7 @@ export const PRODUCTS = [
     name: "Chair 5",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "52 x 52 x 47 CM",
     images: [
       "../images/chairs/11360308/5/CW4A4347 copy.jpg",
       "../images/chairs/11360308/5/CW4A4349 copy.jpg",
@@ -277,7 +277,7 @@ export const PRODUCTS = [
     name: "Chair 6",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "52 x 50 x 48 CM",
     images: [
       "../images/chairs/11360308/\u0666/CW4A4352-2 copy.jpg",
       "../images/chairs/11360308/\u0666/CW4A4358.jpg",
@@ -289,7 +289,7 @@ export const PRODUCTS = [
     name: "Chair 7",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "52 x 52 x 43 CM",
     images: [
       "../images/chairs/11360308/7/CW4A4360 copy.jpg",
       "../images/chairs/11360308/7/CW4A4362 copy.jpg",
@@ -313,7 +313,7 @@ export const PRODUCTS = [
     name: "Chair 9",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "49 x 48 x 46 CM",
     images: [
       "../images/chairs/11360308/\u0669/CW4A4377 copy.jpg",
       "../images/chairs/11360308/\u0669/CW4A4378 copy.jpg",
@@ -325,7 +325,7 @@ export const PRODUCTS = [
     name: "Chair 10",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "49 x 49 x 42 CM",
     images: [
       "../images/chairs/11360308/\u0661\u0660/CW4A4396 copy.jpg",
       "../images/chairs/11360308/\u0661\u0660/CW4A4397 copy.jpg",
@@ -337,7 +337,7 @@ export const PRODUCTS = [
     name: "Chair 11",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 46 CM",
     images: [
       "../images/chairs/11360308/11/CW4A4390 copy.jpg",
       "../images/chairs/11360308/11/CW4A4391 copy.jpg",
@@ -349,7 +349,7 @@ export const PRODUCTS = [
     name: "Chair 12",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "55 x 53 x 49 CM",
     images: [
       "../images/chairs/11360308/12/CW4A4402 copy.jpg",
       "../images/chairs/11360308/12/CW4A4406 copy.jpg",
@@ -385,7 +385,7 @@ export const PRODUCTS = [
     name: "Chair 15",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "53 x 50 x 46 CM",
     images: [
       "../images/chairs/11360308/\u0661\u0665/CW4A4383.jpg",
       "../images/chairs/11360308/\u0661\u0665/CW4A4384 copy.jpg",
@@ -397,7 +397,7 @@ export const PRODUCTS = [
     name: "Chair 16",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 52 x 48 CM",
     images: [
       "../images/chairs/11360308/\u0661\u0666/CW4A4410 copy.jpg",
       "../images/chairs/11360308/\u0661\u0666/CW4A4411 copy.jpg",
@@ -409,7 +409,7 @@ export const PRODUCTS = [
     name: "Chair 17",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "52 x 55 x 48 CM",
     images: [
       "../images/chairs/11360308/\u0661\u0667/CW4A4415 copy.jpg",
       "../images/chairs/11360308/\u0661\u0667/CW4A4416 copy.jpg",
@@ -433,7 +433,7 @@ export const PRODUCTS = [
     name: "Chair 19",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "45 x 45 x 50 CM",
     images: [
       "../images/chairs/11360308/\u0661\u0669/CW4A4458.jpg",
       "../images/chairs/11360308/\u0661\u0669/CW4A4460 -copy.jpg",
@@ -457,7 +457,7 @@ export const PRODUCTS = [
     name: "Chair 21",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "49 x 50 x 45 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0661/CW4A4465 copy.jpg",
       "../images/chairs/11360308/\u0662\u0661/CW4A4467 copy.jpg",
@@ -469,7 +469,7 @@ export const PRODUCTS = [
     name: "Chair 22",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 50 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0662/CW4A4479 copy.jpg",
       "../images/chairs/11360308/\u0662\u0662/CW4A4480 copy.jpg",
@@ -481,7 +481,7 @@ export const PRODUCTS = [
     name: "Chair 23",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "45 x 50 x 49 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0663/CW4A4470 copy.jpg",
       "../images/chairs/11360308/\u0662\u0663/CW4A4472.jpg",
@@ -493,7 +493,7 @@ export const PRODUCTS = [
     name: "Chair 24",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 46 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0664/CW4A4484 copy.jpg",
       "../images/chairs/11360308/\u0662\u0664/CW4A4486.jpg",
@@ -505,7 +505,7 @@ export const PRODUCTS = [
     name: "Chair 25",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "35 x 47 x 47 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0665/CW4A4490 copy.jpg",
       "../images/chairs/11360308/\u0662\u0665/CW4A4492 copy.jpg",
@@ -517,7 +517,7 @@ export const PRODUCTS = [
     name: "Chair 26",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 46 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0666/CW4A4449 copy.jpg",
       "../images/chairs/11360308/\u0662\u0666/CW4A4452 copy.jpg",
@@ -529,7 +529,7 @@ export const PRODUCTS = [
     name: "Chair 27",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "52 x 52 x 46 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0667/CW4A4503-2 copy.jpg",
       "../images/chairs/11360308/\u0662\u0667/CW4A4505 copy.jpg",
@@ -577,7 +577,7 @@ export const PRODUCTS = [
     name: "Chair 31",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "48 x 50 x 49 CM",
     images: [
       "../images/chairs/11360308/\u0663\u0661/CW4A4632 copy.jpg",
       "../images/chairs/11360308/\u0663\u0661/CW4A4633 copy.jpg",
@@ -601,7 +601,7 @@ export const PRODUCTS = [
     name: "Chair 33",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "45 x 50 x 47 CM",
     images: [
       "../images/chairs/11360308/\u0663\u0663/CW4A4546 copy.jpg",
       "../images/chairs/11360308/\u0663\u0663/CW4A4547 copy.jpg",
@@ -613,7 +613,7 @@ export const PRODUCTS = [
     name: "Chair 34",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "40 x 40 x 48 CM",
     images: [
       "../images/chairs/11360308/\u0663\u0664/CW4A4601 copy.jpg",
       "../images/chairs/11360308/\u0663\u0664/CW4A4602 copy.jpg",
@@ -661,7 +661,7 @@ export const PRODUCTS = [
     name: "Chair 38",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 45 CM",
     images: [
       "../images/chairs/11360308/\u0663\u0668/CW4A4563 copy.jpg",
       "../images/chairs/11360308/\u0663\u0668/CW4A4566 copy.jpg",
@@ -685,7 +685,7 @@ export const PRODUCTS = [
     name: "Chair 40",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "52 x 50 x 47 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0660/CW4A4576 copy.jpg",
       "../images/chairs/11360308/\u0664\u0660/CW4A4577 copy.jpg",
@@ -697,7 +697,7 @@ export const PRODUCTS = [
     name: "Chair 41",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "53 x 49 x 47 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0661/CW4A4551 copy.jpg",
       "../images/chairs/11360308/\u0664\u0661/CW4A4552 copy.jpg",
@@ -709,7 +709,7 @@ export const PRODUCTS = [
     name: "Chair 42",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "47 x 47 x 45 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0662/CW4A4567 copy.jpg",
       "../images/chairs/11360308/\u0664\u0662/CW4A4569 copy.jpg",
@@ -721,7 +721,7 @@ export const PRODUCTS = [
     name: "Chair 43",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "49 x 54 x 45 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0663/\u0661.jpg",
       "../images/chairs/11360308/\u0664\u0663/CW4A4444 copy.jpg",
@@ -745,7 +745,7 @@ export const PRODUCTS = [
     name: "Chair 45",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 46 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0665/CW4A4581 copy.jpg",
       "../images/chairs/11360308/\u0664\u0665/CW4A4582 copy.jpg",
@@ -769,7 +769,7 @@ export const PRODUCTS = [
     name: "Chair 47",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 49 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0667/CW4A4539 copy.jpg",
       "../images/chairs/11360308/\u0664\u0667/CW4A4541-2 copy.jpg",
@@ -817,7 +817,7 @@ export const PRODUCTS = [
     name: "Chair 51",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "51 x 51 x 45 CM",
     images: [
       "../images/chairs/11360308/\u0665\u0661/---.jpg",
       "../images/chairs/11360308/\u0665\u0661/\u0661 copy.jpg",
@@ -829,7 +829,7 @@ export const PRODUCTS = [
     name: "Chair 52",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "52 x 52 x 50 CM",
     images: [
       "../images/chairs/11360308/\u0665\u0662/CW4A4314 copy.jpg",
       "../images/chairs/11360308/\u0665\u0662/CW4A4318.jpg",

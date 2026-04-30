@@ -17,7 +17,21 @@ const MODAL_ZOOM_MAX = 3;
 const MODAL_ZOOM_STEP = 0.25;
 const INITIAL_VISIBLE_PRODUCTS = 12;
 const LOAD_MORE_STEP = 12;
+const PRODUCT_CARD_MEDIA_WIDTH = 1200;
+const PRODUCT_CARD_MEDIA_HEIGHT = 900;
+const FAILED_IMAGE_SOURCES = new Set();
 const PRODUCT_ID_MAP = new Map(PRODUCTS.map((product) => [String(product.id), product]));
+const PRODUCT_IMAGE_CACHE = new Map(
+  PRODUCTS.map((product) => {
+    const images = Array.isArray(product?.images)
+      ? product.images
+        .map((image) => normalizeCatalogImageUrl(image))
+        .filter((image) => String(image || "").trim())
+      : [];
+
+    return [String(product.id), images.length ? images : [CATALOG_PLACEHOLDER_IMAGE]];
+  })
+);
 const PRODUCT_SEARCH_INDEX = PRODUCTS.map((product) => ({
   product,
   category: String(product.category || ""),
@@ -162,13 +176,7 @@ function applyInitialCategoryFromUrl(){
 }
 
 function getProductImages(product){
-  const images = Array.isArray(product?.images)
-    ? product.images
-      .map((image) => normalizeCatalogImageUrl(image))
-      .filter((image) => String(image || "").trim())
-    : [];
-
-  return images.length ? images : [CATALOG_PLACEHOLDER_IMAGE];
+  return PRODUCT_IMAGE_CACHE.get(String(product?.id)) || [CATALOG_PLACEHOLDER_IMAGE];
 }
 
 function getPrimaryProductImage(product){
@@ -198,8 +206,72 @@ function getProductThumbClasses(product){
   return classes.join(" ");
 }
 
-function getImageFallbackAttribute(){
-  return `this.onerror=null;this.src='${CATALOG_PLACEHOLDER_IMAGE.replaceAll("'", "\\'")}';`;
+function getImageSourceOrFallback(imageSource){
+  const normalizedSource = String(imageSource || "").trim();
+
+  if(!normalizedSource || FAILED_IMAGE_SOURCES.has(normalizedSource)){
+    return CATALOG_PLACEHOLDER_IMAGE;
+  }
+
+  return normalizedSource;
+}
+
+function applySafeImageFallback(image){
+  if(!(image instanceof HTMLImageElement)){
+    return;
+  }
+
+  const imageSource = String(image.dataset.originalSrc || image.currentSrc || image.src || "").trim();
+
+  if(image.dataset.fallbackApplied === "true"){
+    image.onerror = null;
+    image.src = CATALOG_PLACEHOLDER_IMAGE;
+    image.classList.add("is-fallback");
+    image.classList.add("is-loaded");
+    return;
+  }
+
+  if(imageSource && imageSource !== CATALOG_PLACEHOLDER_IMAGE){
+    FAILED_IMAGE_SOURCES.add(imageSource);
+  }
+
+  image.dataset.fallbackApplied = "true";
+  image.onerror = null;
+  image.src = CATALOG_PLACEHOLDER_IMAGE;
+  image.classList.add("is-fallback");
+  image.classList.add("is-loaded");
+}
+
+function hydrateImageElement(image){
+  if(!(image instanceof HTMLImageElement) || image.dataset.imageHydrated === "true"){
+    return;
+  }
+
+  image.dataset.imageHydrated = "true";
+  image.onload = () => {
+    image.classList.add("is-loaded");
+  };
+  image.onerror = () => {
+    applySafeImageFallback(image);
+  };
+
+  if(image.complete){
+    if(image.naturalWidth > 0){
+      image.classList.add("is-loaded");
+    }else{
+      applySafeImageFallback(image);
+    }
+  }
+}
+
+function hydrateImages(container){
+  if(!container){
+    return;
+  }
+
+  container.querySelectorAll("img[data-safe-image]").forEach((image) => {
+    hydrateImageElement(image);
+  });
 }
 
 function clampModalZoom(value){
@@ -381,16 +453,21 @@ function renderProducts(){
   grid.innerHTML = productsToRender.map((product, index) => `
     <article class="product-card" data-product-id="${product.id}">
       <div class="product-media">
+        <div class="product-media-surface">
         <img
           class="${getProductThumbClasses(product)}"
-          src="${escapeHtml(getPrimaryProductImage(product))}"
+          src="${escapeHtml(getImageSourceOrFallback(getPrimaryProductImage(product)))}"
           alt="${escapeHtml(product.name)}"
           loading="${index < 2 ? "eager" : "lazy"}"
           decoding="async"
           fetchpriority="${index === 0 ? "high" : "low"}"
           sizes="(max-width: 760px) 100vw, (max-width: 1280px) 33vw, 24vw"
-          onerror="${getImageFallbackAttribute()}"
+          width="${PRODUCT_CARD_MEDIA_WIDTH}"
+          height="${PRODUCT_CARD_MEDIA_HEIGHT}"
+          data-safe-image="true"
+          data-original-src="${escapeHtml(getPrimaryProductImage(product))}"
         >
+        </div>
         <span class="badge product-badge">${escapeHtml(product.category)}</span>
       </div>
 
@@ -403,6 +480,7 @@ function renderProducts(){
     </article>
   `).join("");
 
+  hydrateImages(grid);
   renderCatalogMeta(shownCount, totalProducts);
 }
 
@@ -581,10 +659,17 @@ function renderModalGallery(){
   const productImages = getProductImages(selectedProduct);
 
   if(modalImage){
-    modalImage.src = productImages[currentImageIndex];
+    const currentImage = getImageSourceOrFallback(productImages[currentImageIndex]);
+    modalImage.src = currentImage;
     modalImage.alt = selectedProduct.name;
+    modalImage.loading = "eager";
     modalImage.decoding = "async";
-    modalImage.setAttribute("onerror", getImageFallbackAttribute());
+    modalImage.dataset.safeImage = "true";
+    modalImage.dataset.originalSrc = productImages[currentImageIndex];
+    modalImage.dataset.imageHydrated = "false";
+    delete modalImage.dataset.fallbackApplied;
+    modalImage.classList.remove("is-fallback", "is-loaded");
+    hydrateImageElement(modalImage);
   }
 
   if(modalImageCount){
@@ -600,14 +685,18 @@ function renderModalGallery(){
         aria-label="View image ${index + 1}"
       >
         <img
-          src="${escapeHtml(image)}"
+          src="${escapeHtml(getImageSourceOrFallback(image))}"
           alt="${escapeHtml(`${selectedProduct.name} thumbnail ${index + 1}`)}"
           loading="lazy"
           decoding="async"
-          onerror="${getImageFallbackAttribute()}"
+          width="240"
+          height="240"
+          data-safe-image="true"
+          data-original-src="${escapeHtml(image)}"
         >
       </button>
     `).join("");
+    hydrateImages(modalThumbs);
   }
 
   galleryButtons.forEach((button) => {
