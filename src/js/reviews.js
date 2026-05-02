@@ -1,4 +1,5 @@
 import { db } from "./firebase.js";
+import { formatLocalizedDate, initI18n, onLanguageChange, t } from "./i18n.js";
 import { collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const reviewsGrid = document.getElementById("reviewsGrid");
@@ -73,7 +74,7 @@ async function loadReviews(){
     return;
   }
 
-  reviewsGrid.innerHTML = '<div class="empty-state">Loading reviews...</div>';
+  reviewsGrid.innerHTML = `<div class="empty-state">${escapeHtml(t("common.loadingReviews"))}</div>`;
   reviewsPagination.innerHTML = "";
   reviewsPagination.style.display = "none";
 
@@ -93,7 +94,7 @@ async function loadReviews(){
     applyActiveFilter();
   }catch(error){
     console.error("Failed to load reviews:", error);
-    reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
+    reviewsGrid.innerHTML = `<div class="empty-state">${escapeHtml(t("common.noReviewsYet"))}</div>`;
     reviewsPagination.innerHTML = "";
     reviewsPagination.style.display = "none";
   }
@@ -101,7 +102,7 @@ async function loadReviews(){
 
 function renderReviews(reviews){
   if(!reviews.length){
-    reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
+    reviewsGrid.innerHTML = `<div class="empty-state">${escapeHtml(t("common.noReviewsYet"))}</div>`;
     renderPagination(0, 0);
     return;
   }
@@ -110,9 +111,9 @@ function renderReviews(reviews){
     <article class="review-card">
       <div class="stars">${"&#9733;".repeat(Number(review.rating) || 0)}</div>
       <p class="review-comment">${escapeHtml(review.comment || "")}</p>
-      ${review.imageUrl ? `<img class="review-image" src="${escapeAttribute(review.imageUrl)}" alt="Customer review photo" loading="lazy" decoding="async">` : ""}
+      ${review.imageUrl ? `<img class="review-image" src="${escapeAttribute(review.imageUrl)}" alt="${escapeAttribute(t("reviews.reviewPhotoAlt"))}" loading="lazy" decoding="async">` : ""}
       <div class="review-meta">
-        <div class="review-author">${escapeHtml(review.name || "Anonymous")}</div>
+        <div class="review-author">${escapeHtml(review.name || t("common.anonymous"))}</div>
         <div class="review-date">${formatReviewDate(review.createdAt)}</div>
       </div>
     </article>
@@ -178,7 +179,7 @@ function renderPagination(activePage, totalPages){
         class="reviews-pagination-btn ${pageNumber === activePage ? "is-active" : ""}"
         type="button"
         data-page="${pageNumber}"
-        aria-label="Go to page ${pageNumber}"
+        aria-label="${escapeAttribute(t("reviews.goToPage", { page: pageNumber }))}"
         ${pageNumber === activePage ? 'aria-current="page"' : ""}
       >
         ${pageNumber}
@@ -193,7 +194,7 @@ function renderPagination(activePage, totalPages){
       data-page-nav="prev"
       ${activePage === 1 ? "disabled" : ""}
     >
-      Previous
+      ${escapeHtml(t("reviews.previous"))}
     </button>
     <div class="reviews-pagination-pages">
       ${pageButtons}
@@ -204,7 +205,7 @@ function renderPagination(activePage, totalPages){
       data-page-nav="next"
       ${activePage === totalPages ? "disabled" : ""}
     >
-      Next
+      ${escapeHtml(t("reviews.next"))}
     </button>
   `;
 
@@ -263,11 +264,7 @@ function formatReviewDate(timestamp){
     ? timestamp.toDate()
     : new Date(timestamp);
 
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  });
+  return formatLocalizedDate(date);
 }
 
 function escapeHtml(value){
@@ -284,7 +281,14 @@ function escapeAttribute(value){
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initI18n();
   initMobileMenu();
   initReviewFilters();
   loadReviews();
+});
+
+onLanguageChange(() => {
+  if(reviewsGrid){
+    applyActiveFilter();
+  }
 });

@@ -12,33 +12,38 @@
     crossorigin=""
   />
 </head>
-<body>
+<body class="quote-page" data-i18n-title="meta.quoteTitle">
   <header class="site-header">
     <div class="container navbar">
       <a href="/" class="brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" />
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="brand-logo" />
         <div class="brand-copy">
           <h2>Al Taj Al Malaky</h2>
-          <span>Luxury Event Setup & Rental</span>
         </div>
       </a>
 
       <nav class="nav-links">
-        <a href="/">Home</a>
-        <a href="/order" class="active">Order</a>
-        <a href="/track">Track Order</a>
-        <a href="/reviews">Reviews</a>
+        <a href="/" data-i18n="nav.home">Home</a>
+        <a href="/order" class="active" data-i18n="nav.order">Order</a>
+        <a href="/track" data-i18n="nav.track">Track Order</a>
+        <a href="/reviews" data-i18n="nav.reviews">Reviews</a>
       </nav>
 
-      <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
+      <div class="header-actions">
+        <div class="lang-switcher" data-language-switcher data-i18n-aria-label="common.languageSelector" aria-label="Language selector">
+          <button class="lang-switcher-btn" type="button" data-lang-option="en" aria-pressed="true">EN</button>
+          <button class="lang-switcher-btn" type="button" data-lang-option="ar" aria-pressed="false">AR</button>
+        </div>
+        <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" data-i18n-aria-label="common.openNavigation">&#9776;</button>
+      </div>
     </div>
   </header>
 
   <main class="page-section">
     <div class="container">
       <div class="section-head">
-        <div class="section-kicker">Quote Request</div>
-        <h1 class="section-title"></h1>
+        <div class="section-kicker" data-i18n="quote.kicker">Quote Request</div>
+        <h1 class="section-title" data-i18n="quote.pageTitle">Complete Your Quote Request</h1>
       </div>
 
       <div class="quote-layout">
@@ -46,63 +51,63 @@
           <form id="quoteForm" class="form-grid">
             <div class="form-grid two-col">
               <div class="form-group">
-                <label for="customerName">Customer Name</label>
-                <input type="text" id="customerName" placeholder="Ahmed" required />
+                <label for="customerName" data-i18n="quote.customerNameLabel">Customer Name</label>
+                <input type="text" id="customerName" placeholder="Ahmed" data-i18n-placeholder="quote.customerNamePlaceholder" required />
               </div>
 
               <div class="form-group">
-                <label for="customerPhone">Phone Number</label>
-                <input type="tel" id="customerPhone" placeholder="05xxxxxxxx" required />
+                <label for="customerPhone" data-i18n="quote.phoneLabel">Phone Number</label>
+                <input type="tel" id="customerPhone" placeholder="05xxxxxxxx" data-i18n-placeholder="quote.phonePlaceholder" required />
               </div>
             </div>
 
             <div class="form-grid two-col">
               <div class="form-group">
-                <label for="eventDate">Event Date</label>
+                <label for="eventDate" data-i18n="quote.eventDateLabel">Event Date</label>
                 <input type="date" id="eventDate" required />
               </div>
             
               <div class="form-group">
-                <label for="eventTime">Event Time</label>
+                <label for="eventTime" data-i18n="quote.eventTimeLabel">Event Time</label>
                 <input type="time" id="eventTime" required />
               </div>
             </div>
 
             <div class="form-grid two-col">
               <div class="form-group">
-                <label for="setupTime">Setup Time</label>
+                <label for="setupTime" data-i18n="quote.setupTimeLabel">Setup Time</label>
                 <input type="time" id="setupTime" required />
-                <p class="help-text">When should our team arrive for setup?</p>
+                <p class="help-text" data-i18n="quote.setupTimeHelp">When should our team arrive for setup?</p>
               </div>
 
               <div class="form-group">
-                <label for="rentalDays">Rental Days</label>
+                <label for="rentalDays" data-i18n="quote.rentalDaysLabel">Rental Days</label>
                 <input type="number" id="rentalDays" min="1" step="1" value="1" required />
-                <p class="help-text">How many days should the rental remain reserved?</p>
+                <p class="help-text" data-i18n="quote.rentalDaysHelp">How many days should the rental remain reserved?</p>
               </div>
             </div>
             
             <div class="form-group">
-              <label for="mapLink">Google Maps Link</label>
-              <input type="url" id="mapLink" placeholder="Paste Google Maps location link here" required />
+              <label for="mapLink" data-i18n="quote.mapLinkLabel">Google Maps Link</label>
+              <input type="url" id="mapLink" placeholder="Paste Google Maps location link here" data-i18n-placeholder="quote.mapLinkPlaceholder" required />
             </div>
 
             <div class="form-group">
               <div class="location-field-actions">
-                <button type="button" class="btn btn-primary" id="pickEventLocationBtn">
+                <button type="button" class="btn btn-primary" id="pickEventLocationBtn" data-i18n="quote.pickLocationBtn">
                   Pick Event Location on Map
                 </button>
-                <button type="button" class="btn btn-secondary" id="useLocationBtn">
+                <button type="button" class="btn btn-secondary" id="useLocationBtn" data-i18n="quote.useCurrentLocationBtn">
                   Use My Current Location
                 </button>
               </div>
-              <p class="help-text">Search for a venue or tap directly on the map to lock the exact destination for delivery tracking.</p>
+              <p class="help-text" data-i18n="quote.locationPickerHelp">Search for a venue or tap directly on the map to lock the exact destination for delivery tracking.</p>
             </div>
 
             <div class="form-group">
-              <label for="eventLocation">Event Location</label>
-              <input type="text" id="eventLocation" placeholder="Dubai, Business Bay" required />
-              <p class="help-text">Please enter the exact accurate location (street number, building name, and floor).</p>
+              <label for="eventLocation" data-i18n="quote.eventLocationLabel">Event Location</label>
+              <input type="text" id="eventLocation" placeholder="Dubai, Business Bay" data-i18n-placeholder="quote.eventLocationPlaceholder" required />
+              <p class="help-text" data-i18n="quote.eventLocationHelp">Please enter the exact accurate location (street number, building name, and floor).</p>
             </div>
 
             <div class="form-group">
@@ -111,8 +116,8 @@
             
 
             <div class="form-group">
-              <label for="eventNotes">Notes</label>
-              <textarea id="eventNotes" placeholder="Outdoor event, evening setup, special seating request, etc."></textarea>
+              <label for="eventNotes" data-i18n="quote.notesLabel">Notes</label>
+              <textarea id="eventNotes" placeholder="Outdoor event, evening setup, special seating request, etc." data-i18n-placeholder="quote.notesPlaceholder"></textarea>
             </div>
 
           </form>
@@ -120,26 +125,26 @@
 
         <aside class="quote-summary-card">
           <div class="quote-summary-head">
-            <h3>Your Selected Items</h3>
-            <button type="button" id="quoteClearAllBtn" class="clear-all">Clear all</button>
+            <h3 data-i18n="quote.selectedItemsTitle">Your Selected Items</h3>
+            <button type="button" id="quoteClearAllBtn" class="clear-all" data-i18n="quote.clearAll">Clear all</button>
           </div>
 
-          <div id="quoteEmptyState" class="empty-state">
+          <div id="quoteEmptyState" class="empty-state" data-i18n="quote.emptyState">
             Your order is empty
           </div>
 
           <div id="quoteItemsList" class="quote-items-list"></div>
 
           <div id="quoteOrderSummary" class="quote-order-summary">
-            <div id="quoteItemCount">Total items: 0</div>
+            <div id="quoteItemCount" data-i18n="quote.totalItemsZero">Total items: 0</div>
           </div>
 
-          <button type="submit" form="quoteForm" id="quoteSubmitBtn" class="btn btn-primary quote-submit-btn">
+          <button type="submit" form="quoteForm" id="quoteSubmitBtn" class="btn btn-primary quote-submit-btn" data-i18n="quote.submitBtn">
             Send via WhatsApp
           </button>
 
           <div class="quote-summary-footer">
-            <a href="/order" class="btn btn-secondary">Back to Order Page</a>
+            <a href="/order" class="btn btn-secondary" data-i18n="quote.backToOrder">Back to Order Page</a>
           </div>
         </aside>
       </div>
@@ -150,15 +155,15 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
         <div class="footer-brand-copy">
           <h4>Al Taj Al Malaky</h4>
-          <p>Luxury Event Setup &amp; Rental</p>
+          <p data-i18n="common.brandTagline">Luxury Event Setup &amp; Rental</p>
         </div>
       </div>
 
       <div class="footer-links footer-links-inline">
-        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer">WhatsApp</a>
+        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer" data-i18n="common.whatsapp">WhatsApp</a>
         <a href="https://instagram.com/taj_almalaki" target="_blank" rel="noreferrer">@taj_almalaki</a>
       </div>
     </div>

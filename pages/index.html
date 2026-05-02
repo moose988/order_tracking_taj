@@ -8,25 +8,30 @@
   <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
   <link rel="stylesheet" href="../src/css/styles.css" />
 </head>
-<body class="home-page">
+<body class="home-page" data-i18n-title="meta.homeTitle">
   <header class="site-header">
     <div class="container navbar">
       <a href="/" class="brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" width="54" height="54" decoding="async" />
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="brand-logo" width="54" height="54" decoding="async" />
         <div class="brand-copy">
           <h2>Al Taj Al Malaky</h2>
-          <span>Luxury Event Setup & Rental</span>
         </div>
       </a>
 
       <nav class="nav-links">
-        <a href="/" class="active">Home</a>
-        <a href="/order">Order</a>
-        <a href="/track">Track Order</a>
-        <a href="/reviews">Reviews</a>
+        <a href="/" class="active" data-i18n="nav.home">Home</a>
+        <a href="/order" data-i18n="nav.order">Order</a>
+        <a href="/track" data-i18n="nav.track">Track Order</a>
+        <a href="/reviews" data-i18n="nav.reviews">Reviews</a>
       </nav>
 
-      <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
+      <div class="header-actions">
+        <div class="lang-switcher" data-language-switcher data-i18n-aria-label="common.languageSelector" aria-label="Language selector">
+          <button class="lang-switcher-btn" type="button" data-lang-option="en" aria-pressed="true">EN</button>
+          <button class="lang-switcher-btn" type="button" data-lang-option="ar" aria-pressed="false">AR</button>
+        </div>
+        <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" data-i18n-aria-label="common.openNavigation">&#9776;</button>
+      </div>
     </div>
   </header>
 
@@ -37,29 +42,29 @@
 
       <div class="container home-hero-shell">
         <div class="home-hero-copy" data-home-reveal>
-          <h1>Premium event rentals across the UAE</h1>
-          <p class="home-hero-lead">
+          <h1 data-i18n="home.heroTitle">Premium event rentals across the UAE</h1>
+          <p class="home-hero-lead" data-i18n="home.heroLead">
             Chairs, tables, majlis, bridal seating, and lounge pieces delivered across the UAE with premium quality, service, and presentation.
           </p>
 
           <div class="home-hero-actions">
-            <a href="/order" class="btn btn-primary">Request Your Quote</a>
-            <a href="/reviews" class="btn btn-secondary">Client Reviews</a>
+            <a href="/order" class="btn btn-primary" data-i18n="home.heroPrimary">Request Your Quote</a>
+            <a href="/reviews" class="btn btn-secondary" data-i18n="home.heroSecondary">Client Reviews</a>
           </div>
         </div>
       </div>
 
       <div class="home-scroll-cue" aria-hidden="true">
         <span></span>
-        <p>Scroll to enter the collection</p>
+        <p data-i18n="home.heroScroll">Scroll to enter the collection</p>
       </div>
     </section>
 
     <section class="page-section home-collections-section">
       <div class="container">
         <div class="section-head home-section-head" data-home-reveal>
-          <div class="section-kicker">Collections</div>
-          <h2 class="section-title">Explore our signature collection</h2>
+          <div class="section-kicker" data-i18n="home.collectionsKicker">Collections</div>
+          <h2 class="section-title" data-i18n="home.collectionsTitle">Explore our signature collection</h2>
         </div>
 
         <div id="homeCollectionsGrid" class="home-collections-grid" aria-live="polite"></div>
@@ -70,27 +75,27 @@
       <div class="container">
         <div class="home-values-layout">
           <div class="home-values-intro" data-home-reveal>
-            <div class="section-kicker">Why Clients Choose Us</div>
-            <h2 class="section-title">We deliver refined event setups across the UAE</h2>
-            <p class="section-text">
+            <div class="section-kicker" data-i18n="home.valuesKicker">Why Clients Choose Us</div>
+            <h2 class="section-title" data-i18n="home.valuesTitle">We deliver refined event setups across the UAE</h2>
+            <p class="section-text" data-i18n="home.valuesText">
               Chairs, tables, majlis, and bridal seating curated with precision and delivered with premium service.
             </p>
           </div>
 
           <div class="home-values-grid">
             <article class="home-value-card" data-home-reveal>
-              <h3>Curated Pieces</h3>
-              <p>A refined selection of chairs, tables, and statement setups for elevated settings.</p>
+              <h3 data-i18n="home.valuesCuratedTitle">Curated Pieces</h3>
+              <p data-i18n="home.valuesCuratedText">A refined selection of chairs, tables, and statement setups for elevated settings.</p>
             </article>
 
             <article class="home-value-card" data-home-reveal>
-              <h3>Seamless Ordering</h3>
-              <p>An effortless journey from selection to quote, designed for clarity and ease.</p>
+              <h3 data-i18n="home.valuesOrderingTitle">Seamless Ordering</h3>
+              <p data-i18n="home.valuesOrderingText">An effortless journey from selection to quote, designed for clarity and ease.</p>
             </article>
 
             <article class="home-value-card" data-home-reveal>
-              <h3>Reliable Delivery &amp; Tracking</h3>
-              <p>On-time setup across the UAE with real-time order tracking for complete peace of mind.</p>
+              <h3 data-i18n="home.valuesTrackingTitle">Reliable Delivery &amp; Tracking</h3>
+              <p data-i18n="home.valuesTrackingText">On-time setup across the UAE with real-time order tracking for complete peace of mind.</p>
             </article>
           </div>
         </div>
@@ -100,8 +105,8 @@
     <section class="page-section home-showcase-section">
       <div class="container">
         <div class="section-head home-section-head" data-home-reveal>
-          <div class="section-kicker">Event Highlights</div>
-          <h2 class="section-title">Spaces styled to feel poised at first glance and memorable long after</h2>
+          <div class="section-kicker" data-i18n="home.showcaseKicker">Event Highlights</div>
+          <h2 class="section-title" data-i18n="home.showcaseTitle">Spaces styled to feel poised at first glance and memorable long after</h2>
         </div>
 
         <div class="home-showcase-grid">
@@ -123,14 +128,14 @@
     <section class="page-section home-reviews-section">
       <div class="container">
         <div class="section-head home-section-head" data-home-reveal>
-          <div class="section-kicker">Client Feedback</div>
-          <h2 class="section-title">Client experiences shaped by elegance, service, and trust</h2>
+          <div class="section-kicker" data-i18n="home.reviewsKicker">Client Feedback</div>
+          <h2 class="section-title" data-i18n="home.reviewsTitle">Client experiences shaped by elegance, service, and trust</h2>
         </div>
 
         <div id="homeReviewsGrid" class="reviews-grid home-reviews-grid"></div>
 
         <div class="home-reviews-footer" data-home-reveal>
-          <a href="/reviews" class="btn btn-secondary">View Client Experiences</a>
+          <a href="/reviews" class="btn btn-secondary" data-i18n="home.reviewsCta">View Client Experiences</a>
         </div>
       </div>
     </section>
@@ -139,34 +144,34 @@
       <div class="container">
         <div class="home-location-card">
           <div class="home-location-copy" data-home-reveal>
-            <div class="section-kicker">Visit Us</div>
-            <h2 class="section-title">Visit our office.</h2>
-            <p class="section-text">
+            <div class="section-kicker" data-i18n="home.visitKicker">Visit Us</div>
+            <h2 class="section-title" data-i18n="home.visitTitle">Visit our office.</h2>
+            <p class="section-text" data-i18n="home.visitText">
               Visit our location for consultations, event planning, and rental selection in a calm, premium setting.
             </p>
 
             <div class="home-hours-card">
-              <div class="home-hours-label">Opening Hours</div>
+              <div class="home-hours-label" data-i18n="home.openingHours">Opening Hours</div>
               <div class="home-hours-grid">
-                <div class="home-hours-row"><span>Monday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
-                <div class="home-hours-row"><span>Tuesday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
-                <div class="home-hours-row"><span>Wednesday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
-                <div class="home-hours-row"><span>Thursday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
-                <div class="home-hours-row is-closed"><span>Friday</span><strong>Closed</strong></div>
-                <div class="home-hours-row"><span>Saturday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
-                <div class="home-hours-row"><span>Sunday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
+                <div class="home-hours-row"><span data-i18n="common.dayMonday">Monday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
+                <div class="home-hours-row"><span data-i18n="common.dayTuesday">Tuesday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
+                <div class="home-hours-row"><span data-i18n="common.dayWednesday">Wednesday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
+                <div class="home-hours-row"><span data-i18n="common.dayThursday">Thursday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
+                <div class="home-hours-row is-closed"><span data-i18n="common.dayFriday">Friday</span><strong data-i18n="common.closed">Closed</strong></div>
+                <div class="home-hours-row"><span data-i18n="common.daySaturday">Saturday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
+                <div class="home-hours-row"><span data-i18n="common.daySunday">Sunday</span><strong>9 AM-2 PM, 4-8 PM</strong></div>
               </div>
             </div>
 
             <div class="home-location-actions">
-              <a href="https://maps.app.goo.gl/SuF2ah7CpGjDaQDH9" class="btn btn-primary" target="_blank" rel="noreferrer">Get Directions</a>
-              <a href="https://wa.me/971505373383" class="btn btn-secondary" target="_blank" rel="noreferrer">WhatsApp Us</a>
+              <a href="https://maps.app.goo.gl/SuF2ah7CpGjDaQDH9" class="btn btn-primary" target="_blank" rel="noreferrer" data-i18n="home.getDirections">Get Directions</a>
+              <a href="https://wa.me/971505373383" class="btn btn-secondary" target="_blank" rel="noreferrer" data-i18n="home.whatsappUs">WhatsApp Us</a>
             </div>
           </div>
 
           <div class="home-location-preview" data-home-reveal>
             <div class="home-location-map">
-              <div class="home-location-map-label">Our Location</div>
+              <div class="home-location-map-label" data-i18n="home.locationLabel">Our Location</div>
               <iframe
                 src="https://www.google.com/maps?q=25.3464357,55.4067289&z=17&output=embed"
                 loading="lazy"
@@ -183,16 +188,16 @@
       <div class="container">
         <div class="home-cta-card" data-home-reveal>
           <div>
-            <span class="section-kicker">Begin Your Event</span>
-            <h2 class="section-title">Ready to build a more elegant event setting?</h2>
-            <p class="section-text">
+            <span class="section-kicker" data-i18n="home.ctaKicker">Begin Your Event</span>
+            <h2 class="section-title" data-i18n="home.ctaTitle">Ready to build a more elegant event setting?</h2>
+            <p class="section-text" data-i18n="home.ctaText">
               Explore the collection, choose your preferred pieces, and send your quote request directly to our team.
             </p>
           </div>
 
           <div class="home-cta-actions">
-            <a href="/order" class="btn btn-primary">Explore the Collection</a>
-            <a href="/track" class="btn btn-secondary">Track an Existing Order</a>
+            <a href="/order" class="btn btn-primary" data-i18n="home.ctaPrimary">Explore the Collection</a>
+            <a href="/track" class="btn btn-secondary" data-i18n="home.ctaSecondary">Track an Existing Order</a>
           </div>
         </div>
       </div>
@@ -203,15 +208,15 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
         <div class="footer-brand-copy">
           <h4>Al Taj Al Malaky</h4>
-          <p>Luxury Event Setup &amp; Rental</p>
+          <p data-i18n="common.brandTagline">Luxury Event Setup &amp; Rental</p>
         </div>
       </div>
 
       <div class="footer-links footer-links-inline">
-        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer">WhatsApp</a>
+        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer" data-i18n="common.whatsapp">WhatsApp</a>
         <a href="https://instagram.com/taj_almalaki" target="_blank" rel="noreferrer">@taj_almalaki</a>
       </div>
     </div>

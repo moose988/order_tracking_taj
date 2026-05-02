@@ -1,5 +1,6 @@
 import { CATALOG_PLACEHOLDER_IMAGE, PRODUCTS } from "../data/products.js";
 import { initScrollTopButton } from "./scroll-top.js";
+import { initI18n, onLanguageChange, t, translateCategory, translateCount } from "./i18n.js";
 
 let order = JSON.parse(localStorage.getItem("tajOrder")) || [];
 let selectedProduct = null;
@@ -8,6 +9,8 @@ let currentImageIndex = 0;
 let modalZoomLevel = 1;
 let modalZoomOriginX = 50;
 let modalZoomOriginY = 50;
+let modalPinchStartDistance = 0;
+let modalPinchStartZoom = 1;
 let currentCategory = "All";
 let currentSearchQuery = "";
 let searchDebounceTimer = null;
@@ -106,6 +109,10 @@ function escapeHtml(value){
     .replaceAll("'", "&#39;");
 }
 
+function escapeAttribute(value){
+  return escapeHtml(value);
+}
+
 function normalizeCatalogImageUrl(imagePath){
   const rawValue = String(imagePath || "").trim();
 
@@ -201,6 +208,17 @@ function getProductThumbClasses(product){
 
   if(category === "Bridal Sofa" || category === "Majlis Sofa"){
     classes.push("product-thumb-sofa");
+  }
+
+  return classes.join(" ");
+}
+
+function getProductCardClasses(product){
+  const classes = ["product-card"];
+  const category = String(product?.category || "").trim();
+
+  if(category === "Chairs"){
+    classes.push("product-card-chair");
   }
 
   return classes.join(" ");
@@ -329,6 +347,8 @@ function zoomModalOut(){
 function resetModalZoom(){
   modalZoomOriginX = 50;
   modalZoomOriginY = 50;
+  modalPinchStartDistance = 0;
+  modalPinchStartZoom = MODAL_ZOOM_MIN;
   setModalZoom(MODAL_ZOOM_MIN);
 }
 
@@ -347,6 +367,33 @@ function updateZoomOriginFromPointer(event){
 
   const relativeX = ((event.clientX - rect.left) / rect.width) * 100;
   const relativeY = ((event.clientY - rect.top) / rect.height) * 100;
+
+  modalZoomOriginX = Math.min(100, Math.max(0, relativeX));
+  modalZoomOriginY = Math.min(100, Math.max(0, relativeY));
+}
+
+function getTouchDistance(touchA, touchB){
+  const deltaX = touchA.clientX - touchB.clientX;
+  const deltaY = touchA.clientY - touchB.clientY;
+
+  return Math.hypot(deltaX, deltaY);
+}
+
+function updateZoomOriginFromTouches(touchA, touchB, frame){
+  if(!frame){
+    return;
+  }
+
+  const rect = frame.getBoundingClientRect();
+
+  if(!rect.width || !rect.height){
+    return;
+  }
+
+  const centerX = (touchA.clientX + touchB.clientX) / 2;
+  const centerY = (touchA.clientY + touchB.clientY) / 2;
+  const relativeX = ((centerX - rect.left) / rect.width) * 100;
+  const relativeY = ((centerY - rect.top) / rect.height) * 100;
 
   modalZoomOriginX = Math.min(100, Math.max(0, relativeX));
   modalZoomOriginY = Math.min(100, Math.max(0, relativeY));
@@ -378,7 +425,10 @@ function renderCatalogMeta(shownCount, totalCount){
 
   if(productsCountText){
     if(totalCount > 0){
-      productsCountText.textContent = `Showing ${shownCount} of ${totalCount} piece${totalCount === 1 ? "" : "s"}`;
+      productsCountText.textContent = translateCount("order.showingCount", totalCount, {
+        shown: shownCount,
+        total: totalCount
+      });
       productsCountText.hidden = false;
     }else{
       productsCountText.textContent = "";
@@ -421,7 +471,7 @@ function renderFilterButtons(){
       type="button"
       data-category="${escapeHtml(category)}"
     >
-      ${escapeHtml(category)}
+      ${escapeHtml(translateCategory(category))}
     </button>
   `).join("");
 }
@@ -441,9 +491,9 @@ function renderProducts(){
   if(!totalProducts){
     grid.innerHTML = `
       <article class="order-products-empty">
-        <span class="section-kicker">No Matches</span>
-        <h3>No products found</h3>
-        <p>Try a different search or switch categories to continue browsing the collection.</p>
+        <span class="section-kicker">${escapeHtml(t("order.noMatchesKicker"))}</span>
+        <h3>${escapeHtml(t("order.noMatchesTitle"))}</h3>
+        <p>${escapeHtml(t("order.noMatchesText"))}</p>
       </article>
     `;
     renderCatalogMeta(0, 0);
@@ -451,7 +501,7 @@ function renderProducts(){
   }
 
   grid.innerHTML = productsToRender.map((product, index) => `
-    <article class="product-card" data-product-id="${product.id}">
+    <article class="${getProductCardClasses(product)}" data-product-id="${product.id}" data-category="${escapeHtml(product.category || "")}">
       <div class="product-media">
         <div class="product-media-surface">
         <img
@@ -468,13 +518,13 @@ function renderProducts(){
           data-original-src="${escapeHtml(getPrimaryProductImage(product))}"
         >
         </div>
-        <span class="badge product-badge">${escapeHtml(product.category)}</span>
+        <span class="badge product-badge">${escapeHtml(translateCategory(product.category))}</span>
       </div>
 
       <div class="product-copy">
         <div class="product-copy-head">
           <h3>${escapeHtml(product.name)}</h3>
-          <span class="product-card-link">Tap to view details</span>
+          <span class="product-card-link">${escapeHtml(t("order.tapToViewDetails"))}</span>
         </div>
       </div>
     </article>
@@ -579,7 +629,7 @@ function handleManualQtyInput(){
 }
 
 function clearOrder(){
-  if(window.confirm("Are you sure you want to clear your entire order?")){
+  if(window.confirm(t("order.clearOrderConfirm"))){
     order = [];
     saveOrder();
     renderOrderSummary();
@@ -615,13 +665,13 @@ function renderOrderSummary(){
     list.innerHTML = `
       <article class="order-empty-state">
         <span class="order-empty-icon" aria-hidden="true">+</span>
-        <strong>Your basket is ready</strong>
-        <p>Select products from the collection to build a polished quote request.</p>
+        <strong>${escapeHtml(t("order.emptyBasketTitle"))}</strong>
+        <p>${escapeHtml(t("order.emptyBasketText"))}</p>
       </article>
     `;
-    totalText.textContent = "0 items selected";
-    summaryCaption.textContent = "Select pieces from the collection to start building your quote.";
-    mobileCartCount.textContent = "0 items selected";
+    totalText.textContent = translateCount("order.itemsSelected", 0);
+    summaryCaption.textContent = t("order.summaryCaption");
+    mobileCartCount.textContent = translateCount("order.itemsSelected", 0);
     updateOrderActionState(0);
     return;
   }
@@ -630,20 +680,20 @@ function renderOrderSummary(){
     <article class="order-item-row">
       <div class="order-item-copy">
         <strong>${escapeHtml(item.name)}</strong>
-        <small class="item-category">${escapeHtml(item.category)}</small>
+        <small class="item-category">${escapeHtml(translateCategory(item.category))}</small>
       </div>
 
       <div class="qty-controls">
-        <button type="button" class="qty-minus" data-id="${item.id}" aria-label="Decrease ${escapeHtml(item.name)} quantity">-</button>
+        <button type="button" class="qty-minus" data-id="${item.id}" aria-label="${escapeHtml(`${t("order.decreaseQuantity")} ${item.name}`)}">-</button>
         <span>${item.quantity}</span>
-        <button type="button" class="qty-plus" data-id="${item.id}" aria-label="Increase ${escapeHtml(item.name)} quantity">+</button>
+        <button type="button" class="qty-plus" data-id="${item.id}" aria-label="${escapeHtml(`${t("order.increaseQuantity")} ${item.name}`)}">+</button>
       </div>
     </article>
   `).join("");
 
-  totalText.textContent = `${totalItems} item${totalItems !== 1 ? "s" : ""} selected`;
-  summaryCaption.textContent = `${selectionCount} selection${selectionCount !== 1 ? "s" : ""} prepared for your quote request.`;
-  mobileCartCount.textContent = `${totalItems} item${totalItems !== 1 ? "s" : ""} selected`;
+  totalText.textContent = translateCount("order.itemsSelected", totalItems);
+  summaryCaption.textContent = translateCount("order.selectionsPrepared", selectionCount);
+  mobileCartCount.textContent = translateCount("order.itemsSelected", totalItems);
   updateOrderActionState(totalItems);
 }
 
@@ -682,11 +732,11 @@ function renderModalGallery(){
         type="button"
         class="order-modal-thumb ${index === currentImageIndex ? "is-active" : ""}"
         data-index="${index}"
-        aria-label="View image ${index + 1}"
+        aria-label="${escapeAttribute(t("order.viewImage", { index: index + 1 }))}"
       >
         <img
           src="${escapeHtml(getImageSourceOrFallback(image))}"
-          alt="${escapeHtml(`${selectedProduct.name} thumbnail ${index + 1}`)}"
+          alt="${escapeHtml(t("order.imageThumbAlt", { name: selectedProduct.name, index: index + 1 }))}"
           loading="lazy"
           decoding="async"
           width="240"
@@ -734,7 +784,7 @@ function openProductModal(id){
   }
 
   if(modalCategoryBadge){
-    modalCategoryBadge.textContent = selectedProduct.category || "Collection";
+    modalCategoryBadge.textContent = translateCategory(selectedProduct.category || t("order.collectionFallback"));
   }
 
   updateQuantityDisplay();
@@ -796,7 +846,7 @@ function addToOrder(){
 
 function goToQuotePage(){
   if(order.length === 0){
-    alert("Add items first.");
+    alert(t("order.addItemsFirst"));
     return;
   }
 
@@ -917,6 +967,72 @@ function attachOrderEvents(){
     applyModalZoom();
   });
 
+  modalImageFrame?.addEventListener("touchstart", (event) => {
+    if(!modal?.classList.contains("active")){
+      return;
+    }
+
+    if(event.touches.length >= 2){
+      event.preventDefault();
+      modalPinchStartDistance = getTouchDistance(event.touches[0], event.touches[1]);
+      modalPinchStartZoom = modalZoomLevel;
+      updateZoomOriginFromTouches(event.touches[0], event.touches[1], modalImageFrame);
+    }
+  }, { passive: false });
+
+  modalImageFrame?.addEventListener("touchmove", (event) => {
+    if(!modal?.classList.contains("active")){
+      return;
+    }
+
+    if(event.touches.length >= 2){
+      event.preventDefault();
+
+      const currentDistance = getTouchDistance(event.touches[0], event.touches[1]);
+
+      if(!modalPinchStartDistance){
+        modalPinchStartDistance = currentDistance;
+        modalPinchStartZoom = modalZoomLevel;
+      }
+
+      updateZoomOriginFromTouches(event.touches[0], event.touches[1], modalImageFrame);
+      setModalZoom(modalPinchStartZoom * (currentDistance / modalPinchStartDistance));
+      return;
+    }
+
+    if(event.touches.length === 1 && modalZoomLevel > MODAL_ZOOM_MIN){
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  modalImageFrame?.addEventListener("touchend", () => {
+    modalPinchStartDistance = 0;
+    modalPinchStartZoom = modalZoomLevel;
+  });
+
+  modalImageFrame?.addEventListener("touchcancel", () => {
+    modalPinchStartDistance = 0;
+    modalPinchStartZoom = modalZoomLevel;
+  });
+
+  modalImageFrame?.addEventListener("gesturestart", (event) => {
+    if(modal?.classList.contains("active")){
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  modalImageFrame?.addEventListener("gesturechange", (event) => {
+    if(modal?.classList.contains("active")){
+      event.preventDefault();
+    }
+  }, { passive: false });
+
+  modalImageFrame?.addEventListener("gestureend", (event) => {
+    if(modal?.classList.contains("active")){
+      event.preventDefault();
+    }
+  }, { passive: false });
+
   loadMoreProductsBtn?.addEventListener("click", () => {
     visibleProductsLimit += LOAD_MORE_STEP;
     renderProducts();
@@ -930,6 +1046,7 @@ function setCurrentYear(){
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initI18n();
   setCurrentYear();
   initMobileMenu();
   initScrollTopButton();
@@ -941,6 +1058,22 @@ document.addEventListener("DOMContentLoaded", () => {
   syncOrderFromStorage();
   attachOrderEvents();
   syncSearchClearButton();
+});
+
+onLanguageChange(() => {
+  renderFilterButtons();
+  renderProducts();
+  renderOrderSummary();
+
+  if(selectedProduct && document.getElementById("productModal")?.classList.contains("active")){
+    const modalCategoryBadge = document.getElementById("modalCategoryBadge");
+
+    if(modalCategoryBadge){
+      modalCategoryBadge.textContent = translateCategory(selectedProduct.category || t("order.collectionFallback"));
+    }
+
+    renderModalGallery();
+  }
 });
 
 window.addEventListener("pageshow", () => {

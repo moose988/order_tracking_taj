@@ -1,5 +1,6 @@
 import { db } from "./firebase.js";
 import { CATALOG_PLACEHOLDER_IMAGE, PRODUCTS } from "../data/products.js";
+import { formatLocalizedDate, initI18n, onLanguageChange, t, translateCategory, translateCount } from "./i18n.js";
 import {
   collection,
   doc,
@@ -76,7 +77,7 @@ async function loadHomepageReviews(){
     return;
   }
 
-  reviewsGrid.innerHTML = '<div class="empty-state">Loading reviews...</div>';
+  reviewsGrid.innerHTML = `<div class="empty-state">${escapeHtml(t("common.loadingReviews"))}</div>`;
 
   try{
     let reviews = [];
@@ -99,7 +100,7 @@ async function loadHomepageReviews(){
     }
 
     if(reviews.length === 0){
-      reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
+      reviewsGrid.innerHTML = `<div class="empty-state">${escapeHtml(t("common.noReviewsYet"))}</div>`;
       return;
     }
 
@@ -108,7 +109,7 @@ async function loadHomepageReviews(){
         <div class="stars">${"&#9733;".repeat(Number(review.rating) || 0)}</div>
         <p class="review-comment">${escapeHtml(review.comment || "")}</p>
         <div class="review-meta">
-          <div class="review-author">${escapeHtml(review.name || "Anonymous")}</div>
+          <div class="review-author">${escapeHtml(review.name || t("common.anonymous"))}</div>
           <div class="review-date">${escapeHtml(formatReviewDate(review.createdAt))}</div>
         </div>
       </article>
@@ -117,7 +118,7 @@ async function loadHomepageReviews(){
     initHomepageRevealAnimations();
   }catch(error){
     console.error("Failed to load homepage reviews:", error);
-    reviewsGrid.innerHTML = '<div class="empty-state">No reviews yet</div>';
+    reviewsGrid.innerHTML = `<div class="empty-state">${escapeHtml(t("common.noReviewsYet"))}</div>`;
   }
 }
 
@@ -137,14 +138,10 @@ function formatReviewDate(timestamp){
   const timestampValue = getTimestampValue(timestamp);
 
   if(!timestampValue){
-    return "Recent review";
+    return t("common.recentReview");
   }
 
-  return new Date(timestampValue).toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric"
-  });
+  return formatLocalizedDate(new Date(timestampValue));
 }
 
 function escapeHtml(value){
@@ -228,32 +225,32 @@ function getHomepageCollectionDefinitions(){
     {
       category: "Dining Tables",
       featuredProductName: "Dining Table 15",
-      description: "Formal table foundations for weddings, receptions, and elevated dining layouts."
+      descriptionKey: "home.collectionDiningDescription"
     },
     {
       category: "Chairs",
       featuredProductName: "Chair 19",
-      description: "Guest seating selected to feel elegant, polished, and visually balanced across the room."
+      descriptionKey: "home.collectionChairsDescription"
     },
     {
       category: "Coffee Table",
       featuredProductName: "Coffee Table 18",
-      description: "Low-profile accent pieces for lounge scenes, bridal moments, and welcome areas."
+      descriptionKey: "home.collectionCoffeeDescription"
     },
     {
       category: "Bridal Sofa",
       featuredProductName: "Bridal Sofa 35",
-      description: "Statement seating for bridal stages and VIP focal points with graceful presence."
+      descriptionKey: "home.collectionBridalDescription"
     },
     {
       category: "Majlis Sofa",
       featuredProductName: "Sofa 23",
-      description: "Majlis-inspired seating for warm hospitality spaces and culturally rich event settings."
+      descriptionKey: "home.collectionMajlisDescription"
     },
     {
       category: "Cocktail Table",
       featuredProductName: "Cocktail Table 2",
-      description: "Reception-ready standing tables for mingling, hospitality moments, and refined gatherings."
+      descriptionKey: "home.collectionCocktailDescription"
     }
   ];
 }
@@ -271,14 +268,14 @@ function renderHomepageCollections(){
       || matchingProducts[0]
       || null;
     const image = getPreferredCollectionImage(featuredProduct);
-    const itemsCount = matchingProducts.length;
     const collectionHref = `/order?category=${encodeURIComponent(definition.category)}`;
+    const categoryLabel = translateCategory(definition.category);
     const altText = featuredProduct?.name
-      ? `${featuredProduct.name} from the ${definition.category} collection`
-      : `${definition.category} collection preview`;
+      ? t("home.collectionAlt", { product: featuredProduct.name, category: categoryLabel })
+      : t("home.collectionAltFallback", { category: categoryLabel });
 
     return `
-      <a class="home-collection-card" href="${escapeAttribute(collectionHref)}" aria-label="${escapeAttribute(`Explore ${definition.category}`)}" data-home-reveal>
+      <a class="home-collection-card" href="${escapeAttribute(collectionHref)}" aria-label="${escapeAttribute(t("home.collectionAria", { category: categoryLabel }))}" data-home-reveal>
         <div class="home-collection-media">
           <img
             class="${escapeAttribute(getHomepageCollectionImageClasses(definition.category))}"
@@ -291,9 +288,9 @@ function renderHomepageCollections(){
           />
         </div>
         <div class="home-collection-copy">
-          <h3>${escapeHtml(definition.category)}</h3>
-          <p>${escapeHtml(definition.description)}</p>
-          <span class="home-collection-link">View Collection</span>
+          <h3>${escapeHtml(categoryLabel)}</h3>
+          <p>${escapeHtml(t(definition.descriptionKey))}</p>
+          <span class="home-collection-link">${escapeHtml(t("common.viewCollection"))}</span>
         </div>
       </a>
     `;
@@ -409,6 +406,7 @@ function initHomepageExperience(){
 
 let order = [];
 const QUOTE_SUCCESS_STORAGE_KEY = "tajQuoteSuccess";
+let quoteLocationBinding = null;
 
 function buildQuoteSuccessUrl(orderId){
   const params = new URLSearchParams();
@@ -514,7 +512,9 @@ function updateQuoteSummary(){
 
   if(itemCount){
     const count = getOrderItemCount();
-    itemCount.textContent = `${count} item${count !== 1 ? "s" : ""} selected`;
+    itemCount.textContent = count > 0
+      ? translateCount("quote.totalItems", count)
+      : t("quote.totalItemsZero");
   }
 
   if(submitButton){
@@ -546,7 +546,7 @@ function renderQuoteItems(){
     <div class="quote-item">
       <div class="quote-item-info">
         <strong>${escapeHtml(item.name)}</strong>
-        <div class="item-category">${escapeHtml(item.category || "")}</div>
+        <div class="item-category">${escapeHtml(translateCategory(item.category || ""))}</div>
       </div>
 
       <div class="qty-controls">
@@ -595,6 +595,7 @@ function clearQuoteOrder(){
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initI18n();
   const yearEls = document.querySelectorAll(".current-year");
   const currentYear = new Date().getFullYear();
 
@@ -645,22 +646,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const mapLinkInput = document.getElementById("mapLink");
   const eventLocationInput = document.getElementById("eventLocation");
   const locationSummary = document.getElementById("quoteLocationSummary");
-  const quoteLocationBinding = pickLocationBtn && mapLinkInput && eventLocationInput && locationSummary
+  quoteLocationBinding = pickLocationBtn && mapLinkInput && eventLocationInput && locationSummary
     ? createLocationFieldBinding({
       triggerButton: pickLocationBtn,
       summaryContainer: locationSummary,
       eventLocationInput,
       mapLinkInput,
-      pickerTitle: "Pick Event Location",
-      pickerSubtitle: "Search for a venue in the UAE or tap directly on the map to place the delivery pin.",
-      summaryTitle: "Selected Location"
+      pickerTitle: t("quote.pickerTitle"),
+      pickerSubtitle: t("quote.pickerSubtitle"),
+      summaryTitle: t("quote.summaryTitle")
     })
     : null;
 
   if(locationBtn){
     locationBtn.addEventListener("click", async () => {
       if(!navigator.geolocation){
-        alert("Geolocation not supported on this device.");
+        alert(t("quote.geolocationUnsupported"));
         return;
       }
 
@@ -683,9 +684,9 @@ document.addEventListener("DOMContentLoaded", () => {
           mapLinkInput.value = normalizeGoogleMapsLink(`https://maps.google.com/?q=${lat},${lng}`);
         }
 
-        alert("Location captured successfully.");
+        alert(t("quote.locationCaptured"));
       }, () => {
-        alert("Unable to retrieve your location.");
+        alert(t("quote.locationUnavailable"));
       }, {
         enableHighAccuracy: true,
         timeout: 15000,
@@ -704,17 +705,17 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
 
     const submitButton = document.getElementById("quoteSubmitBtn");
-    const originalButtonText = submitButton?.textContent || "Submit Request";
+    const originalButtonText = submitButton?.textContent || t("quote.submitBtn");
 
     if(submitButton){
       submitButton.disabled = true;
-      submitButton.textContent = "Submitting...";
+      submitButton.textContent = t("quote.submitting");
     }
 
     const order = JSON.parse(localStorage.getItem("tajOrder")) || [];
 
     if(order.length === 0){
-      alert("Add items first.");
+      alert(t("quote.addItemsFirst"));
       if(submitButton){
         submitButton.disabled = false;
         submitButton.textContent = originalButtonText;
@@ -737,7 +738,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const destinationLocation = quoteLocationBinding?.getDestinationLocation() || null;
 
       if(!mapLink){
-        alert("Please provide the Google Maps link for the event location.");
+        alert(t("quote.mapLinkRequired"));
         document.getElementById("mapLink")?.focus();
         return;
       }
@@ -799,7 +800,7 @@ ${notes || "None"}
       window.location.href = buildQuoteSuccessUrl(orderId);
     }catch(error){
       console.error("Quote submission failed:", error);
-      alert("We couldn't submit your request right now. Please try again.");
+      alert(t("quote.submitError"));
     }finally{
       if(submitButton){
         submitButton.disabled = false;
@@ -807,4 +808,24 @@ ${notes || "None"}
       }
     }
   });
+});
+
+onLanguageChange(() => {
+  if(document.body.classList.contains("home-page")){
+    renderHomepageCollections();
+    loadHomepageReviews();
+    initHomepageRevealAnimations();
+  }
+
+  if(document.body.classList.contains("quote-page")){
+    renderQuoteItems();
+
+    if(quoteLocationBinding?.refreshLabels){
+      quoteLocationBinding.refreshLabels({
+        pickerTitle: t("quote.pickerTitle"),
+        pickerSubtitle: t("quote.pickerSubtitle"),
+        summaryTitle: t("quote.summaryTitle")
+      });
+    }
+  }
 });

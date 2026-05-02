@@ -686,6 +686,25 @@ export function createLocationFieldBinding({
       isMapLinkAutoSynced = false;
       render();
     },
+    refreshLabels({
+      pickerTitle: nextPickerTitle,
+      pickerSubtitle: nextPickerSubtitle,
+      summaryTitle: nextSummaryTitle
+    } = {}){
+      if(typeof nextPickerTitle === "string"){
+        pickerTitle = nextPickerTitle;
+      }
+
+      if(typeof nextPickerSubtitle === "string"){
+        pickerSubtitle = nextPickerSubtitle;
+      }
+
+      if(typeof nextSummaryTitle === "string"){
+        summaryTitle = nextSummaryTitle;
+      }
+
+      render();
+    },
     preloadFromOrder(order){
       const nextSelection = getInitialSelectionFromOrder(order);
       if(nextSelection){

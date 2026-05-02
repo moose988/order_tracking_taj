@@ -8,26 +8,31 @@
 <link rel="stylesheet" href="../src/css/styles.css">
 </head>
 
-<body class="order-page">
+<body class="order-page" data-i18n-title="meta.orderTitle">
 
 <header class="site-header">
   <div class="container navbar">
     <a href="/" class="brand">
-      <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" width="54" height="54" decoding="async">
+      <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="brand-logo" width="54" height="54" decoding="async">
       <div class="brand-copy">
         <h2>Al Taj Al Malaky</h2>
-        <span>Luxury Event Setup & Rental</span>
       </div>
     </a>
 
     <nav class="nav-links">
-      <a href="/">Home</a>
-      <a href="/order" class="active">Order</a>
-      <a href="/track">Track Order</a>
-      <a href="/reviews">Reviews</a>
+      <a href="/" data-i18n="nav.home">Home</a>
+      <a href="/order" class="active" data-i18n="nav.order">Order</a>
+      <a href="/track" data-i18n="nav.track">Track Order</a>
+      <a href="/reviews" data-i18n="nav.reviews">Reviews</a>
     </nav>
 
-    <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
+    <div class="header-actions">
+      <div class="lang-switcher" data-language-switcher data-i18n-aria-label="common.languageSelector" aria-label="Language selector">
+        <button class="lang-switcher-btn" type="button" data-lang-option="en" aria-pressed="true">EN</button>
+        <button class="lang-switcher-btn" type="button" data-lang-option="ar" aria-pressed="false">AR</button>
+      </div>
+      <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" data-i18n-aria-label="common.openNavigation">&#9776;</button>
+    </div>
   </div>
 </header>
 
@@ -36,28 +41,29 @@
     <div class="container order-catalog-shell">
       <header class="order-page-head">
         <div class="order-page-head-copy">
-          <span class="section-kicker">Curated Collection</span>
-          <h1 class="section-title">Build Your Event Order</h1>
+          <span class="section-kicker" data-i18n="order.kicker">Curated Collection</span>
+          <h1 class="section-title" data-i18n="order.pageTitle">Build Your Event Order</h1>
         </div>
       </header>
 
-      <section class="order-toolbar" aria-label="Browse products">
+      <section class="order-toolbar" aria-label="Browse products" data-i18n-aria-label="order.toolbarAria">
         <div class="order-toolbar-top">
           <label class="order-search-field" for="productSearchInput">
-            <span class="order-search-label">Search Collection</span>
+            <span class="order-search-label" data-i18n="order.searchLabel">Search Collection</span>
             <div class="order-search-input-wrap">
               <input
                 id="productSearchInput"
                 type="search"
                 placeholder="Search by product name or category"
+                data-i18n-placeholder="order.searchPlaceholder"
                 autocomplete="off"
               >
-              <button id="clearProductSearchBtn" class="order-search-clear" type="button" aria-label="Clear product search" hidden>x</button>
+              <button id="clearProductSearchBtn" class="order-search-clear" type="button" aria-label="Clear product search" data-i18n-aria-label="order.clearSearch" hidden>x</button>
             </div>
           </label>
         </div>
 
-        <div id="productFilters" class="product-filters" aria-label="Product categories"></div>
+        <div id="productFilters" class="product-filters" aria-label="Product categories" data-i18n-aria-label="order.filterAria"></div>
       </section>
 
       <div class="order-layout">
@@ -68,16 +74,16 @@
           <div id="productsGrid" class="products-grid" aria-live="polite"></div>
           <div id="orderLoadMoreWrap" class="order-load-more-wrap" hidden>
             <button id="loadMoreProductsBtn" class="btn btn-secondary order-load-more-btn" type="button">
-              Load More
+              <span data-i18n="order.loadMore">Load More</span>
             </button>
           </div>
         </section>
 
         <aside class="order-summary">
           <div class="order-summary-head">
-            <span class="order-summary-kicker">Booking Basket</span>
-            <h3>Your Order</h3>
-            <p id="orderSummaryCaption" class="order-summary-caption">Select pieces from the collection to start building your quote.</p>
+            <span class="order-summary-kicker" data-i18n="order.bookingBasket">Booking Basket</span>
+            <h3 data-i18n="order.yourOrder">Your Order</h3>
+            <p id="orderSummaryCaption" class="order-summary-caption" data-i18n="order.summaryCaption">Select pieces from the collection to start building your quote.</p>
           </div>
 
           <div id="orderItemsList" class="order-items-list" aria-live="polite"></div>
@@ -86,8 +92,8 @@
             <p id="orderTotalText" class="order-total">0 items selected</p>
 
             <div class="summary-actions">
-              <button id="summaryQuoteBtn" class="btn btn-primary" type="button" onclick="goToQuotePage()">Get Quote</button>
-              <button id="summaryClearBtn" class="btn btn-secondary btn-small" type="button" onclick="clearOrder()">Clear All</button>
+              <button id="summaryQuoteBtn" class="btn btn-primary" type="button" onclick="goToQuotePage()" data-i18n="order.getQuote">Get Quote</button>
+              <button id="summaryClearBtn" class="btn btn-secondary btn-small" type="button" onclick="clearOrder()" data-i18n="order.clearAll">Clear All</button>
             </div>
           </div>
         </aside>
@@ -102,30 +108,30 @@
       <div class="modal-gallery order-modal-gallery">
         <div class="order-modal-gallery-shell">
           <div class="order-modal-main-image-frame">
-            <img id="modalImage" src="" alt="Product Image">
+            <img id="modalImage" src="" alt="Product Image" data-i18n-alt="order.modalImageAlt">
           </div>
 
-          <div class="order-modal-zoom-controls" aria-label="Image zoom controls">
-            <button id="modalZoomOutBtn" type="button" onclick="zoomModalOut()" aria-label="Zoom out">-</button>
-            <button id="modalZoomResetBtn" type="button" onclick="resetModalZoom()" aria-label="Reset zoom">
+          <div class="order-modal-zoom-controls" aria-label="Image zoom controls" data-i18n-aria-label="order.zoomControls">
+            <button id="modalZoomOutBtn" type="button" onclick="zoomModalOut()" aria-label="Zoom out" data-i18n-aria-label="order.zoomOut">-</button>
+            <button id="modalZoomResetBtn" type="button" onclick="resetModalZoom()" aria-label="Reset zoom" data-i18n-aria-label="order.resetZoom">
               <span id="modalZoomLevel">100%</span>
             </button>
-            <button id="modalZoomInBtn" type="button" onclick="zoomModalIn()" aria-label="Zoom in">+</button>
+            <button id="modalZoomInBtn" type="button" onclick="zoomModalIn()" aria-label="Zoom in" data-i18n-aria-label="order.zoomIn">+</button>
           </div>
 
           <div class="gallery-nav">
-            <button type="button" onclick="prevImage()" aria-label="Previous image">&#10094;</button>
-            <button type="button" onclick="nextImage()" aria-label="Next image">&#10095;</button>
+            <button type="button" onclick="prevImage()" aria-label="Previous image" data-i18n-aria-label="order.previousImage">&#10094;</button>
+            <button type="button" onclick="nextImage()" aria-label="Next image" data-i18n-aria-label="order.nextImage">&#10095;</button>
           </div>
 
           <div id="modalImageCount" class="order-modal-image-count" aria-live="polite"></div>
         </div>
 
-        <div id="modalThumbs" class="order-modal-thumbs" aria-label="Product gallery thumbnails"></div>
+        <div id="modalThumbs" class="order-modal-thumbs" aria-label="Product gallery thumbnails" data-i18n-aria-label="order.thumbsAria"></div>
       </div>
 
       <div class="modal-content order-modal-content">
-        <button class="modal-close" type="button" onclick="closeProductModal()" aria-label="Close product modal">&#10005;</button>
+        <button class="modal-close" type="button" onclick="closeProductModal()" aria-label="Close product modal" data-i18n-aria-label="order.closeModal">&#10005;</button>
 
         <div class="order-modal-copy">
           <span id="modalCategoryBadge" class="badge order-modal-badge"></span>
@@ -135,14 +141,14 @@
 
         <div class="order-modal-specs">
           <div class="order-modal-spec-card">
-            <span>Measurements</span>
+            <span data-i18n="order.measurements">Measurements</span>
             <strong id="modalMeasurements"></strong>
           </div>
         </div>
 
         <div class="order-modal-purchase">
           <div class="qty-box">
-            <button type="button" onclick="decreaseQty()" aria-label="Decrease quantity">-</button>
+            <button type="button" onclick="decreaseQty()" aria-label="Decrease quantity" data-i18n-aria-label="order.decreaseQuantity">-</button>
             <input
               type="number"
               id="modalQuantity"
@@ -153,12 +159,13 @@
               onblur="handleManualQtyInput()"
               onfocus="this.select()"
               aria-label="Quantity"
+              data-i18n-aria-label="order.quantity"
             >
-            <button type="button" onclick="increaseQty()" aria-label="Increase quantity">+</button>
+            <button type="button" onclick="increaseQty()" aria-label="Increase quantity" data-i18n-aria-label="order.increaseQuantity">+</button>
           </div>
 
           <div class="modal-actions order-modal-actions">
-            <button class="btn btn-primary" type="button" onclick="addToOrder()">Add to Order</button>
+            <button class="btn btn-primary" type="button" onclick="addToOrder()" data-i18n="order.addToOrder">Add to Order</button>
           </div>
         </div>
       </div>
@@ -169,28 +176,28 @@
 <div id="mobileCartBar" class="mobile-cart-bar" aria-live="polite">
   <div class="mobile-cart-copy">
     <strong id="mobileCartCount">0 items selected</strong>
-    <span>Open your basket and continue to quote</span>
+    <span data-i18n="order.mobileCartText">Open your basket and continue to quote</span>
   </div>
-  <button id="mobileCartBtn" type="button" onclick="goToQuotePage()">Get Quote</button>
+  <button id="mobileCartBtn" type="button" onclick="goToQuotePage()" data-i18n="order.getQuote">Get Quote</button>
 </div>
 
 <button class="scroll-top-btn" type="button" data-scroll-top aria-label="Scroll back to top" title="Back to top">
-  Top
+  <span data-i18n="order.top">Top</span>
 </button>
 
 <footer class="footer">
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
         <div class="footer-brand-copy">
           <h4>Al Taj Al Malaky</h4>
-          <p>Luxury Event Setup &amp; Rental</p>
+          <p data-i18n="common.brandTagline">Luxury Event Setup &amp; Rental</p>
         </div>
       </div>
 
       <div class="footer-links footer-links-inline">
-        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer">WhatsApp</a>
+        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer" data-i18n="common.whatsapp">WhatsApp</a>
         <a href="https://instagram.com/taj_almalaki" target="_blank" rel="noreferrer">@taj_almalaki</a>
       </div>
     </div>

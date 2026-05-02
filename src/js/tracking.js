@@ -1,4 +1,5 @@
 import { db } from "./firebase.js";
+import { formatLocalizedDate, formatLocalizedTime, initI18n, onLanguageChange, t, translateStatus } from "./i18n.js";
 import {
   addDoc,
   collection,
@@ -29,7 +30,6 @@ let reviewPromptState = {
   submitted: false,
   dismissed: false
 };
-const reviewThanksMessage = `Thank you for your feedback ${String.fromCodePoint(0x1F64C)}`;
 const DEFAULT_MAP_CENTER = [25.2048, 55.2708];
 const APPROX_CITY_SPEED_KMH = 32;
 const MAX_REASONABLE_DELIVERY_DISTANCE_KM = 120;
@@ -480,18 +480,18 @@ function estimateEtaMinutes(start, end){
 
 function formatEta(minutes){
   if(!Number.isFinite(minutes) || minutes <= 0){
-    return "ETA unavailable";
+    return t("track.etaUnavailable");
   }
 
   if(minutes >= 60){
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
     return remainingMinutes
-      ? `Estimated arrival: ${hours} hr ${remainingMinutes} min`
-      : `Estimated arrival: ${hours} hr`;
+      ? t("track.etaHoursMinutes", { hours, minutes: remainingMinutes })
+      : t("track.etaHours", { hours });
   }
 
-  return `Estimated arrival: ${minutes} min`;
+  return t("track.etaMinutes", { minutes });
 }
 
 function getFallbackDriverMarkerIcon(){
@@ -855,10 +855,7 @@ function formatLocationTimestamp(value){
   }
 
   if(typeof value.toDate === "function"){
-    return value.toDate().toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit"
-    });
+    return formatLocalizedTime(value);
   }
 
   const parsedDate = new Date(value);
@@ -867,10 +864,7 @@ function formatLocationTimestamp(value){
     return "";
   }
 
-  return parsedDate.toLocaleTimeString([], {
-    hour: "numeric",
-    minute: "2-digit"
-  });
+  return formatLocalizedTime(parsedDate);
 }
 
 function extractMapQuery(link){
@@ -947,7 +941,7 @@ async function loadOrder(orderId){
   const resolvedOrderRef = await resolveOrderRef(orderId);
 
   if(!resolvedOrderRef){
-    renderTrackMessage("Order not found", "This order may have been removed or the ID is incorrect.", "not-found");
+    renderTrackMessage(t("track.orderNotFoundTitle"), t("track.orderNotFoundText"), "not-found");
     return;
   }
 
@@ -955,7 +949,7 @@ async function loadOrder(orderId){
     if(!snap.exists()){
       clearOrderSubscription();
       resetTrackState();
-      renderTrackMessage("Order not found", "This order may have been removed or the ID is incorrect.", "not-found");
+      renderTrackMessage(t("track.orderNotFoundTitle"), t("track.orderNotFoundText"), "not-found");
       return;
     }
 
@@ -968,7 +962,7 @@ async function loadOrder(orderId){
     await renderOrder(currentOrder);
   }, (error) => {
     console.error("Failed to subscribe to order:", error);
-    renderTrackMessage("Unable to load this order", "Please try again in a moment.", "error");
+    renderTrackMessage(t("track.orderLoadErrorTitle"), t("track.orderLoadErrorText"), "error");
   });
 }
 
@@ -1021,14 +1015,14 @@ async function renderOrder(order){
 
   info.innerHTML = `
 <div class="track-info-grid">
-  <p><strong>Order ID:</strong> ${order.orderId}</p>
-  <p><strong>Customer:</strong> ${order.customerName}</p>
-  <p><strong>Event Date:</strong> ${order.eventDate}</p>
-  <p><strong>Rental Days:</strong> ${getOrderRentalDays(order)}</p>
-  <p><strong>Event Time:</strong> ${order.eventTime || "N/A"}</p>
-  <p><strong>Setup Time:</strong> ${order.setupTime || "N/A"}</p>
-  <p><strong>Location:</strong> ${order.eventLocation}</p>
-  <p><strong>Map:</strong> <a href="${openLocationUrl}" target="_blank" rel="noreferrer" class="track-inline-link">Open Location</a></p>
+  <p><strong>${t("track.orderIdLabel")}</strong> ${order.orderId}</p>
+  <p><strong>${t("track.customerLabel")}</strong> ${order.customerName}</p>
+  <p><strong>${t("track.eventDateLabel")}</strong> ${order.eventDate}</p>
+  <p><strong>${t("track.rentalDaysLabel")}</strong> ${getOrderRentalDays(order)}</p>
+  <p><strong>${t("track.eventTimeLabel")}</strong> ${order.eventTime || t("common.noData")}</p>
+  <p><strong>${t("track.setupTimeLabel")}</strong> ${order.setupTime || t("common.noData")}</p>
+  <p><strong>${t("track.locationLabel")}</strong> ${order.eventLocation}</p>
+  <p><strong>${t("track.mapLabel")}</strong> <a href="${openLocationUrl}" target="_blank" rel="noreferrer" class="track-inline-link">${t("track.openLocation")}</a></p>
 </div>
 `;
 
@@ -1042,7 +1036,7 @@ async function renderOrder(order){
 
   const itemsBox = document.getElementById("orderItems");
   itemsBox.innerHTML = `
-<h4>Items in this Order</h4>
+<h4>${t("track.orderInfoTitle")}</h4>
 <ul class="track-order-items-list">
 ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.max(1, Number(item.quantity) || 1)}</strong></li>`).join("")}
 </ul>
@@ -1069,26 +1063,26 @@ ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.
     locationInfo.innerHTML = `
 <div class="track-location-overview">
   <div class="track-location-copy">
-    <span class="track-status-eyebrow">Delivery Location</span>
-    <strong>${order.eventLocation || "Location pending"}</strong>
+    <span class="track-status-eyebrow">${t("track.deliveryLocation")}</span>
+    <strong>${order.eventLocation || t("track.locationPending")}</strong>
   </div>
   <a href="${openLocationUrl}" target="_blank" class="track-open-location-link">
-    Open Location
+    ${t("track.openLocation")}
   </a>
 </div>
 <div class="track-status-grid">
   ${driverCoordinates ? `
   <article class="track-status-card is-live">
-    <span class="track-status-card-label">Driver Update</span>
-    <strong>Live driver location active</strong>
-    <p>${liveLocationTime ? `Last updated at ${liveLocationTime}.` : "Your driver is currently sharing live location."}</p>
+    <span class="track-status-card-label">${t("track.driverUpdate")}</span>
+    <strong>${t("track.liveDriverTitle")}</strong>
+    <p>${liveLocationTime ? t("track.liveDriverTime", { time: liveLocationTime }) : t("track.liveDriverFallback")}</p>
   </article>
   ` : ""}
   ${normalizedStatus === "delivered" ? `
   <article class="track-status-card is-complete">
-    <span class="track-status-card-label">Delivery</span>
-    <strong>Delivery complete</strong>
-    <p>This order has been delivered successfully.</p>
+    <span class="track-status-card-label">${t("track.deliveryCardLabel")}</span>
+    <strong>${t("track.deliveryCompleteTitle")}</strong>
+    <p>${t("track.deliveryCompleteText")}</p>
   </article>
   ` : ""}
 </div>
@@ -1108,8 +1102,8 @@ ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.
         : `
 <article class="track-status-hero-card is-muted">
   <div>
-    <strong>ETA unavailable</strong>
-    <p>Live ETA needs reliable destination coordinates and a sane delivery distance.</p>
+    <strong>${t("track.etaUnavailable")}</strong>
+    <p>${t("track.etaUnavailableText")}</p>
   </div>
 </article>
 `
@@ -1150,8 +1144,8 @@ function renderStatusSummary(status){
   if(normalizedStatus === "cancelled"){
     summary.innerHTML = `
       <article class="track-status-summary-card is-cancelled ${statusToneClass}">
-        <strong>Order Cancelled</strong>
-        <p>This order is marked as cancelled. Please contact support if you need help.</p>
+        <strong>${t("track.orderCancelledTitle")}</strong>
+        <p>${t("track.orderCancelledText")}</p>
       </article>
     `;
     return;
@@ -1160,7 +1154,7 @@ function renderStatusSummary(status){
   summary.innerHTML = `
     <article class="track-status-summary-card is-${normalizedStatus || "unknown"} ${statusToneClass}">
       <strong>${formatStatusLabel(normalizedStatus || status)}</strong>
-      <p>Your latest order progress is shown here in real time.</p>
+      <p>${t("track.latestProgress")}</p>
     </article>
   `;
 }
@@ -1632,7 +1626,7 @@ async function updateReviewUI(order){
   if(submitted){
     setReviewPromptSubmitted(order.orderId);
     setReviewFormsVisibility(false, false);
-    setReviewMessage(reviewThanksMessage, "success");
+    setReviewMessage(`${t("track.reviewThanks")} ${String.fromCodePoint(0x1F64C)}`, "success");
     return;
   }
 
@@ -1669,13 +1663,13 @@ async function submitReview(event){
   const name = fields.name?.value.trim() || "";
 
   if(!rating || rating < 1 || rating > 5){
-    setReviewMessage("Please choose a rating before submitting your review.", "error");
+    setReviewMessage(t("track.reviewRatingRequired"), "error");
     return;
   }
 
   syncReviewFormValues(sourceSurface, targetSurface);
   submitButton.disabled = true;
-  submitButton.textContent = "Submitting...";
+  submitButton.textContent = t("track.reviewSubmitting");
   setReviewMessage("", "");
 
   try{
@@ -1685,7 +1679,7 @@ async function submitReview(event){
       setReviewPromptSubmitted(currentOrder.orderId);
       setReviewFormsVisibility(false, false);
       hideReviewModal();
-      setReviewMessage(reviewThanksMessage, "success");
+      setReviewMessage(`${t("track.reviewThanks")} ${String.fromCodePoint(0x1F64C)}`, "success");
       syncReviewPrompts();
       return;
     }
@@ -1703,14 +1697,14 @@ async function submitReview(event){
     resetReviewForm("modal");
     setReviewFormsVisibility(false, false);
     hideReviewModal();
-    setReviewMessage(reviewThanksMessage, "success");
+    setReviewMessage(`${t("track.reviewThanks")} ${String.fromCodePoint(0x1F64C)}`, "success");
     syncReviewPrompts();
   }catch(error){
     console.error("Review submission failed:", error);
-    setReviewMessage("We could not submit your review right now. Please try again.", "error");
+    setReviewMessage(t("track.reviewSubmitError"), "error");
   }finally{
     submitButton.disabled = false;
-    submitButton.textContent = "Submit Review";
+    submitButton.textContent = t("track.submitReview");
   }
 }
 
@@ -1756,9 +1750,7 @@ function resetTrackState(){
 }
 
 function formatStatusLabel(status){
-  return (status || "unknown")
-    .replaceAll("-", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return translateStatus(status || "unknown");
 }
 
 function normalizeStatus(status){
@@ -1793,14 +1785,15 @@ function updateDriverInfo(order, normalizedStatus){
 
   const phone = getPhoneForWhatsApp(order.driver.phone);
   const message = `
-Hello ${order.driver.name || "Driver"},
-
-I'm contacting you regarding my order ${order.orderId}.
+${t("track.driverMessage", {
+    name: order.driver.name || t("track.driverFallbackName"),
+    orderId: order.orderId
+  })}
 `;
 
   driverInfoBox.style.display = "block";
-  driverName.textContent = order.driver.name || "N/A";
-  driverPhone.textContent = order.driver.phone || "N/A";
+  driverName.textContent = order.driver.name || t("common.noData");
+  driverPhone.textContent = order.driver.phone || t("common.noData");
   driverWhatsappBtn.href = phone
     ? buildWhatsAppUrl(phone, message)
     : "#";
@@ -1810,7 +1803,7 @@ async function trackOrder(){
   const orderId = document.getElementById("orderIdInput").value.trim();
 
   if(!orderId){
-    alert("Please enter an Order ID");
+    alert(t("track.enterOrderId"));
     return;
   }
 
@@ -1818,6 +1811,7 @@ async function trackOrder(){
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  initI18n();
   initMobileMenu();
   initReviewInteractions();
   syncTrackResultLayoutOrder();
@@ -1828,6 +1822,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   if(urlOrderId){
     document.getElementById("orderIdInput").value = urlOrderId;
     await loadOrder(urlOrderId);
+  }
+});
+
+onLanguageChange(() => {
+  const enteredOrderId = document.getElementById("orderIdInput")?.value.trim();
+
+  if(currentOrder){
+    renderOrder(currentOrder);
+    return;
+  }
+
+  if(enteredOrderId){
+    loadOrder(enteredOrderId);
   }
 });
 

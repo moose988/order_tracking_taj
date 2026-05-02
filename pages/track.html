@@ -8,27 +8,32 @@
 <link rel="stylesheet" href="../src/css/styles.css" />
 </head>
 
-<body class="track-page">
+<body class="track-page" data-i18n-title="meta.trackTitle">
 
 <header class="site-header">
 <div class="container navbar">
 
 <a href="/" class="brand">
-<img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="brand-logo" width="54" height="54" decoding="async">
+<img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="brand-logo" width="54" height="54" decoding="async">
 <div class="brand-copy">
 <h2>Al Taj Al Malaky</h2>
-<span>Luxury Event Setup & Rental</span>
 </div>
 </a>
 
 <nav class="nav-links">
-<a href="/">Home</a>
-<a href="/order">Order</a>
-<a href="/track" class="active">Track Order</a>
-<a href="/reviews">Reviews</a>
+<a href="/" data-i18n="nav.home">Home</a>
+<a href="/order" data-i18n="nav.order">Order</a>
+<a href="/track" class="active" data-i18n="nav.track">Track Order</a>
+<a href="/reviews" data-i18n="nav.reviews">Reviews</a>
 </nav>
 
-<button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
+<div class="header-actions">
+<div class="lang-switcher" data-language-switcher data-i18n-aria-label="common.languageSelector" aria-label="Language selector">
+<button class="lang-switcher-btn" type="button" data-lang-option="en" aria-pressed="true">EN</button>
+<button class="lang-switcher-btn" type="button" data-lang-option="ar" aria-pressed="false">AR</button>
+</div>
+<button class="mobile-menu-btn" type="button" aria-label="Open navigation menu" data-i18n-aria-label="common.openNavigation">&#9776;</button>
+</div>
 
 </div>
 </header>
@@ -39,7 +44,7 @@
 <div class="container">
 
 <div class="section-head">
-<div class="section-kicker">Track Your Order</div>
+<div class="section-kicker" data-i18n="track.kicker">Track Your Order</div>
 </div>
 
 
@@ -49,17 +54,17 @@
 
 <div class="track-lookup-head">
 <div>
-<span class="track-section-kicker">Order Lookup</span>
-<h3>Enter your order ID</h3>
+<span class="track-section-kicker" data-i18n="track.lookupKicker">Order Lookup</span>
+<h3 data-i18n="track.lookupTitle">Enter your order ID</h3>
 </div>
 </div>
 
 <div class="track-lookup-form">
 <div class="form-group">
-<input type="text" id="orderIdInput" placeholder="Example: TAJ-1024">
+<input type="text" id="orderIdInput" placeholder="Example: TAJ-1024" data-i18n-placeholder="track.orderIdPlaceholder">
 </div>
 
-<button class="btn btn-primary" onclick="trackOrder()">Track Order</button>
+<button class="btn btn-primary" onclick="trackOrder()" data-i18n="track.trackButton">Track Order</button>
 </div>
 
 <div id="trackResult" class="track-result-message"></div>
@@ -70,104 +75,104 @@
 
 <section class="track-card track-status-card-shell">
 <div class="track-section-head">
-<span class="track-section-kicker">Current Status</span>
+<span class="track-section-kicker" data-i18n="track.currentStatusKicker">Current Status</span>
 </div>
 <div id="statusSummary" class="track-status-summary"></div>
 </section>
 
 <section id="reviewSection" class="track-card review-section review-section--inline" style="display:none;">
 <div class="review-section-head">
-<span class="track-section-kicker">Review</span>
-<h3>Rate your experience</h3>
-<p>Your feedback helps us continue delivering refined event experiences.</p>
+<span class="track-section-kicker" data-i18n="track.reviewKicker">Review</span>
+<h3 data-i18n="track.reviewTitle">Rate your experience</h3>
+<p data-i18n="track.reviewText">Your feedback helps us continue delivering refined event experiences.</p>
 </div>
 
 <p id="reviewStatusMessage" class="review-status-message" style="display:none;"></p>
 
 <form id="reviewForm" class="review-form">
 <div class="form-group">
-<label for="reviewName">Name (optional)</label>
-<input type="text" id="reviewName" placeholder="Your name">
+<label for="reviewName" data-i18n="track.reviewNameLabel">Name (optional)</label>
+<input type="text" id="reviewName" placeholder="Your name" data-i18n-placeholder="track.reviewNamePlaceholder">
 </div>
 
 <div class="form-group">
-<label for="reviewStars">Rating</label>
+<label for="reviewStars" data-i18n="track.reviewRatingLabel">Rating</label>
 <div class="review-star-field" data-review-stars="inline">
 <input type="hidden" id="reviewStars" value="5">
-<div class="review-star-group" role="radiogroup" aria-label="Rate your experience">
-<button type="button" class="review-star-btn" data-rating="1" aria-label="1 star">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="2" aria-label="2 stars">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="3" aria-label="3 stars">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="4" aria-label="4 stars">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="5" aria-label="5 stars">&#9733;</button>
+<div class="review-star-group" role="radiogroup" aria-label="Rate your experience" data-i18n-aria-label="track.reviewStarsAria">
+<button type="button" class="review-star-btn" data-rating="1" aria-label="1 star" data-i18n-aria-label="track.reviewOneStar">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="2" aria-label="2 stars" data-i18n-aria-label="track.reviewTwoStars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="3" aria-label="3 stars" data-i18n-aria-label="track.reviewThreeStars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="4" aria-label="4 stars" data-i18n-aria-label="track.reviewFourStars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="5" aria-label="5 stars" data-i18n-aria-label="track.reviewFiveStars">&#9733;</button>
 </div>
-<p class="review-star-caption">Tap a star to rate your delivery experience.</p>
+<p class="review-star-caption" data-i18n="track.reviewTapCaption">Tap a star to rate your delivery experience.</p>
 </div>
 </div>
 
 <div class="form-group">
-<label for="reviewComment">Comment (optional)</label>
-<textarea id="reviewComment" placeholder="Share a few words about your experience"></textarea>
+<label for="reviewComment" data-i18n="track.reviewCommentLabel">Comment (optional)</label>
+<textarea id="reviewComment" placeholder="Share a few words about your experience" data-i18n-placeholder="track.reviewCommentPlaceholder"></textarea>
 </div>
 
 <button id="reviewSubmitBtn" class="btn btn-primary review-submit-btn" type="submit">
-Submit Review
+<span data-i18n="track.submitReview">Submit Review</span>
 </button>
 </form>
 </section>
 
 <section class="track-card track-timeline-card">
 <div class="track-section-head">
-<span class="track-section-kicker">Progress Timeline</span>
-<h3>Follow each step of your order journey</h3>
+<span class="track-section-kicker" data-i18n="track.timelineKicker">Progress Timeline</span>
+<h3 data-i18n="track.timelineTitle">Follow each step of your order journey</h3>
 </div>
 
 <div class="status-list">
 <div class="status-step">
 <div class="status-dot"></div>
 <div>
-<strong>Request Received</strong>
-<p>Your quote request has been received successfully.</p>
+<strong data-i18n="track.statusRequestTitle">Request Received</strong>
+<p data-i18n="track.statusRequestText">Your quote request has been received successfully.</p>
 </div>
 </div>
 
 <div class="status-step">
 <div class="status-dot"></div>
 <div>
-<strong>Quote Sent</strong>
-<p>Your quotation has been prepared and sent to you.</p>
+<strong data-i18n="track.statusQuoteTitle">Quote Sent</strong>
+<p data-i18n="track.statusQuoteText">Your quotation has been prepared and sent to you.</p>
 </div>
 </div>
 
 <div class="status-step">
 <div class="status-dot"></div>
 <div>
-<strong>Order Confirmed</strong>
-<p>Your order has been reviewed and confirmed.</p>
+<strong data-i18n="track.statusConfirmedTitle">Order Confirmed</strong>
+<p data-i18n="track.statusConfirmedText">Your order has been reviewed and confirmed.</p>
 </div>
 </div>
 
 <div class="status-step">
 <div class="status-dot"></div>
 <div>
-<strong>Being Prepared</strong>
-<p>Your event setup is currently being prepared.</p>
+<strong data-i18n="track.statusPreparingTitle">Being Prepared</strong>
+<p data-i18n="track.statusPreparingText">Your event setup is currently being prepared.</p>
 </div>
 </div>
 
 <div class="status-step">
 <div class="status-dot"></div>
 <div>
-<strong>Out for Delivery</strong>
-<p>The team is on the way to your location.</p>
+<strong data-i18n="track.statusDeliveryTitle">Out for Delivery</strong>
+<p data-i18n="track.statusDeliveryText">The team is on the way to your location.</p>
 </div>
 </div>
 
 <div class="status-step">
 <div class="status-dot"></div>
 <div>
-<strong>Delivered</strong>
-<p>Your order has arrived and setup is complete.</p>
+<strong data-i18n="track.statusDeliveredTitle">Delivered</strong>
+<p data-i18n="track.statusDeliveredText">Your order has arrived and setup is complete.</p>
 </div>
 </div>
 </div>
@@ -176,7 +181,7 @@ Submit Review
 <section class="track-card track-map-card">
 
 <div class="track-section-head">
-<span class="track-section-kicker">Live Map</span>
+<span class="track-section-kicker" data-i18n="track.liveMapKicker">Live Map</span>
 </div>
 
 <div class="track-map-status-shell">
@@ -190,14 +195,14 @@ Submit Review
 <div id="mapContainer"></div>
 
 <div id="driverInfoBox" class="track-driver-info-card" style="display:none;">
-<h3>Driver Details</h3>
+<h3 data-i18n="track.driverDetails">Driver Details</h3>
 
-<p><strong>Name:</strong> <span id="driverName"></span></p>
-<p><strong>Phone:</strong> <span id="driverPhone"></span></p>
+<p><strong data-i18n="track.driverName">Name:</strong> <span id="driverName"></span></p>
+<p><strong data-i18n="track.driverPhone">Phone:</strong> <span id="driverPhone"></span></p>
 
 <div class="track-driver-action">
 <a id="driverWhatsappBtn" class="btn btn-primary">
-Contact Driver on WhatsApp
+<span data-i18n="track.contactDriver">Contact Driver on WhatsApp</span>
 </a>
 </div>
 </div>
@@ -206,8 +211,8 @@ Contact Driver on WhatsApp
 
 <section id="orderDetailsBlock" class="track-card track-order-details-block" style="display:none;">
 <div class="track-section-head">
-<span class="track-section-kicker">Order Details</span>
-<h3>Your booking information</h3>
+<span class="track-section-kicker" data-i18n="track.orderDetailsKicker">Order Details</span>
+<h3 data-i18n="track.orderDetailsTitle">Your booking information</h3>
 </div>
 <div id="orderInfo" class="track-order-info"></div>
 <div id="orderItems" class="track-order-items"></div>
@@ -215,20 +220,20 @@ Contact Driver on WhatsApp
 
 <section id="supportBox" class="track-card support-box">
 <div class="track-section-head">
-<span class="track-section-kicker">Need Help</span>
-<h3>Get support for this order</h3>
+<span class="track-section-kicker" data-i18n="track.supportKicker">Need Help</span>
+<h3 data-i18n="track.supportTitle">Get support for this order</h3>
 </div>
 
 <select id="supportReason" class="support-select">
-<option value="general">General Inquiry</option>
-<option value="delay">Order Delay</option>
-<option value="edit">Edit Order</option>
-<option value="cancel">Cancel Order</option>
-<option value="location">Change Location</option>
+<option value="general" data-i18n="track.supportGeneral">General Inquiry</option>
+<option value="delay" data-i18n="track.supportDelay">Order Delay</option>
+<option value="edit" data-i18n="track.supportEdit">Edit Order</option>
+<option value="cancel" data-i18n="track.supportCancel">Cancel Order</option>
+<option value="location" data-i18n="track.supportLocation">Change Location</option>
 </select>
 
 <button id="supportBtn" class="btn btn-primary support-btn">
-Contact Support on WhatsApp
+<span data-i18n="track.supportButton">Contact Support on WhatsApp</span>
 </button>
 </section>
 
@@ -244,15 +249,15 @@ Contact Support on WhatsApp
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
+        <img src="../images/logo/logo.jpeg" alt="Al Taj Al Malaky logo" data-i18n-alt="common.logoAlt" class="footer-logo" width="58" height="58" loading="lazy" decoding="async" />
         <div class="footer-brand-copy">
           <h4>Al Taj Al Malaky</h4>
-          <p>Luxury Event Setup &amp; Rental</p>
+          <p data-i18n="common.brandTagline">Luxury Event Setup &amp; Rental</p>
         </div>
       </div>
 
       <div class="footer-links footer-links-inline">
-        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer">WhatsApp</a>
+        <a class="footer-link-primary" href="https://wa.me/971505373383" target="_blank" rel="noreferrer" data-i18n="common.whatsapp">WhatsApp</a>
         <a href="https://instagram.com/taj_almalaki" target="_blank" rel="noreferrer">@taj_almalaki</a>
       </div>
     </div>
@@ -266,50 +271,50 @@ Contact Support on WhatsApp
 <div id="reviewModal" class="review-modal" aria-hidden="true">
 <div class="review-modal__backdrop" data-review-close="backdrop"></div>
 <div class="review-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle">
-<button id="reviewModalClose" class="review-modal__close" type="button" aria-label="Close review prompt">
+<button id="reviewModalClose" class="review-modal__close" type="button" aria-label="Close review prompt" data-i18n-aria-label="track.closeReviewPrompt">
 &times;
 </button>
 
 <div class="review-modal__head">
-<span class="track-section-kicker">Review</span>
-<h2 id="reviewModalTitle">How was your experience?</h2>
-<p>Your feedback helps us continue delivering refined event experiences.</p>
+<span class="track-section-kicker" data-i18n="track.reviewKicker">Review</span>
+<h2 id="reviewModalTitle" data-i18n="track.reviewModalTitle">How was your experience?</h2>
+<p data-i18n="track.reviewText">Your feedback helps us continue delivering refined event experiences.</p>
 </div>
 
 <p id="reviewModalStatusMessage" class="review-status-message" style="display:none;"></p>
 
 <form id="reviewModalForm" class="review-form review-form--modal">
 <div class="form-group">
-<label for="reviewModalName">Name (optional)</label>
-<input type="text" id="reviewModalName" placeholder="Your name">
+<label for="reviewModalName" data-i18n="track.reviewNameLabel">Name (optional)</label>
+<input type="text" id="reviewModalName" placeholder="Your name" data-i18n-placeholder="track.reviewNamePlaceholder">
 </div>
 
 <div class="form-group">
-<label for="reviewModalStars">Rating</label>
+<label for="reviewModalStars" data-i18n="track.reviewRatingLabel">Rating</label>
 <div class="review-star-field" data-review-stars="modal">
 <input type="hidden" id="reviewModalStars" value="5">
-<div class="review-star-group" role="radiogroup" aria-label="Rate your experience">
-<button type="button" class="review-star-btn" data-rating="1" aria-label="1 star">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="2" aria-label="2 stars">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="3" aria-label="3 stars">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="4" aria-label="4 stars">&#9733;</button>
-<button type="button" class="review-star-btn" data-rating="5" aria-label="5 stars">&#9733;</button>
+<div class="review-star-group" role="radiogroup" aria-label="Rate your experience" data-i18n-aria-label="track.reviewStarsAria">
+<button type="button" class="review-star-btn" data-rating="1" aria-label="1 star" data-i18n-aria-label="track.reviewOneStar">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="2" aria-label="2 stars" data-i18n-aria-label="track.reviewTwoStars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="3" aria-label="3 stars" data-i18n-aria-label="track.reviewThreeStars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="4" aria-label="4 stars" data-i18n-aria-label="track.reviewFourStars">&#9733;</button>
+<button type="button" class="review-star-btn" data-rating="5" aria-label="5 stars" data-i18n-aria-label="track.reviewFiveStars">&#9733;</button>
 </div>
-<p class="review-star-caption">Select a rating that reflects your overall experience.</p>
+<p class="review-star-caption" data-i18n="track.reviewSelectCaption">Select a rating that reflects your overall experience.</p>
 </div>
 </div>
 
 <div class="form-group">
-<label for="reviewModalComment">Comment (optional)</label>
-<textarea id="reviewModalComment" placeholder="Share a few words about your experience"></textarea>
+<label for="reviewModalComment" data-i18n="track.reviewCommentLabel">Comment (optional)</label>
+<textarea id="reviewModalComment" placeholder="Share a few words about your experience" data-i18n-placeholder="track.reviewCommentPlaceholder"></textarea>
 </div>
 
 <div class="review-modal__actions">
 <button id="reviewMaybeLaterBtn" class="btn btn-secondary" type="button">
-Maybe later
+<span data-i18n="track.maybeLater">Maybe later</span>
 </button>
 <button id="reviewModalSubmitBtn" class="btn btn-primary review-submit-btn" type="submit">
-Submit Review
+<span data-i18n="track.submitReview">Submit Review</span>
 </button>
 </div>
 </form>
@@ -317,8 +322,8 @@ Submit Review
 </div>
 
 <div id="reviewStickyBar" class="review-sticky-bar" style="display:none;">
-<span>Rate your experience</span>
-<button id="reviewStickyOpenBtn" class="btn btn-primary" type="button">Leave Review</button>
+<span data-i18n="track.reviewTitle">Rate your experience</span>
+<button id="reviewStickyOpenBtn" class="btn btn-primary" type="button" data-i18n="track.leaveReview">Leave Review</button>
 </div>
 
 <script src="../src/js/mobile-menu.js" defer></script>
