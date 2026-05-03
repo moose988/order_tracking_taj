@@ -87,6 +87,15 @@ function buildPublicTrackingPayload(orderPayload){
     status: orderPayload.status,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    quoteSentAt: orderPayload.quoteSentAt || null,
+    confirmedAt: orderPayload.confirmedAt || null,
+    preparingAt: orderPayload.preparingAt || null,
+    driverAssignedAt: orderPayload.driverAssignedAt || null,
+    outForDeliveryAt: orderPayload.outForDeliveryAt || null,
+    deliveredAt: orderPayload.deliveredAt || null,
+    collectionRequestedAt: orderPayload.collectionRequestedAt || null,
+    collectedAt: orderPayload.collectedAt || null,
+    cancelledAt: orderPayload.cancelledAt || null,
     ...(orderPayload.destinationLocation ? { destinationLocation: orderPayload.destinationLocation } : {})
   };
 }

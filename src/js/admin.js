@@ -18,6 +18,7 @@ import {
 } from "./location-utils.js";
 import { WAREHOUSE_LOCATION } from "./app-config.js";
 import { initScrollTopButton } from "./scroll-top.js";
+import { normalizeOrderStatus } from "./order-status.js";
 import {
   SESSION_EXPIRED_MESSAGE,
   clearAdminSession,
@@ -436,9 +437,19 @@ function buildPublicTrackingPayload(order, patch = {}){
     items: Array.isArray(nextOrder.items) ? nextOrder.items : [],
     status: normalizeOrderStatusValue(nextOrder.status),
     updatedAt: serverTimestamp(),
+    createdAt: nextOrder.createdAt || null,
+    quoteSentAt: nextOrder.quoteSentAt || null,
+    confirmedAt: nextOrder.confirmedAt || null,
+    preparingAt: nextOrder.preparingAt || null,
+    driverAssignedAt: nextOrder.driverAssignedAt || null,
+    outForDeliveryAt: nextOrder.outForDeliveryAt || null,
+    deliveredAt: nextOrder.deliveredAt || null,
+    collectionRequestedAt: nextOrder.collectionRequestedAt || null,
+    collectedAt: nextOrder.collectedAt || null,
+    cancelledAt: nextOrder.cancelledAt || null,
     ...(nextOrder.destinationLocation ? { destinationLocation: nextOrder.destinationLocation } : {}),
     ...(nextOrder.driver ? { driver: nextOrder.driver } : {}),
-    ...(nextOrder.driverLocation ? { driverLocation: nextOrder.driverLocation } : {})
+    driverLocation: nextOrder.driverLocation || null
   };
 }
 
@@ -588,8 +599,10 @@ const STATUS_META = {
   "quote-sent": { label: "Quote Sent", className: "is-quote-sent" },
   confirmed: { label: "Confirmed", className: "is-confirmed" },
   preparing: { label: "Preparing", className: "is-preparing" },
+  "driver-assigned": { label: "Driver Assigned", className: "is-preparing" },
   "out-for-delivery": { label: "Out For Delivery", className: "is-out-for-delivery" },
   delivered: { label: "Delivered", className: "is-delivered" },
+  "collection-requested": { label: "Collection Requested", className: "is-delivered" },
   collected: { label: "Collected", className: "is-collected" },
   cancelled: { label: "Cancelled", className: "is-cancelled" }
 };
@@ -3482,7 +3495,7 @@ async function handleSendCollectionRequest(){
       actionTypes: ["collection-requested"]
     });
 
-    await updateDoc(doc(db, "orders", latestOrder.id), {
+    const patch = {
       collectionRequest: {
         assigned: true,
         assignedAt: serverTimestamp(),
@@ -3496,7 +3509,12 @@ async function handleSendCollectionRequest(){
         locationLink
       },
       ...collectionLifecyclePatch
-    });
+    };
+
+    await Promise.all([
+      updateDoc(doc(db, "orders", latestOrder.id), patch),
+      upsertPublicTracking(latestOrder, patch)
+    ]);
 
     const localOrderIndex = allOrders.findIndex((order) => order.id === latestOrder.id);
 
@@ -5346,7 +5364,7 @@ function normalizeInventoryText(value){
 }
 
 function normalizeOrderStatusValue(value){
-  return String(value || "").trim().toLowerCase().replace(/\s+/g, "-");
+  return normalizeOrderStatus(value);
 }
 
 function addLifecycleTimestampIfMissing(patch, order, fieldName){
@@ -6983,8 +7001,9 @@ function renderCalendar(){
     }
 
     const eventMarkup = dayOrders.map(order => {
-      const statusMeta = STATUS_META[order.status] || {
-        label: order.status || "unknown",
+      const normalizedStatus = normalizeOrderStatusValue(order.status);
+      const statusMeta = STATUS_META[normalizedStatus] || {
+        label: normalizedStatus || "unknown",
         className: ""
       };
 
@@ -7139,7 +7158,7 @@ function getFilteredOrders(){
   }
 
   if(status !== "all"){
-    filtered = filtered.filter(o => o.status === status);
+    filtered = filtered.filter(o => normalizeOrderStatusValue(o.status) === status);
   }
 
   if(priority !== "all"){

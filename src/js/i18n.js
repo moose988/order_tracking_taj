@@ -52,8 +52,11 @@ const TRANSLATIONS = {
       "quote-sent": "Quote Sent",
       confirmed: "Order Confirmed",
       preparing: "Being Prepared",
+      "driver-assigned": "Driver Assigned",
       "out-for-delivery": "Out for Delivery",
       delivered: "Delivered",
+      "collection-requested": "Collection Requested",
+      collected: "Collected",
       cancelled: "Order Cancelled",
       unknown: "Unknown"
     },

@@ -4178,6 +4178,14 @@
   line-height: 1.5;
 }
 
+.track-page .status-step-time {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .track-page .status-dot {
   width: 12px;
   height: 12px;

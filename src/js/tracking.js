@@ -1,5 +1,6 @@
 import { db } from "./firebase.js";
 import { formatLocalizedDate, formatLocalizedTime, initI18n, onLanguageChange, t, translateStatus } from "./i18n.js";
+import { normalizeOrderStatus } from "./order-status.js";
 import {
   collection,
   doc,
@@ -31,6 +32,7 @@ let reviewPromptState = {
   dismissed: false
 };
 const DEFAULT_MAP_CENTER = [25.2048, 55.2708];
+const TRACKING_DEBUG = false;
 const APPROX_CITY_SPEED_KMH = 32;
 const MAX_REASONABLE_DELIVERY_DISTANCE_KM = 120;
 const DEFAULT_RENTAL_DAYS = 1;
@@ -65,6 +67,12 @@ function escapeHtml(value){
 
 function escapeAttribute(value){
   return escapeHtml(value).replaceAll("`", "&#96;");
+}
+
+function logTrackingDebug(message, payload = {}){
+  if(TRACKING_DEBUG){
+    console.debug(`[tracking] ${message}`, payload);
+  }
 }
 
 function isSafeMapUrl(link){
@@ -288,6 +296,69 @@ function getLocationCoordinates(value){
   }
 
   return { lat, lng };
+}
+
+function getDriverLocation(order){
+  return (
+    order?.driverLocation ||
+    order?.liveLocation ||
+    order?.driver?.location ||
+    order?.driver?.driverLocation ||
+    null
+  );
+}
+
+function getOrderTimestamp(order, fieldName){
+  const fallbackFields = {
+    createdAt: ["createdAt", "requestedAt", "submittedAt"],
+    quoteSentAt: ["quoteSentAt", "quotedAt"],
+    confirmedAt: ["confirmedAt", "confirmedOn"],
+    preparingAt: ["preparingAt", "preppingAt", "preparationStartedAt"],
+    driverAssignedAt: ["driverAssignedAt", "assignedAt", "driver.assignedAt"],
+    outForDeliveryAt: ["outForDeliveryAt", "deliveryStartedAt", "out_for_delivery_at"],
+    deliveredAt: ["deliveredAt", "finishedAt", "deliveryCompletedAt"],
+    collectionRequestedAt: ["collectionRequestedAt", "collectionRequest.assignedAt", "pickupRequestedAt"],
+    collectedAt: ["collectedAt", "returnedAt", "itemsCollectedAt"],
+    cancelledAt: ["cancelledAt", "canceledAt"]
+  };
+  const fields = fallbackFields[fieldName] || [fieldName];
+
+  for(const field of fields){
+    const value = field.split(".").reduce((source, key) => source?.[key], order);
+
+    if(value){
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getFirstOrderTimestamp(order, fieldNames = []){
+  for(const fieldName of fieldNames){
+    const value = getOrderTimestamp(order, fieldName);
+
+    if(value){
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getStatusTimestampMap(order){
+  return {
+    "quote-requested": getOrderTimestamp(order, "createdAt"),
+    "quote-sent": getOrderTimestamp(order, "quoteSentAt"),
+    confirmed: getOrderTimestamp(order, "confirmedAt"),
+    preparing: getOrderTimestamp(order, "preparingAt"),
+    "driver-assigned": getOrderTimestamp(order, "driverAssignedAt"),
+    "out-for-delivery": getOrderTimestamp(order, "outForDeliveryAt"),
+    delivered: getOrderTimestamp(order, "deliveredAt"),
+    "collection-requested": getOrderTimestamp(order, "collectionRequestedAt"),
+    collected: getOrderTimestamp(order, "collectedAt"),
+    cancelled: getOrderTimestamp(order, "cancelledAt")
+  };
 }
 
 function parseCoordinateString(value){
@@ -996,6 +1067,13 @@ async function loadOrder(orderId){
       id: snap.id,
       ...snap.data()
     };
+    logTrackingDebug("listener update", {
+      docId: snap.id,
+      rawStatus: currentOrder.status,
+      normalizedStatus: normalizeStatus(currentOrder.status),
+      timestamps: Object.fromEntries(Object.entries(getStatusTimestampMap(currentOrder)).filter(([, value]) => Boolean(value))),
+      hasDriverLocation: Boolean(getDriverLocation(currentOrder))
+    });
     document.getElementById("trackResult").innerHTML = "";
 
     await renderOrder(currentOrder);
@@ -1053,8 +1131,9 @@ async function renderOrder(order){
   const normalizedStatus = normalizeStatus(order.status);
   const destinationResolution = resolveDestinationCoordinates(order);
   const destinationCoordinates = destinationResolution.coordinates;
+  const orderDriverLocation = getDriverLocation(order);
   const driverCoordinates = normalizedStatus === "out-for-delivery"
-    ? getLocationCoordinates(order.driverLocation)
+    ? getLocationCoordinates(orderDriverLocation)
     : null;
   const openLocationUrl = getOpenLocationUrl(order, destinationCoordinates);
   const safeOpenLocationUrl = escapeAttribute(openLocationUrl || "#");
@@ -1091,7 +1170,7 @@ ${(order.items || []).map(item => `<li><span>${escapeHtml(item.name)}</span><str
 
   const mapContainer = document.getElementById("mapContainer");
   const locationInfo = document.getElementById("locationInfo");
-  const liveLocationTime = formatLocationTimestamp(order.driverLocation?.updatedAt);
+  const liveLocationTime = formatLocationTimestamp(orderDriverLocation?.updatedAt || orderDriverLocation?.lastUpdatedAt || orderDriverLocation?.timestamp);
   const etaInfo = document.getElementById("etaInfo");
   const mapLegend = document.getElementById("mapLegend");
   const etaEstimate = normalizedStatus === "out-for-delivery" && driverCoordinates && destinationCoordinates
@@ -1125,7 +1204,7 @@ ${(order.items || []).map(item => `<li><span>${escapeHtml(item.name)}</span><str
     <p>${liveLocationTime ? t("track.liveDriverTime", { time: liveLocationTime }) : t("track.liveDriverFallback")}</p>
   </article>
   ` : ""}
-  ${normalizedStatus === "delivered" ? `
+  ${normalizedStatus === "delivered" || normalizedStatus === "collected" ? `
   <article class="track-status-card is-complete">
     <span class="track-status-card-label">${t("track.deliveryCardLabel")}</span>
     <strong>${t("track.deliveryCompleteTitle")}</strong>
@@ -1174,7 +1253,7 @@ ${(order.items || []).map(item => `<li><span>${escapeHtml(item.name)}</span><str
   }
 
   updateDriverInfo(order, normalizedStatus);
-  renderStatus(normalizedStatus);
+  renderStatus(normalizedStatus, order);
   await updateReviewUI(order);
 }
 
@@ -1212,8 +1291,11 @@ function getStatusToneClass(status){
     "quote-sent": "status-sent",
     confirmed: "status-confirmed",
     preparing: "status-preparing",
+    "driver-assigned": "status-preparing",
     "out-for-delivery": "status-delivery",
     delivered: "status-delivered",
+    "collection-requested": "status-delivered",
+    collected: "status-delivered",
     cancelled: "status-cancelled"
   };
 
@@ -1608,19 +1690,29 @@ function bindSupportButton(order){
   };
 }
 
-function renderStatus(status){
+function renderStatus(status, order = null){
+  const normalizedStatus = normalizeStatus(status);
   const steps = {
     "quote-requested": 0,
     "quote-sent": 1,
     confirmed: 2,
     preparing: 3,
+    "driver-assigned": 3,
     "out-for-delivery": 4,
     delivered: 5,
+    "collection-requested": 5,
     collected: 5,
     cancelled: -1
   };
-
-  const currentIndex = steps[status] ?? 0;
+  const stepTimestampFields = [
+    ["createdAt"],
+    ["quoteSentAt"],
+    ["confirmedAt"],
+    ["preparingAt", "driverAssignedAt"],
+    ["outForDeliveryAt"],
+    normalizedStatus === "collected" ? ["collectedAt", "deliveredAt"] : ["deliveredAt", "collectedAt"]
+  ];
+  const currentIndex = steps[normalizedStatus] ?? 0;
   const statusSteps = document.querySelectorAll(".status-step");
 
   statusSteps.forEach((step, index) => {
@@ -1632,6 +1724,24 @@ function renderStatus(status){
 
     if(index === currentIndex){
       step.classList.add("current");
+    }
+
+    const existingTime = step.querySelector(".status-step-time");
+    const timestampField = stepTimestampFields[index];
+    const timestamp = timestampField ? getFirstOrderTimestamp(order, timestampField) : null;
+    const formattedTimestamp = timestamp ? formatLocationTimestamp(timestamp) : "";
+
+    if(formattedTimestamp){
+      if(existingTime){
+        existingTime.textContent = formattedTimestamp;
+      }else{
+        const timeEl = document.createElement("small");
+        timeEl.className = "status-step-time";
+        timeEl.textContent = formattedTimestamp;
+        step.querySelector("div:last-child")?.appendChild(timeEl);
+      }
+    }else{
+      existingTime?.remove();
     }
   });
 }
@@ -1651,7 +1761,8 @@ async function updateReviewUI(order){
   setReviewFormsVisibility(false, false);
   setReviewMessage("", "");
 
-  if(normalizeStatus(order.status) !== "delivered" || !order?.orderId){
+  const reviewStatus = normalizeStatus(order.status);
+  if(!(reviewStatus === "delivered" || reviewStatus === "collected") || !order?.orderId){
     reviewPromptState = {
       orderId: "",
       submitted: false,
@@ -1696,7 +1807,8 @@ async function getExistingReview(orderId){
 async function submitReview(event){
   event.preventDefault();
 
-  if(!currentOrder || normalizeStatus(currentOrder.status) !== "delivered"){
+  const reviewStatus = normalizeStatus(currentOrder?.status);
+  if(!currentOrder || !(reviewStatus === "delivered" || reviewStatus === "collected")){
     return;
   }
 
@@ -1802,10 +1914,7 @@ function formatStatusLabel(status){
 }
 
 function normalizeStatus(status){
-  const normalizedStatus = (status || "").toLowerCase().trim().replaceAll(" ", "-");
-
-  // Customer tracking still treats returned rentals as a completed delivery milestone.
-  return normalizedStatus === "collected" ? "delivered" : normalizedStatus;
+  return normalizeOrderStatus(status);
 }
 
 function updateDriverInfo(order, normalizedStatus){

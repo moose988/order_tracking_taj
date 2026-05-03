@@ -14,6 +14,7 @@ import {
   normalizeMapUrl
 } from "./location-utils.js";
 import { initScrollTopButton } from "./scroll-top.js";
+import { normalizeOrderStatus } from "./order-status.js";
 import {
   SESSION_EXPIRED_MESSAGE,
   clearDriverSession,
@@ -1067,7 +1068,7 @@ function initMobileMenu(){
 }
 
 function normalizeOrderStatusValue(status){
-  return String(status || "").trim().toLowerCase().replace(/\s+/g, "-");
+  return normalizeOrderStatus(status);
 }
 
 function normalizeOrderIdInput(value){
@@ -1564,23 +1565,34 @@ function buildPublicTrackingPayload(order, patch = {}){
     ...order,
     ...patch
   };
-
-  return {
-    orderId: nextOrder.orderId || nextOrder.id || "",
-    customerName: nextOrder.customerName || "",
-    eventDate: nextOrder.eventDate || "",
-    rentalDays: getOrderRentalDays(nextOrder),
-    eventTime: nextOrder.eventTime || "",
-    setupTime: nextOrder.setupTime || "",
-    eventLocation: nextOrder.eventLocation || "",
-    mapLink: normalizeMapUrl(nextOrder.mapLink || "") || "",
-    items: Array.isArray(nextOrder.items) ? nextOrder.items : [],
-    status: normalizeStatus(nextOrder.status),
-    updatedAt: serverTimestamp(),
-    ...(nextOrder.destinationLocation ? { destinationLocation: nextOrder.destinationLocation } : {}),
-    ...(nextOrder.driver ? { driver: nextOrder.driver } : {}),
-    ...(nextOrder.driverLocation ? { driverLocation: nextOrder.driverLocation } : {})
+  const payload = {
+    updatedAt: serverTimestamp()
   };
+
+  if(Object.prototype.hasOwnProperty.call(patch, "status")){
+    payload.status = normalizeOrderStatusValue(nextOrder.status);
+  }
+
+  if(Object.prototype.hasOwnProperty.call(patch, "driver")){
+    payload.driver = nextOrder.driver || null;
+  }
+
+  if(Object.prototype.hasOwnProperty.call(patch, "driverLocation")){
+    payload.driverLocation = nextOrder.driverLocation || null;
+  }
+
+  [
+    "outForDeliveryAt",
+    "deliveredAt",
+    "collectedAt",
+    "collectedBy"
+  ].forEach((fieldName) => {
+    if(Object.prototype.hasOwnProperty.call(patch, fieldName)){
+      payload[fieldName] = patch[fieldName];
+    }
+  });
+
+  return payload;
 }
 
 async function upsertPublicTracking(order, patch = {}){
@@ -2162,11 +2174,16 @@ async function handleMarkItemsCollected(){
     const collectedBy = getDriverMeta(currentDriver);
 
     // Preserve the original delivery assignment/details and only append the return metadata.
-    await updateDoc(orderRef, {
+    const patch = {
       status: "collected",
       collectedAt: serverTimestamp(),
       collectedBy
-    });
+    };
+
+    await Promise.all([
+      updateDoc(orderRef, patch),
+      upsertPublicTracking(latestOrder, patch)
+    ]);
 
     currentCollectionLookupOrder = {
       ...latestOrder,
@@ -2709,7 +2726,8 @@ function subscribeToDriverOrders(uid){
   ordersUnsubscribe = onSnapshot(driverOrdersQuery, (snapshot) => {
     const assignedOrders = snapshot.docs.map((orderDoc) => ({
       id: orderDoc.id,
-      ...orderDoc.data()
+      ...orderDoc.data(),
+      status: normalizeOrderStatusValue(orderDoc.data()?.status)
     }));
 
     currentOrders = assignedOrders;

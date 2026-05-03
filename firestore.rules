@@ -109,7 +109,10 @@ service cloud.firestore {
         request.resource.data.keys().hasOnly([
           "orderId", "customerName", "eventDate", "rentalDays", "eventTime",
           "setupTime", "eventLocation", "mapLink", "items", "status",
-          "createdAt", "updatedAt", "destinationLocation"
+          "createdAt", "updatedAt", "quoteSentAt", "confirmedAt",
+          "preparingAt", "driverAssignedAt", "outForDeliveryAt",
+          "deliveredAt", "collectionRequestedAt", "collectedAt",
+          "cancelledAt", "destinationLocation"
         ]) &&
         request.resource.data.status == "quote-requested" &&
         request.resource.data.customerName is string &&
@@ -123,9 +126,14 @@ service cloud.firestore {
       );
       allow update: if isAdmin() || (
         isDriver() &&
-        resource.data.driver is map &&
-        resource.data.driver.uid == request.auth.uid &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "driver", "driverLocation", "updatedAt"])
+        (
+          resource.data.driver is map && resource.data.driver.uid == request.auth.uid ||
+          request.resource.data.driver is map && request.resource.data.driver.uid == request.auth.uid
+        ) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "driver", "driverLocation", "updatedAt",
+          "outForDeliveryAt", "deliveredAt", "collectedAt", "collectedBy"
+        ])
       );
       allow delete: if isAdmin();
     }
