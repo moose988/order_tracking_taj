@@ -239,6 +239,28 @@
           <p id="driverPanelSummary" class="driver-panel-summary">Loading driver workload...</p>
         </div>
 
+        <div class="driver-panel-toolbar" aria-label="Driver workload navigation">
+          <p id="driverPanelIndicator" class="driver-panel-indicator">Loading drivers...</p>
+          <div id="driverPanelControls" class="driver-panel-controls" hidden>
+            <button
+              id="driverPanelPrevBtn"
+              class="driver-panel-nav-btn"
+              type="button"
+              aria-label="Show previous drivers"
+            >
+              &#8592;
+            </button>
+            <button
+              id="driverPanelNextBtn"
+              class="driver-panel-nav-btn"
+              type="button"
+              aria-label="Show next drivers"
+            >
+              &#8594;
+            </button>
+          </div>
+        </div>
+
         <div id="driverPanel" class="driver-panel">
           <article class="driver-card is-loading">Loading...</article>
         </div>

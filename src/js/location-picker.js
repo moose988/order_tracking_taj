@@ -251,6 +251,27 @@ function ensurePickerController(){
   let searchDebounceId = null;
   let activeSearchToken = 0;
   let previousBodyOverflow = "";
+  let previousBodyOverscrollBehavior = "";
+
+  function syncMapLayout(selection = null){
+    window.requestAnimationFrame(() => {
+      map.invalidateSize();
+
+      if(selection){
+        map.setView([selection.lat, selection.lng], PICKER_ZOOM, {
+          animate: false
+        });
+      }else{
+        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM, {
+          animate: false
+        });
+      }
+    });
+
+    window.setTimeout(() => {
+      map.invalidateSize();
+    }, 180);
+  }
 
   function updatePreview(selection){
     previewTitle.textContent = getSelectionHeading(selection);
@@ -327,7 +348,9 @@ function ensurePickerController(){
 
   function closePicker(selection = null){
     overlay.classList.remove("active");
+    document.body.classList.remove("location-picker-open");
     document.body.style.overflow = previousBodyOverflow;
+    document.body.style.overscrollBehavior = previousBodyOverscrollBehavior;
 
     if(activeResolver){
       const resolver = activeResolver;
@@ -448,6 +471,12 @@ function ensurePickerController(){
     }
   });
 
+  window.addEventListener("resize", () => {
+    if(overlay.classList.contains("active")){
+      map.invalidateSize();
+    }
+  });
+
   pickerController = {
     open({
       titleText = "Pick Event Location",
@@ -462,21 +491,12 @@ function ensurePickerController(){
       setMarker(initialSelection ? { ...initialSelection } : null);
       overlay.classList.add("active");
       previousBodyOverflow = document.body.style.overflow;
+      previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
+      document.body.classList.add("location-picker-open");
       document.body.style.overflow = "hidden";
+      document.body.style.overscrollBehavior = "none";
 
-      window.setTimeout(() => {
-        map.invalidateSize();
-
-        if(initialSelection){
-          map.setView([initialSelection.lat, initialSelection.lng], PICKER_ZOOM, {
-            animate: false
-          });
-        }else{
-          map.setView(DEFAULT_CENTER, DEFAULT_ZOOM, {
-            animate: false
-          });
-        }
-      }, 50);
+      syncMapLayout(initialSelection);
 
       return new Promise((resolve) => {
         activeResolver = resolve;

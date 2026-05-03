@@ -1780,6 +1780,21 @@
     overflow: hidden;
     overscroll-behavior: none;
   }
+
+  body.location-picker-open.order-page .mobile-cart-bar {
+    display: none !important;
+  }
+
+  body.location-picker-open.order-page .scroll-top-btn {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(8px);
+  }
+
+  body.location-picker-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   
   /* MODAL */
   .modal-overlay {
@@ -2221,17 +2236,30 @@
   }
 
   .location-picker-overlay {
-    z-index: 260;
+    z-index: 1400;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overscroll-behavior: contain;
   }
 
   .location-picker-modal {
-    width: min(920px, 100%);
+    width: min(920px, calc(100vw - 40px));
+    max-height: calc(100dvh - 40px);
+    border: 1px solid rgba(201, 169, 106, 0.18);
+    background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%);
+    box-shadow: 0 28px 70px rgba(20, 16, 12, 0.24);
   }
 
   .location-picker-modal-content {
     padding: 28px;
     display: grid;
     gap: 18px;
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
   }
 
   .location-picker-head h3 {
@@ -2260,7 +2288,7 @@
   .location-picker-results {
     display: grid;
     gap: 10px;
-    max-height: 220px;
+    max-height: min(220px, 25vh);
     overflow-y: auto;
   }
 
@@ -2299,7 +2327,8 @@
   }
 
   .location-picker-map {
-    height: 360px;
+    height: clamp(320px, 42vh, 400px);
+    min-height: 320px;
     border-radius: 20px;
     overflow: hidden;
     border: 1px solid var(--border);
@@ -2332,6 +2361,11 @@
 
   .location-picker-actions {
     margin-top: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding-top: 8px;
+    background: linear-gradient(180deg, rgba(255, 253, 250, 0), #fffdfa 26%);
   }
 
   .location-picker-destination-icon {
@@ -5389,13 +5423,66 @@
     color: var(--text-soft);
   }
 
+  .driver-panel-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .driver-panel-indicator {
+    color: var(--text-soft);
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .driver-panel-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .driver-panel-nav-btn {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(201, 169, 106, 0.24);
+    background: linear-gradient(180deg, #ffffff, #f8f4ec);
+    color: var(--text);
+    box-shadow: 0 10px 24px rgba(31, 26, 23, 0.08);
+    cursor: pointer;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, background 0.2s ease;
+  }
+
+  .driver-panel-nav-btn:hover:not(:disabled),
+  .driver-panel-nav-btn:focus-visible {
+    outline: none;
+    color: var(--gold-dark);
+    border-color: rgba(167, 134, 72, 0.5);
+    background: linear-gradient(180deg, #fffdf8, #f5ead4);
+    box-shadow: 0 16px 28px rgba(167, 134, 72, 0.16);
+    transform: translateY(-1px);
+  }
+
+  .driver-panel-nav-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
   .driver-panel {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
+    overflow: hidden;
   }
 
   .driver-card {
+    min-width: 0;
     padding: 20px 22px;
     border-radius: 22px;
     border: 1px solid var(--border);
@@ -7043,9 +7130,11 @@
     }
 
     .driver-panel-head,
+    .driver-panel-toolbar,
     .operations-map-head,
     .collection-panel-head {
       flex-direction: column;
+      align-items: flex-start;
     }
 
     .ops-panel,
@@ -7061,6 +7150,10 @@
     .inventory-damage-tools,
     .inventory-damage-actions {
       grid-template-columns: 1fr;
+    }
+
+    .driver-panel-controls {
+      align-self: flex-end;
     }
 
     .operations-map-metrics {
@@ -7386,11 +7479,33 @@
     }
 
     .location-picker-modal-content {
-      padding: 22px;
+      padding: 20px 18px 18px;
+      max-height: calc(100dvh - 24px);
     }
 
     .location-picker-map {
-      height: 300px;
+      height: clamp(260px, 38vh, 320px);
+      min-height: 260px;
+    }
+
+    .location-picker-overlay {
+      padding: 12px;
+      align-items: flex-start;
+    }
+
+    .location-picker-modal {
+      width: min(100%, calc(100vw - 24px));
+      max-height: calc(100dvh - 24px);
+      border-radius: 20px;
+    }
+
+    .location-picker-results {
+      max-height: min(190px, 22vh);
+    }
+
+    .location-picker-actions .btn {
+      width: 100%;
+      min-height: 46px;
     }
 
     .track-status-grid {
@@ -12430,7 +12545,7 @@ body.admin-page .site-header .brand-logo {
   .admin-page #upcomingReservationsBody tr {
     display: grid;
     gap: 8px;
-    padding: 12px;
+    padding: 12px 16px;
     border: 1px solid var(--border);
     border-radius: 16px;
     background: #fff;
@@ -12497,15 +12612,71 @@ body.admin-page .site-header .brand-logo {
   .admin-page #upcomingReservationsBody td:nth-child(5)::before { content: "Quantity"; }
   .admin-page #upcomingReservationsBody td:nth-child(6)::before { content: "Status"; }
 
-  .admin-page #adminOrdersSection #ordersTableBody .action-buttons {
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     width: 100%;
-    gap: 8px;
+    min-width: 0;
+    gap: 12px;
+    margin-top: 12px;
   }
 
   .admin-page #adminOrdersSection #ordersTableBody .action-buttons .btn,
   .admin-page #inventoryTableBody .inventory-row-actions .btn {
     width: 100%;
-    min-height: 42px;
+    min-height: 48px;
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions .admin-order-action-btn {
+    width: 85%;
+    max-width: 320px;
+    min-height: 48px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+    align-self: center;
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    white-space: normal;
+    margin: 0 auto;
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions .edit-order-btn {
+    background: transparent;
+    border: 1px solid #E8DCCB;
+    color: var(--text);
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions .quote-builder-btn {
+    background: #F8F3EA;
+    border: 1px solid #E8DCCB;
+    color: var(--text);
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions .wa-btn {
+    background: #C8A060;
+    border: none;
+    color: #fff;
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions .driver-btn,
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions .assign-driver-btn {
+    background: #F8F3EA;
+    border: 1px solid #E8DCCB;
+    color: var(--text);
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody .admin-actions .review-request-btn {
+    background: linear-gradient(180deg, #2B2622, #1F1A17);
+    border: none;
+    color: #fff;
   }
 
   .admin-page #inventoryTableBody .inventory-row-actions {
@@ -13090,5 +13261,51 @@ body.admin-page .site-header .brand-logo {
   .driver-dashboard-page .driver-order-top {
     flex-direction: column;
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(9) {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    width: 100%;
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(9)::before {
+    justify-self: start;
+    width: 100%;
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(9) .action-buttons.admin-order-actions.admin-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(9) .action-buttons.admin-order-actions.admin-actions > button,
+  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(9) .action-buttons.admin-order-actions.admin-actions > a,
+  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(9) .action-buttons.admin-order-actions.admin-actions > .btn {
+    width: 92%;
+    max-width: 340px;
+    min-height: 48px;
+    margin-left: auto;
+    margin-right: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    border-radius: 14px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+    align-self: center;
+    box-sizing: border-box;
+    white-space: normal;
   }
 }

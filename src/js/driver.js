@@ -1,5 +1,12 @@
 import { auth, db } from "./firebase.js";
 import {
+  DRIVER_LOGIN_PATH,
+  DRIVER_REDIRECT_MESSAGE,
+  normalizeEmail,
+  redirectToAuthPage,
+  resolveDriverProfile as resolveDriverAccessProfile
+} from "./auth-access.js";
+import {
   buildGoogleMapsCoordinateLink,
   extractCoordinatesFromMapLink,
   getLocationCoordinates,
@@ -8,7 +15,7 @@ import {
 } from "./location-utils.js";
 import { initScrollTopButton } from "./scroll-top.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const driverWelcomeTitle = document.getElementById("driverWelcomeTitle");
 const driverSummaryText = document.getElementById("driverSummaryText");
@@ -1510,47 +1517,9 @@ async function resolveDriverProfile(user){
     email
   });
 
-  const uidDocRef = doc(db, "drivers", user.uid);
-  const uidDocSnapshot = await getDoc(uidDocRef);
+  const driverProfile = await resolveDriverAccessProfile(db, user);
 
-  console.debug("[driver-dashboard] driver doc by document ID", {
-    uid: user?.uid || "",
-    exists: uidDocSnapshot.exists()
-  });
-
-  let driverDoc = uidDocSnapshot.exists() ? uidDocSnapshot : null;
-
-  if(!driverDoc){
-    const uidQuerySnapshot = await getDocs(
-      query(collection(db, "drivers"), where("uid", "==", user.uid))
-    );
-
-    console.debug("[driver-dashboard] driver fallback by uid field", {
-      uid: user?.uid || "",
-      found: !uidQuerySnapshot.empty
-    });
-
-    if(!uidQuerySnapshot.empty){
-      driverDoc = uidQuerySnapshot.docs[0];
-    }
-  }
-
-  if(!driverDoc && email){
-    const emailQuerySnapshot = await getDocs(
-      query(collection(db, "drivers"), where("email", "==", email))
-    );
-
-    console.debug("[driver-dashboard] driver fallback by email", {
-      email,
-      found: !emailQuerySnapshot.empty
-    });
-
-    if(!emailQuerySnapshot.empty){
-      driverDoc = emailQuerySnapshot.docs[0];
-    }
-  }
-
-  if(!driverDoc){
+  if(!driverProfile){
     console.debug("[driver-dashboard] no driver profile found", {
       uid: user?.uid || "",
       email
@@ -1558,30 +1527,12 @@ async function resolveDriverProfile(user){
     return null;
   }
 
-  const currentData = driverDoc.data();
-  const nextData = {};
+  console.debug("[driver-dashboard] driver profile resolved", {
+    uid: user?.uid || "",
+    driverDocId: driverProfile.id
+  });
 
-  if(email && currentData.email !== email){
-    nextData.email = email;
-  }
-
-  if(currentData.uid !== user.uid){
-    nextData.uid = user.uid;
-  }
-
-  if(Object.keys(nextData).length){
-    await updateDoc(driverDoc.ref, nextData);
-    console.debug("[driver-dashboard] driver profile synced", {
-      driverDocId: driverDoc.id,
-      updates: nextData
-    });
-  }
-
-  return {
-    id: driverDoc.id,
-    ...currentData,
-    ...nextData
-  };
+  return driverProfile;
 }
 
 async function backfillAssignedOrders(user, driverProfile){
@@ -1714,22 +1665,13 @@ function getCompletedOrdersRangeValue(order){
   return getTimestampValue(order.collectedAt) || getTimestampValue(order.deliveredAt) || getEventDateTimeValue(order) || getTimestampValue(order.createdAt);
 }
 
-async function redirectUnauthorizedDriver(reason){
+function redirectUnauthorizedDriver(reason, message = ""){
   console.debug("[driver-dashboard] redirecting unauthorized driver", { reason });
   stopLocationSharing();
   ordersUnsubscribe?.();
   currentDriver = null;
   localStorage.removeItem("driverUid");
-
-  try{
-    if(auth.currentUser){
-      await signOut(auth);
-    }
-  }catch(error){
-    console.error("Failed to sign out unauthorized driver:", error);
-  }finally{
-    window.location.replace("/driver-login");
-  }
+  redirectToAuthPage(DRIVER_LOGIN_PATH, message);
 }
 
 function isOrderInCurrentMonth(order){
@@ -3077,7 +3019,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if(!user){
-      await redirectUnauthorizedDriver("no-auth-user");
+      redirectUnauthorizedDriver("no-auth-user");
       return;
     }
 
@@ -3092,7 +3034,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const driverProfile = await resolveDriverProfile(user);
 
       if(!driverProfile){
-        await redirectUnauthorizedDriver("driver-profile-not-found");
+        redirectUnauthorizedDriver("driver-profile-not-found", DRIVER_REDIRECT_MESSAGE);
         return;
       }
 

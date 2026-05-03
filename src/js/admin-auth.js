@@ -1,64 +1,20 @@
 import { auth, db } from "./firebase.js";
 import {
-  signOut,
+  ADMIN_LOGIN_PATH,
+  ADMIN_REDIRECT_MESSAGE,
+  consumeAuthRedirectMessage,
+  getAuthorizedAdminDoc
+} from "./auth-access.js";
+import {
   signInWithEmailAndPassword,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const loginForm = document.getElementById("adminLoginForm");
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
 const loginButton = document.getElementById("loginBtn");
 const errorMessage = document.getElementById("error");
-
-async function getAuthorizedAdminDoc(user){
-  if(!user?.uid){
-    return null;
-  }
-
-  const adminDocRef = doc(db, "admins", user.uid);
-  const adminSnapshot = await getDoc(adminDocRef);
-
-  if(adminSnapshot.exists()){
-    const adminData = adminSnapshot.data() || {};
-    const role = typeof adminData.role === "string" ? adminData.role.trim().toLowerCase() : "";
-    const roleAllowed = !role || role === "admin";
-
-    return adminData.active === true && roleAllowed
-      ? { id: adminSnapshot.id, ...adminData }
-      : null;
-  }
-
-  const email = String(user.email || "").trim().toLowerCase();
-
-  if(!email){
-    return null;
-  }
-
-  const fallbackQuery = query(collection(db, "admins"), where("email", "==", email));
-  const fallbackSnapshot = await getDocs(fallbackQuery);
-
-  if(fallbackSnapshot.empty){
-    return null;
-  }
-
-  const fallbackDoc = fallbackSnapshot.docs[0];
-  const fallbackData = fallbackDoc.data() || {};
-  const role = typeof fallbackData.role === "string" ? fallbackData.role.trim().toLowerCase() : "";
-  const roleAllowed = !role || role === "admin";
-
-  return fallbackData.active === true && roleAllowed
-    ? { id: fallbackDoc.id, ...fallbackData }
-    : null;
-}
 
 /* LOGIN FUNCTION */
 window.login = async function(){
@@ -71,11 +27,10 @@ window.login = async function(){
 
   try{
     const credential = await signInWithEmailAndPassword(auth, email, password);
-    const authorizedAdmin = await getAuthorizedAdminDoc(credential.user);
+    const authorizedAdmin = await getAuthorizedAdminDoc(db, credential.user);
 
     if(!authorizedAdmin){
-      await signOut(auth);
-      setError("This account does not have admin access.");
+      setError(ADMIN_REDIRECT_MESSAGE);
       setLoadingState(false);
       return;
     }
@@ -120,16 +75,24 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   try{
-    const authorizedAdmin = await getAuthorizedAdminDoc(user);
+    const authorizedAdmin = await getAuthorizedAdminDoc(db, user);
 
     if(authorizedAdmin){
       window.location.href = "/admin";
       return;
     }
 
-    await signOut(auth);
+    setError(ADMIN_REDIRECT_MESSAGE);
   }catch(error){
     console.error("Admin auth state verification failed:", error);
-    await signOut(auth);
+    setError("We could not verify admin access right now. Please try again.");
   }
 });
+
+const authRedirectMessage = consumeAuthRedirectMessage();
+
+if(authRedirectMessage){
+  setError(authRedirectMessage);
+}else if(window.location.pathname === ADMIN_LOGIN_PATH){
+  setError("");
+}

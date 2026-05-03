@@ -22,9 +22,24 @@ const CANVAS_PAGE = {
 };
 
 const CONTENT_BOTTOM = CANVAS_PAGE.height - CANVAS_PAGE.margin - CANVAS_PAGE.footerHeight;
-const CARD_RADIUS = 26;
+const CARD_RADIUS = 20;
 const GUTTER = 28;
 const LOGO_URL = new URL("../../images/logo/logo.jpeg", import.meta.url).href;
+const PDF_COLORS = {
+  pageBackground: "#FDFAF5",
+  topAccent: "#E8D9B8",
+  textPrimary: "#1C1612",
+  textSecondary: "#7A6A58",
+  textMuted: "#9A8878",
+  accentGold: "#A0742A",
+  border: "#E8DCCB",
+  borderGold: "#C8A060",
+  separator: "#EDE3D4",
+  headerFill: "#F5ECD9",
+  cardFill: "#FFFDF9",
+  cardFillSoft: "#FFFCF7",
+  white: "#FFFFFF"
+};
 
 let logoDataUrlPromise = null;
 
@@ -188,11 +203,12 @@ function toDisplayText(value, fallback = "-"){
 
 function buildBankRows(bankPreset, language){
   const fieldLabels = QUOTE_BANK_FIELD_LABELS[language] || QUOTE_BANK_FIELD_LABELS.en;
-  const fields = ["bankName", "branch", "beneficiary", "accountNumber", "iban", "swift"];
+  const fields = ["beneficiary", "iban", "bankName", "swift"];
 
   return fields.map((field) => ({
     label: fieldLabels[field],
-    value: toDisplayText(bankPreset?.[field])
+    value: toDisplayText(bankPreset?.[field]),
+    isIban: field === "iban"
   }));
 }
 
@@ -240,7 +256,7 @@ function buildTotalsRows(quote, labels){
 }
 
 function buildPreparedQuote(quote){
-  const language = quote.language === "ar" ? "ar" : "en";
+  const language = "en";
   const labels = getQuoteLabels(language);
   const discountState = resolveQuoteDiscountValues(quote);
   const rentalDays = Math.max(1, Math.floor(Number(quote.rentalDays) || 1));
@@ -307,7 +323,7 @@ function roundRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle = nu
 function setTextStyle(ctx, language, {
   size = 28,
   weight = 400,
-  color = "#1f1a17",
+  color = PDF_COLORS.textPrimary,
   align = getTextAlign(language),
   baseline = "top"
 } = {}){
@@ -471,10 +487,10 @@ function startPage(state){
   const canvas = createCanvas();
   const ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = PDF_COLORS.pageBackground;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = "#f6efe3";
+  ctx.fillStyle = PDF_COLORS.topAccent;
   ctx.fillRect(CANVAS_PAGE.margin, CANVAS_PAGE.margin - 10, CANVAS_PAGE.contentWidth, CANVAS_PAGE.topAccentHeight);
 
   state.currentPage = { canvas, ctx };
@@ -489,14 +505,14 @@ function drawFooter(page, state){
   const footerTop = CANVAS_PAGE.height - CANVAS_PAGE.footerHeight + 14;
   const lineY = footerTop - 28;
 
-  ctx.strokeStyle = "#e8dccb";
+  ctx.strokeStyle = "#D4C4A8";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(startX, lineY);
   ctx.lineTo(startX + CANVAS_PAGE.contentWidth, lineY);
   ctx.stroke();
 
-  const logoSize = 44;
+  const logoSize = 36;
   const brandBlockWidth = 520;
   const brandX = direction === "rtl"
     ? startX + CANVAS_PAGE.contentWidth - brandBlockWidth
@@ -515,7 +531,7 @@ function drawFooter(page, state){
     brandTextWidth,
     {
       maxSize: 18,
-      minSize: 14,
+      minSize: 13,
       maxLines: 2,
       weight: 700,
       lineHeight: language === "ar" ? 1.28 : 1.2
@@ -527,8 +543,8 @@ function drawFooter(page, state){
     language,
     brandTextWidth,
     {
-      maxSize: 14,
-      minSize: 12,
+      maxSize: 13,
+      minSize: 11,
       maxLines: 2,
       weight: 400,
       lineHeight: language === "ar" ? 1.28 : 1.25
@@ -564,7 +580,7 @@ function drawFooter(page, state){
     {
       size: footerSubtitleMetrics.size,
       weight: 400,
-      color: "#7a6e61",
+      color: PDF_COLORS.textMuted,
       lineHeight: footerSubtitleMetrics.style.lineHeight,
       align: getTextAlign(language)
     }
@@ -578,9 +594,9 @@ function drawFooter(page, state){
     footerTop + 10,
     CANVAS_PAGE.contentWidth,
     {
-      size: 14,
+      size: 13,
       weight: 500,
-      color: "#877968",
+      color: PDF_COLORS.textMuted,
       lineHeight: 1.25,
       align: direction === "rtl" ? "left" : "right"
     }
@@ -620,7 +636,7 @@ function drawInfoRows(ctx, rows, language, x, y, width){
     drawTextBlock(ctx, row.label, language, labelX, currentY, labelWidth, {
       size: 18,
       weight: 700,
-      color: "#786b5e",
+      color: PDF_COLORS.textSecondary,
       lineHeight: 1.28,
       align: getTextAlign(language)
     });
@@ -628,21 +644,21 @@ function drawInfoRows(ctx, rows, language, x, y, width){
     drawTextBlock(ctx, row.value, language, valueX, currentY, valueWidth, {
       size: 18,
       weight: 500,
-      color: "#201b17",
+      color: PDF_COLORS.textPrimary,
       lineHeight: 1.35,
       align: getTextAlign(language)
     });
 
     if(index < rows.length - 1){
-      ctx.strokeStyle = "#eee4d6";
+      ctx.strokeStyle = PDF_COLORS.separator;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x, currentY + rowHeight + 10);
-      ctx.lineTo(x + width, currentY + rowHeight + 10);
+      ctx.moveTo(x + 16, currentY + rowHeight + 14);
+      ctx.lineTo(x + width - 16, currentY + rowHeight + 14);
       ctx.stroke();
     }
 
-    currentY += rowHeight + 22;
+    currentY += rowHeight + 30;
   });
 
   return currentY - y;
@@ -668,14 +684,14 @@ function measureInfoRows(ctx, rows, language, width){
     total += Math.max(labelMeasure.height, valueMeasure.height, 26);
 
     if(index < rows.length - 1){
-      total += 22;
+      total += 30;
     }
   });
 
   return total;
 }
 
-function drawCard(ctx, x, y, width, height, fill = "#fffdfa", stroke = "#e7dccd"){
+function drawCard(ctx, x, y, width, height, fill = PDF_COLORS.cardFill, stroke = PDF_COLORS.border){
   roundRect(ctx, x, y, width, height, CARD_RADIUS, fill, stroke, 2);
 }
 
@@ -683,14 +699,14 @@ function drawHeaderSection(state){
   const { ctx } = state.currentPage;
   const language = state.quote.language;
   const direction = state.quote.direction;
-  const leftWidth = 760;
+  const leftWidth = Math.round(CANVAS_PAGE.contentWidth * 0.55);
   const rightWidth = CANVAS_PAGE.contentWidth - leftWidth - GUTTER;
   const x = CANVAS_PAGE.margin;
   const y = state.currentY;
-  const logoSize = 100;
-  const logoFrameSize = 120;
-  const leftPadding = 34;
-  const rightPadding = 34;
+  const logoSize = 120;
+  const logoFrameSize = 136;
+  const leftPadding = 36;
+  const rightPadding = 40;
   const leftInnerWidth = leftWidth - (leftPadding * 2);
   const textWidth = leftInnerWidth - logoFrameSize - 24;
   const companyNameMetrics = getFittedTextMetrics(
@@ -699,8 +715,8 @@ function drawHeaderSection(state){
     language,
     textWidth,
     {
-      maxSize: 38,
-      minSize: 28,
+      maxSize: 44,
+      minSize: 30,
       maxLines: 2,
       weight: 800,
       lineHeight: language === "ar" ? 1.24 : 1.12
@@ -720,18 +736,9 @@ function drawHeaderSection(state){
     }
   );
   const contactWidth = leftInnerWidth;
-  const phoneHeight = measureTextBlock(ctx, QUOTE_COMPANY.phone, language, contactWidth, {
-    size: 18,
-    weight: 600,
-    lineHeight: language === "ar" ? 1.32 : 1.25
-  }).height;
-  const emailHeight = measureTextBlock(ctx, QUOTE_COMPANY.email, language, contactWidth, {
-    size: 18,
-    weight: 500,
-    lineHeight: language === "ar" ? 1.32 : 1.25
-  }).height;
-  const instagramHeight = measureTextBlock(ctx, QUOTE_COMPANY.instagram, language, contactWidth, {
-    size: 18,
+  const headerContactLine = `${QUOTE_COMPANY.phone} · ${QUOTE_COMPANY.email} · ${QUOTE_COMPANY.instagram}`;
+  const contactLineHeight = measureTextBlock(ctx, headerContactLine, language, contactWidth, {
+    size: 17,
     weight: 500,
     lineHeight: language === "ar" ? 1.32 : 1.25
   }).height;
@@ -739,11 +746,11 @@ function drawHeaderSection(state){
     logoFrameSize,
     companyNameMetrics.measurement.height + 10 + subtitleMetrics.measurement.height
   );
-  const companyLinesHeight = phoneHeight + 10 + emailHeight + 10 + instagramHeight;
+  const companyLinesHeight = contactLineHeight;
   const metaContentWidth = rightWidth - (rightPadding * 2);
   const metaRowsHeight = measureInfoRows(ctx, state.quote.metaRows, language, metaContentWidth);
   const metaEyebrowHeight = measureTextBlock(ctx, state.quote.labels.quotation, language, metaContentWidth, {
-    size: 16,
+    size: 15,
     weight: 800,
     lineHeight: 1.2
   }).height;
@@ -753,20 +760,20 @@ function drawHeaderSection(state){
     language,
     metaContentWidth,
     {
-      maxSize: 44,
-      minSize: 34,
+      maxSize: 42,
+      minSize: 32,
       maxLines: 2,
       weight: 800,
       lineHeight: language === "ar" ? 1.14 : 1.05
     }
   );
 
-  const leftHeight = 30 + topClusterHeight + 22 + companyLinesHeight + 30;
-  const rightHeight = 32 + metaEyebrowHeight + 10 + metaTitleMetrics.measurement.height + 24 + metaRowsHeight + 32;
+  const leftHeight = 30 + topClusterHeight + 14 + companyLinesHeight + 24;
+  const rightHeight = 40 + metaEyebrowHeight + 12 + metaTitleMetrics.measurement.height + 26 + metaRowsHeight + 40;
   const cardHeight = Math.max(leftHeight, rightHeight);
 
-  drawCard(ctx, x, y, leftWidth, cardHeight, "#fffaf1", "#eadcc5");
-  drawCard(ctx, x + leftWidth + GUTTER, y, rightWidth, cardHeight, "#fff9ec", "#dec59f");
+  drawCard(ctx, x, y, leftWidth, cardHeight, PDF_COLORS.cardFillSoft, PDF_COLORS.border);
+  drawCard(ctx, x + leftWidth + GUTTER, y, rightWidth, cardHeight, PDF_COLORS.cardFillSoft, PDF_COLORS.borderGold);
 
   const logoFrameX = direction === "rtl"
     ? x + leftWidth - leftPadding - logoFrameSize
@@ -775,59 +782,47 @@ function drawHeaderSection(state){
   const textX = direction === "rtl"
     ? x + leftPadding
     : logoFrameX + logoFrameSize + 24;
-  const topBlockY = y + 34;
+  const topBlockY = y + 32;
   const subtitleY = topBlockY + companyNameMetrics.measurement.height + 10;
   const companyTextWidth = textWidth;
   const contactX = x + leftPadding;
-  const contactY = topBlockY + topClusterHeight + 22;
+  const contactY = topBlockY + topClusterHeight + 14;
 
-  roundRect(ctx, logoFrameX, y + 30, logoFrameSize, logoFrameSize, 30, "#ffffff", "#eadfce", 2);
-  ctx.drawImage(state.logoImage, logoX, y + 40, logoSize, logoSize);
+  roundRect(ctx, logoFrameX, y + 28, logoFrameSize, logoFrameSize, CARD_RADIUS, PDF_COLORS.white, PDF_COLORS.border, 2);
+  ctx.drawImage(state.logoImage, logoX - 2, y + 36, logoSize, logoSize);
 
   drawTextBlock(ctx, QUOTE_COMPANY.name[language] || QUOTE_COMPANY.name.en, language, textX, topBlockY, companyTextWidth, {
     size: companyNameMetrics.size,
     weight: 800,
     lineHeight: companyNameMetrics.style.lineHeight,
+    color: PDF_COLORS.textPrimary,
     align: getTextAlign(language)
   });
 
   drawTextBlock(ctx, QUOTE_COMPANY.subtitle[language] || QUOTE_COMPANY.subtitle.en, language, textX, subtitleY, companyTextWidth, {
     size: subtitleMetrics.size,
     weight: 500,
-    color: "#7b6e60",
+    color: PDF_COLORS.textSecondary,
     lineHeight: subtitleMetrics.style.lineHeight,
     align: getTextAlign(language)
   });
 
-  let companyY = contactY;
-  companyY += drawTextBlock(ctx, QUOTE_COMPANY.phone, language, contactX, companyY, contactWidth, {
-    size: 18,
-    weight: 600,
-    lineHeight: language === "ar" ? 1.32 : 1.25,
-    color: "#403830"
-  }) + 10;
-  companyY += drawTextBlock(ctx, QUOTE_COMPANY.email, language, contactX, companyY, contactWidth, {
-    size: 18,
+  drawTextBlock(ctx, headerContactLine, language, contactX, contactY, contactWidth, {
+    size: 17,
     weight: 500,
     lineHeight: language === "ar" ? 1.32 : 1.25,
-    color: "#403830"
-  }) + 10;
-  drawTextBlock(ctx, QUOTE_COMPANY.instagram, language, contactX, companyY, contactWidth, {
-    size: 18,
-    weight: 500,
-    lineHeight: language === "ar" ? 1.32 : 1.25,
-    color: "#403830"
+    color: PDF_COLORS.textSecondary
   });
 
   const metaX = x + leftWidth + GUTTER + rightPadding;
-  const metaEyebrowY = y + 32;
-  const metaTitleY = metaEyebrowY + metaEyebrowHeight + 10;
-  const metaRowsY = metaTitleY + metaTitleMetrics.measurement.height + 24;
+  const metaEyebrowY = y + 40;
+  const metaTitleY = metaEyebrowY + metaEyebrowHeight + 12;
+  const metaRowsY = metaTitleY + metaTitleMetrics.measurement.height + 26;
 
-  drawTextBlock(ctx, state.quote.labels.quotation, language, metaX, metaEyebrowY, metaContentWidth, {
-    size: 16,
+  drawTextBlock(ctx, "Q U O T A T I O N", language, metaX, metaEyebrowY, metaContentWidth, {
+    size: 15,
     weight: 800,
-    color: "#aa7b2e",
+    color: PDF_COLORS.accentGold,
     lineHeight: 1.2,
     align: getTextAlign(language)
   });
@@ -835,7 +830,7 @@ function drawHeaderSection(state){
   drawTextBlock(ctx, state.quote.labels.quotation, language, metaX, metaTitleY, metaContentWidth, {
     size: metaTitleMetrics.size,
     weight: 800,
-    color: "#241f19",
+    color: PDF_COLORS.textPrimary,
     lineHeight: metaTitleMetrics.style.lineHeight,
     align: getTextAlign(language)
   });
@@ -857,10 +852,10 @@ function drawDualInfoCards(state){
   const language = state.quote.language;
   const cardWidth = (CANVAS_PAGE.contentWidth - GUTTER) / 2;
   const x = CANVAS_PAGE.margin;
-  const innerWidth = cardWidth - 48;
+  const innerWidth = cardWidth - 64;
   const customerRowsHeight = measureInfoRows(measureCtx, state.quote.customerRows, language, innerWidth);
   const eventRowsHeight = measureInfoRows(measureCtx, state.quote.eventRows, language, innerWidth);
-  const headerSpace = 84;
+  const headerSpace = 94;
   const cardHeight = Math.max(customerRowsHeight, eventRowsHeight) + headerSpace;
 
   ensurePage(state, cardHeight + 30);
@@ -870,20 +865,20 @@ function drawDualInfoCards(state){
   drawCard(ctx, x, y, cardWidth, cardHeight);
   drawCard(ctx, x + cardWidth + GUTTER, y, cardWidth, cardHeight);
 
-  drawTextBlock(ctx, state.quote.labels.customerDetails, language, x + 24, y + 24, innerWidth, {
-    size: 24,
+  drawTextBlock(ctx, state.quote.labels.customerDetails, language, x + 32, y + 28, innerWidth, {
+    size: 22,
     weight: 800,
     lineHeight: 1.1
   });
 
-  drawTextBlock(ctx, state.quote.labels.eventDetails, language, x + cardWidth + GUTTER + 24, y + 24, innerWidth, {
-    size: 24,
+  drawTextBlock(ctx, state.quote.labels.eventDetails, language, x + cardWidth + GUTTER + 32, y + 28, innerWidth, {
+    size: 22,
     weight: 800,
     lineHeight: 1.1
   });
 
-  drawInfoRows(ctx, state.quote.customerRows, language, x + 24, y + 68, innerWidth);
-  drawInfoRows(ctx, state.quote.eventRows, language, x + cardWidth + GUTTER + 24, y + 68, innerWidth);
+  drawInfoRows(ctx, state.quote.customerRows, language, x + 32, y + 78, innerWidth);
+  drawInfoRows(ctx, state.quote.eventRows, language, x + cardWidth + GUTTER + 32, y + 78, innerWidth);
 
   state.currentY = y + cardHeight + 26;
 }
@@ -891,34 +886,33 @@ function drawDualInfoCards(state){
 function drawSectionHeading(state, title){
   const { ctx } = state.currentPage;
   const headingHeight = drawTextBlock(ctx, title, state.quote.language, CANVAS_PAGE.margin, state.currentY, CANVAS_PAGE.contentWidth, {
-    size: 26,
+    size: 24,
     weight: 800,
+    color: PDF_COLORS.textPrimary,
     lineHeight: 1.1
   });
-  state.currentY += headingHeight + 8;
+  state.currentY += headingHeight + 10;
 }
 
 function drawTableHeader(ctx, quote, x, y, widths){
   const labels = ["#", quote.labels.itemDescription, quote.labels.quantity, quote.labels.unitPrice, quote.labels.amount];
   const aligns = ["center", getTextAlign(quote.language), "center", getTextAlign(quote.language, "money"), getTextAlign(quote.language, "money")];
+  const headerHeight = 64;
   let currentX = x;
 
+  roundRect(ctx, x, y, widths.reduce((sum, width) => sum + width, 0), headerHeight, CARD_RADIUS, PDF_COLORS.headerFill, null, 0);
+  ctx.strokeStyle = PDF_COLORS.borderGold;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y + headerHeight);
+  ctx.lineTo(x + widths.reduce((sum, width) => sum + width, 0), y + headerHeight);
+  ctx.stroke();
+
   labels.forEach((label, index) => {
-    roundRect(
-      ctx,
-      currentX,
-      y,
-      widths[index],
-      58,
-      index === 0 || index === labels.length - 1 ? 18 : 0,
-      "#f8efdf",
-      "#dcc8a3",
-      2
-    );
     drawTextBlock(ctx, label, quote.language, currentX + 14, y + 18, widths[index] - 28, {
-      size: 17,
-      weight: 800,
-      color: "#624c2a",
+      size: 15,
+      weight: 700,
+      color: "#5C4A2A",
       lineHeight: 1.15,
       align: aligns[index]
     });
@@ -937,17 +931,13 @@ function measureItemRow(ctx, quote, item, widths){
 }
 
 function drawItemRow(ctx, quote, item, x, y, widths, rowHeight){
-  const backgrounds = item.index % 2 === 0 ? "#fffbf5" : "#ffffff";
+  const rowIsEven = Number(item.index) % 2 === 0;
+  const backgrounds = rowIsEven ? PDF_COLORS.pageBackground : PDF_COLORS.white;
+  const totalWidth = widths.reduce((sum, width) => sum + width, 0);
   let currentX = x;
 
-  widths.forEach((width) => {
-    ctx.fillStyle = backgrounds;
-    ctx.fillRect(currentX, y, width, rowHeight);
-    ctx.strokeStyle = "#eadfce";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(currentX, y, width, rowHeight);
-    currentX += width;
-  });
+  ctx.fillStyle = backgrounds;
+  ctx.fillRect(x, y, totalWidth, rowHeight);
 
   const cells = [
     String(item.index),
@@ -961,27 +951,34 @@ function drawItemRow(ctx, quote, item, x, y, widths, rowHeight){
   currentX = x;
 
   cells.forEach((cell, index) => {
-    drawTextBlock(ctx, cell, quote.language, currentX + 14, y + 12, widths[index] - 28, {
+    drawTextBlock(ctx, cell, quote.language, currentX + 16, y + 14, widths[index] - 32, {
       size: sizes[index],
       weight: index === 1 ? 600 : 700,
-      color: "#201b17",
+      color: PDF_COLORS.textPrimary,
       lineHeight: 1.35,
       align: aligns[index]
     });
     currentX += widths[index];
   });
+
+  ctx.strokeStyle = PDF_COLORS.separator;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + 16, y + rowHeight);
+  ctx.lineTo(x + totalWidth - 16, y + rowHeight);
+  ctx.stroke();
 }
 
 function drawItemsTable(state){
   const quote = state.quote;
   const tableX = CANVAS_PAGE.margin;
-  const widths = [70, 560, 110, 284, 284];
+  const widths = [70, 610, 100, 250, 268];
 
   ensurePage(state, 120);
   let ctx = state.currentPage.ctx;
-  drawSectionHeading(state, quote.labels.itemDescription);
+  drawSectionHeading(state, "Items");
   drawTableHeader(ctx, quote, tableX, state.currentY, widths);
-  state.currentY += 70;
+  state.currentY += 78;
 
   if(!quote.items.length){
     ensurePage(state, 80);
@@ -1002,9 +999,9 @@ function drawItemsTable(state){
     if((state.currentY + rowHeight) > CONTENT_BOTTOM){
       startPage(state);
       ctx = state.currentPage.ctx;
-      drawSectionHeading(state, quote.labels.itemDescription);
+      drawSectionHeading(state, "Items");
       drawTableHeader(ctx, quote, tableX, state.currentY, widths);
-      state.currentY += 70;
+      state.currentY += 78;
       rowHeight = measureItemRow(ctx, quote, item, widths);
     }
 
@@ -1012,83 +1009,84 @@ function drawItemsTable(state){
     state.currentY += rowHeight;
   });
 
-  state.currentY += 26;
+  state.currentY += 14;
 }
 
 function drawTotalsCard(state){
   const quote = state.quote;
-  const cardWidth = 390;
-  const contentWidth = cardWidth - 48;
+  const cardWidth = 436;
+  const contentWidth = cardWidth - 60;
   const columnGap = quote.language === "ar" ? 24 : 18;
-  const valueWidth = quote.language === "ar" ? 150 : 138;
+  const valueWidth = quote.language === "ar" ? 162 : 154;
   const labelWidth = contentWidth - valueWidth - columnGap;
   const headingMeasure = measureTextBlock(ctxMeasureCanvas(), quote.labels.totals, quote.language, contentWidth, {
-    size: 24,
+    size: 22,
     weight: 800,
     lineHeight: 1.1
   });
   const rowHeights = quote.totalRows.map((row) => {
     const labelHeight = measureTextBlock(ctxMeasureCanvas(), row.label, quote.language, labelWidth, {
       size: row.isGrand ? 20 : 18,
-      weight: row.isGrand ? 800 : 600,
+      weight: row.isGrand ? 800 : 500,
       lineHeight: quote.language === "ar" ? 1.32 : 1.2
     }).height;
     const valueHeight = measureTextBlock(ctxMeasureCanvas(), row.value, quote.language, valueWidth, {
-      size: row.isGrand ? 20 : 18,
+      size: row.isGrand ? 26 : 18,
       weight: 800,
       lineHeight: quote.language === "ar" ? 1.28 : 1.2
     }).height;
 
-    return Math.max(labelHeight, valueHeight, row.isGrand ? 28 : 24) + 12;
+    return Math.max(labelHeight, valueHeight, row.isGrand ? 34 : 24) + 14;
   });
-  const height = 24 + headingMeasure.height + 18 + rowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0) + 18;
+  const height = 28 + headingMeasure.height + 18 + rowHeights.reduce((sum, rowHeight) => sum + rowHeight, 0) + 20;
 
   ensurePage(state, height + 20);
   const { ctx } = state.currentPage;
 
   const x = CANVAS_PAGE.margin + CANVAS_PAGE.contentWidth - cardWidth;
   const y = state.currentY;
-  const headingY = y + 20;
+  const headingY = y + 24;
 
-  drawCard(ctx, x, y, cardWidth, height, "#fffdf9", "#e2d4be");
-  drawTextBlock(ctx, quote.labels.totals, quote.language, x + 24, headingY, contentWidth, {
-    size: 24,
+  drawCard(ctx, x, y, cardWidth, height, PDF_COLORS.cardFill, PDF_COLORS.border);
+  drawTextBlock(ctx, quote.labels.totals, quote.language, x + 30, headingY, contentWidth, {
+    size: 22,
     weight: 800,
+    color: PDF_COLORS.textPrimary,
     lineHeight: 1.1
   });
 
   const labelX = quote.language === "ar"
-    ? x + 24 + valueWidth + columnGap
-    : x + 24;
+    ? x + 30 + valueWidth + columnGap
+    : x + 30;
   const valueX = quote.language === "ar"
-    ? x + 24
-    : x + 24 + labelWidth + columnGap;
+    ? x + 30
+    : x + 30 + labelWidth + columnGap;
   let currentY = headingY + headingMeasure.height + 18;
 
   quote.totalRows.forEach((row, index) => {
     const rowHeight = rowHeights[index];
 
     if(row.isGrand){
-      ctx.strokeStyle = "#e6d9c6";
+      ctx.strokeStyle = PDF_COLORS.borderGold;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(x + 24, currentY - 10);
-      ctx.lineTo(x + cardWidth - 24, currentY - 10);
+      ctx.moveTo(x + 30, currentY - 12);
+      ctx.lineTo(x + cardWidth - 30, currentY - 12);
       ctx.stroke();
     }
 
     drawTextBlock(ctx, row.label, quote.language, labelX, currentY, labelWidth, {
-      size: row.isGrand ? 20 : 18,
-      weight: row.isGrand ? 800 : 600,
-      color: row.isGrand ? "#1e1814" : "#6f6459",
+      size: row.isGrand ? 20 : 17,
+      weight: row.isGrand ? 800 : 500,
+      color: row.isGrand ? PDF_COLORS.textPrimary : PDF_COLORS.textMuted,
       lineHeight: quote.language === "ar" ? 1.32 : 1.2,
       align: getTextAlign(quote.language)
     });
 
     drawTextBlock(ctx, row.value, quote.language, valueX, currentY, valueWidth, {
-      size: row.isGrand ? 20 : 18,
+      size: row.isGrand ? 26 : 18,
       weight: 800,
-      color: "#1e1814",
+      color: PDF_COLORS.textPrimary,
       lineHeight: quote.language === "ar" ? 1.28 : 1.2,
       align: getTextAlign(quote.language, "money")
     });
@@ -1096,7 +1094,7 @@ function drawTotalsCard(state){
     currentY += rowHeight;
   });
 
-  state.currentY = y + height + 26;
+  state.currentY = y + height + 14;
 }
 
 function ctxMeasureCanvas(){
@@ -1110,83 +1108,88 @@ function ctxMeasureCanvas(){
 
 function measureBankCardHeight(ctx, quote, width){
   const headingHeight = 44;
-  const contentWidth = width - 48;
+  const contentWidth = width - 64;
   let total = headingHeight + 26;
 
   quote.bankRows.forEach((row, index) => {
-    const labelHeight = measureTextBlock(ctx, row.label, quote.language, contentWidth * 0.36, {
-      size: 18,
+    const labelHeight = measureTextBlock(ctx, row.label, quote.language, contentWidth * 0.34, {
+      size: 17,
       weight: 700,
       lineHeight: 1.25
     }).height;
-    const valueHeight = measureTextBlock(ctx, row.value, quote.language, contentWidth * 0.6, {
-      size: 18,
-      weight: 500,
-      lineHeight: 1.35
+    const valueHeight = measureTextBlock(ctx, row.value, quote.language, contentWidth * 0.62, {
+      size: row.isIban ? 22 : 18,
+      weight: row.isIban ? 800 : 500,
+      lineHeight: row.isIban ? 1.3 : 1.35
     }).height;
 
     total += Math.max(labelHeight, valueHeight, 26);
 
     if(index < quote.bankRows.length - 1){
-      total += 20;
+      total += 24;
     }
   });
 
-  return total + 24;
+  return total + 28;
 }
 
 function drawBankCard(ctx, quote, x, y, width, height){
   drawCard(ctx, x, y, width, height);
-  drawTextBlock(ctx, quote.labels.bankDetails, quote.language, x + 24, y + 22, width - 48, {
-    size: 24,
+  drawTextBlock(ctx, quote.labels.bankDetails, quote.language, x + 32, y + 24, width - 64, {
+    size: 22,
     weight: 800,
+    color: PDF_COLORS.textPrimary,
     lineHeight: 1.1
   });
 
-  let currentY = y + 68;
-  const contentWidth = width - 48;
-  const labelWidth = Math.min(220, contentWidth * 0.36);
+  let currentY = y + 72;
+  const contentWidth = width - 64;
+  const labelWidth = Math.min(210, contentWidth * 0.34);
   const valueWidth = contentWidth - labelWidth - 16;
-  const labelX = quote.language === "ar" ? x + 24 + valueWidth + 16 : x + 24;
-  const valueX = quote.language === "ar" ? x + 24 : x + 24 + labelWidth + 16;
+  const labelX = quote.language === "ar" ? x + 32 + valueWidth + 16 : x + 32;
+  const valueX = quote.language === "ar" ? x + 32 : x + 32 + labelWidth + 16;
 
   quote.bankRows.forEach((row, index) => {
     const rowHeight = Math.max(
-      measureTextBlock(ctx, row.label, quote.language, labelWidth, { size: 18, weight: 700, lineHeight: 1.25 }).height,
-      measureTextBlock(ctx, row.value, quote.language, valueWidth, { size: 18, weight: 500, lineHeight: 1.35 }).height,
+      measureTextBlock(ctx, row.label, quote.language, labelWidth, { size: 17, weight: 700, lineHeight: 1.25 }).height,
+      measureTextBlock(ctx, row.value, quote.language, valueWidth, {
+        size: row.isIban ? 22 : 18,
+        weight: row.isIban ? 800 : 500,
+        lineHeight: row.isIban ? 1.3 : 1.35
+      }).height,
       26
     );
 
     drawTextBlock(ctx, row.label, quote.language, labelX, currentY, labelWidth, {
-      size: 18,
+      size: 17,
       weight: 700,
-      color: "#776a5e",
+      color: PDF_COLORS.textSecondary,
       lineHeight: 1.25
     });
 
     drawTextBlock(ctx, row.value, quote.language, valueX, currentY, valueWidth, {
-      size: 18,
-      weight: 500,
-      color: "#201b17",
-      lineHeight: 1.35
+      size: row.isIban ? 22 : 18,
+      weight: row.isIban ? 800 : 500,
+      color: PDF_COLORS.textPrimary,
+      lineHeight: row.isIban ? 1.3 : 1.35
     });
 
     if(index < quote.bankRows.length - 1){
-      ctx.strokeStyle = "#eee4d7";
+      ctx.strokeStyle = PDF_COLORS.separator;
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x + 24, currentY + rowHeight + 10);
-      ctx.lineTo(x + width - 24, currentY + rowHeight + 10);
+      ctx.moveTo(x + 32, currentY + rowHeight + 12);
+      ctx.lineTo(x + width - 32, currentY + rowHeight + 12);
       ctx.stroke();
     }
 
-    currentY += rowHeight + 20;
+    currentY += rowHeight + 24;
   });
 }
 
 function measureTermsCardHeight(ctx, quote, width){
   const headingHeight = 44;
-  const contentWidth = width - 60;
+  const contentWidth = width - 64;
   const bulletWidth = contentWidth - 26;
   let total = headingHeight + 26;
 
@@ -1198,47 +1201,48 @@ function measureTermsCardHeight(ctx, quote, width){
     }).height) + 16;
   });
 
-  return total + 12;
+  return total + 20;
 }
 
 function drawTermsCard(ctx, quote, x, y, width, height){
   drawCard(ctx, x, y, width, height);
-  drawTextBlock(ctx, quote.labels.terms, quote.language, x + 24, y + 22, width - 48, {
-    size: 24,
+  drawTextBlock(ctx, quote.labels.terms, quote.language, x + 32, y + 24, width - 64, {
+    size: 22,
     weight: 800,
+    color: PDF_COLORS.textPrimary,
     lineHeight: 1.1
   });
 
-  let currentY = y + 70;
-  const bulletWidth = width - 86;
+  let currentY = y + 74;
+  const bulletWidth = width - 92;
 
   quote.terms.forEach((term) => {
-    ctx.fillStyle = "#b48645";
+    ctx.fillStyle = PDF_COLORS.accentGold;
     ctx.beginPath();
-    ctx.arc(x + 30, currentY + 12, 4.5, 0, Math.PI * 2);
+    ctx.arc(x + 36, currentY + 12, 5, 0, Math.PI * 2);
     ctx.fill();
 
-    const blockHeight = drawTextBlock(ctx, term, quote.language, x + 48, currentY, bulletWidth, {
+    const blockHeight = drawTextBlock(ctx, term, quote.language, x + 54, currentY, bulletWidth, {
       size: 18,
       weight: 500,
-      color: "#38312a",
+      color: PDF_COLORS.textPrimary,
       lineHeight: 1.4
     });
 
-    currentY += Math.max(24, blockHeight) + 16;
+    currentY += Math.max(24, blockHeight) + 18;
   });
 }
 
 function drawBottomCards(state){
   const quote = state.quote;
   const measureCtx = state.currentPage.ctx;
-  const leftWidth = 700;
+  const leftWidth = Math.round(CANVAS_PAGE.contentWidth * 0.55);
   const rightWidth = CANVAS_PAGE.contentWidth - leftWidth - GUTTER;
   const bankHeight = measureBankCardHeight(measureCtx, quote, leftWidth);
   const termsHeight = measureTermsCardHeight(measureCtx, quote, rightWidth);
   const blockHeight = Math.max(bankHeight, termsHeight);
 
-  ensurePage(state, blockHeight + 20);
+  ensurePage(state, blockHeight + 12);
   const { ctx } = state.currentPage;
 
   const x = CANVAS_PAGE.margin;
@@ -1247,7 +1251,7 @@ function drawBottomCards(state){
   drawBankCard(ctx, quote, x, y, leftWidth, blockHeight);
   drawTermsCard(ctx, quote, x + leftWidth + GUTTER, y, rightWidth, blockHeight);
 
-  state.currentY = y + blockHeight + 24;
+  state.currentY = y + blockHeight + 18;
 }
 
 async function renderQuotePages(quote){

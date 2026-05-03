@@ -19,11 +19,9 @@ export const QUOTE_COMPANY = {
 export const QUOTE_BANK_FIELD_LABELS = {
   en: {
     bankName: "Bank Name",
-    branch: "Branch",
-    beneficiary: "Beneficiary",
-    accountNumber: "Account Number",
+    beneficiary: "Account Name",
     iban: "IBAN",
-    swift: "SWIFT"
+    swift: "Swift Code"
   },
   ar: {
     bankName: "اسم البنك",
@@ -37,30 +35,43 @@ export const QUOTE_BANK_FIELD_LABELS = {
 
 export const QUOTE_BANK_PRESETS = [
   {
-    id: "emirates-nbd-aed",
+    id: "taj",
     label: {
-      en: "Emirates NBD - AED",
+      en: "TAJ",
       ar: "الإمارات دبي الوطني - درهم"
     },
-    bankName: "Emirates NBD",
-    branch: "Dubai Main Branch",
-    beneficiary: "Al Taj Al Malaky Parties & Events Management",
-    accountNumber: "020000123456",
-    iban: "AE07026000000020000123456",
-    swift: "EBILAEAD"
+    bankName: "Emirates Islamic Bank",
+    branch: "El Sharjah Rolla",
+    beneficiary: "AlTaj AlMalaky Parties and Events Management LLC",
+    accountNumber: "3708273368101",
+    iban: "AE83 0340 0037 0827 3368 101",
+    swift: "MEBLAEADSBA",
+    country: "United Arab Emirates",
+    companyName: "AlTaj AlMalaky Parties and Events Management LLC",
+    contactName: "Hani El Hanoun",
+    contactNumber: "0501227888",
+    trn: "100496625300003",
+    officePhone: "065774244",
+    centralBankNumber: "6006645"
   },
   {
-    id: "mashreq-business-aed",
+    id: "evo",
     label: {
-      en: "Mashreq Business - AED",
+      en: "EVO",
       ar: "مشرق للأعمال - درهم"
     },
-    bankName: "Mashreq Bank",
-    branch: "Business Bay Branch",
-    beneficiary: "Al Taj Al Malaky Parties & Events Management",
-    accountNumber: "101000654321",
-    iban: "AE430330000000101000654321",
-    swift: "BOMLAEAD"
+    bankName: "Emirates Islamic Bank",
+    branch: "El Sharjah Rolla",
+    beneficiary: "EVO CREATION WEDDING SERVICES LLC",
+    accountNumber: "3708488534501",
+    iban: "AE490340003708488534501",
+    swift: "MEBLAEADXXX",
+    country: "United Arab Emirates",
+    companyName: "EVO CREATION WEDDING SERVICES LLC",
+    contactName: "Hani El Hanoun",
+    contactNumber: "0501227888",
+    trn: "104147728000003",
+    officePhone: "065487148"
   }
 ];
 

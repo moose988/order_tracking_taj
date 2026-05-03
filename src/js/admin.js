@@ -1,4 +1,10 @@
 import { auth } from "./firebase.js";
+import {
+  ADMIN_LOGIN_PATH,
+  ADMIN_REDIRECT_MESSAGE,
+  getAuthorizedAdminDoc,
+  redirectToAuthPage
+} from "./auth-access.js";
 import { PRODUCTS } from "../data/products.js";
 import { QUOTE_BANK_PRESETS, QUOTE_CURRENCY, VAT_RATE, getQuoteBankPreset } from "./quote-config.js";
 import { buildQuotePdfFileName, calculateQuoteTotals, generateQuotePdfBlob } from "./quote-pdf.js";
@@ -33,84 +39,34 @@ import {
 let hasVerifiedAdminAccess = false;
 let isHandlingAdminUnauthorized = false;
 
-async function getAuthorizedAdminDoc(user){
-  if(!user?.uid){
-    return null;
-  }
-
-  const adminDocRef = doc(db, "admins", user.uid);
-  const adminSnapshot = await getDoc(adminDocRef);
-
-  if(adminSnapshot.exists()){
-    const adminData = adminSnapshot.data() || {};
-    const role = typeof adminData.role === "string" ? adminData.role.trim().toLowerCase() : "";
-    const roleAllowed = !role || role === "admin";
-
-    return adminData.active === true && roleAllowed
-      ? { id: adminSnapshot.id, ...adminData }
-      : null;
-  }
-
-  const email = String(user.email || "").trim().toLowerCase();
-
-  if(!email){
-    return null;
-  }
-
-  const fallbackQuery = query(collection(db, "admins"), where("email", "==", email));
-  const fallbackSnapshot = await getDocs(fallbackQuery);
-
-  if(fallbackSnapshot.empty){
-    return null;
-  }
-
-  const fallbackDoc = fallbackSnapshot.docs[0];
-  const fallbackData = fallbackDoc.data() || {};
-  const role = typeof fallbackData.role === "string" ? fallbackData.role.trim().toLowerCase() : "";
-  const roleAllowed = !role || role === "admin";
-
-  return fallbackData.active === true && roleAllowed
-    ? { id: fallbackDoc.id, ...fallbackData }
-    : null;
-}
-
-async function redirectUnauthorizedAdmin(){
+function redirectUnauthorizedAdmin(message = ""){
   if(isHandlingAdminUnauthorized){
     return;
   }
 
   isHandlingAdminUnauthorized = true;
-
-  try{
-    if(auth.currentUser){
-      await signOut(auth);
-    }
-  }catch(error){
-    console.error("Failed to sign out unauthorized admin session:", error);
-  }finally{
-    window.location.replace("/admin-login");
-  }
+  redirectToAuthPage(ADMIN_LOGIN_PATH, message);
 }
 
 /* PROTECT ADMIN PAGE */
 onAuthStateChanged(auth, async (user) => {
   if(!user){
-    window.location.replace("/admin-login");
+    redirectUnauthorizedAdmin();
     return;
   }
 
   try{
-    const authorizedAdmin = await getAuthorizedAdminDoc(user);
+    const authorizedAdmin = await getAuthorizedAdminDoc(db, user);
 
     if(!authorizedAdmin){
-      await redirectUnauthorizedAdmin();
+      redirectUnauthorizedAdmin(ADMIN_REDIRECT_MESSAGE);
       return;
     }
 
     hasVerifiedAdminAccess = true;
   }catch(error){
     console.error("Admin authorization guard failed:", error);
-    await redirectUnauthorizedAdmin();
+    redirectUnauthorizedAdmin(ADMIN_REDIRECT_MESSAGE);
   }
 });
 
@@ -129,6 +85,10 @@ const opsPanel = document.getElementById("opsPanel");
 const opsPanelSummary = document.getElementById("opsPanelSummary");
 const driverPanel = document.getElementById("driverPanel");
 const driverPanelSummary = document.getElementById("driverPanelSummary");
+const driverPanelIndicator = document.getElementById("driverPanelIndicator");
+const driverPanelControls = document.getElementById("driverPanelControls");
+const driverPanelPrevBtn = document.getElementById("driverPanelPrevBtn");
+const driverPanelNextBtn = document.getElementById("driverPanelNextBtn");
 const driverPerformanceModal = document.getElementById("driverPerformanceModal");
 const closeDriverPerformanceModalBtn = document.getElementById("closeDriverPerformanceModalBtn");
 const driverPerformanceTitle = document.getElementById("driverPerformanceTitle");
@@ -294,6 +254,8 @@ let hasAttemptedCatalogInventorySeed = false;
 let inventoryClockIntervalId = null;
 let currentOpenOrderId = null;
 let currentDriverPerformanceKey = "";
+let driverWorkloadPage = 0;
+let driversPerPage = getDriverWorkloadPerPage();
 let currentInventorySort = {
   key: "name",
   direction: "asc"
@@ -811,7 +773,7 @@ function renderOrders(orders, source = "general"){
     </td>
 
       <td>
-        <div class="action-buttons admin-order-actions">
+        <div class="action-buttons admin-order-actions admin-actions">
           <button class="btn btn-secondary edit-order-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
             Edit
           </button>
@@ -1127,7 +1089,7 @@ function populateDriverFilter(){
 
       return {
         value,
-        label: driver.name ? `${driver.name}${driver.email ? ` (${driver.email})` : driver.phone ? ` (${driver.phone})` : ""}` : (driver.email || driver.phone || "Unnamed Driver")
+        label: getDriverAssignmentOptionLabel(driver)
       };
     })
     .filter(Boolean)
@@ -1746,8 +1708,10 @@ function getDriverPerformanceData(){
   allOrders.forEach((order) => {
     const orderDriver = order?.driver || {};
     const driverName = getDriverPerformanceDisplayName(orderDriver, "");
+    const identityCandidates = getDriverPerformanceIdentityCandidates(orderDriver);
+    const matchesCurrentDriver = identityCandidates.some((candidate) => aliases.has(candidate));
 
-    if(!driverName){
+    if(!driverName || !matchesCurrentDriver){
       return;
     }
 
@@ -1834,10 +1798,17 @@ function renderDriverPanel(){
   }
 
   const workload = getDriverPerformanceData();
+  const nextDriversPerPage = getDriverWorkloadPerPage();
+  if(nextDriversPerPage !== driversPerPage){
+    driversPerPage = nextDriversPerPage;
+  }
   const unassignedCount = allOrders.filter((order) => {
     return isActiveDriverOrder(order) && !String(order?.driver?.name || "").trim();
   }).length;
   const activeDriverCount = workload.filter(driver => driver.activeOrders > 0).length;
+  const totalPages = Math.max(1, Math.ceil(workload.length / driversPerPage));
+
+  driverWorkloadPage = clampDriverWorkloadPage(driverWorkloadPage, totalPages);
 
   if(driverPanelSummary){
     if(!workload.length){
@@ -1851,10 +1822,14 @@ function renderDriverPanel(){
 
   if(!workload.length){
     driverPanel.innerHTML = '<article class="driver-card is-empty">No driver workload to show yet.</article>';
+    updateDriverPanelNavigation(workload.length);
     return;
   }
 
-  driverPanel.innerHTML = workload.map(driver => `
+  const startIndex = driverWorkloadPage * driversPerPage;
+  const visibleDrivers = workload.slice(startIndex, startIndex + driversPerPage);
+
+  driverPanel.innerHTML = visibleDrivers.map(driver => `
     <article class="driver-card ${driver.activeOrders > 0 ? "is-busy" : "is-available"}" data-driver-performance-key="${escapeAttribute(driver.key)}" role="button" tabindex="0" aria-label="${escapeAttribute(`Open performance details for ${driver.driverName}`)}">
       <div class="driver-card-top">
         <div>
@@ -1897,7 +1872,79 @@ function renderDriverPanel(){
     </article>
   `).join("");
 
+  updateDriverPanelNavigation(workload.length);
   attachDriverPerformanceCardEvents();
+}
+
+function getDriverWorkloadPerPage(){
+  if(window.innerWidth <= 760){
+    return 1;
+  }
+
+  if(window.innerWidth <= 1024){
+    return 2;
+  }
+
+  return 3;
+}
+
+function clampDriverWorkloadPage(page, totalPages){
+  if(!Number.isFinite(page)){
+    return 0;
+  }
+
+  return Math.min(Math.max(0, page), Math.max(0, totalPages - 1));
+}
+
+function updateDriverPanelNavigation(totalDrivers = 0){
+  const totalPages = Math.max(1, Math.ceil(totalDrivers / driversPerPage));
+  const hasMultiplePages = totalDrivers > driversPerPage;
+  const start = totalDrivers ? (driverWorkloadPage * driversPerPage) + 1 : 0;
+  const end = totalDrivers ? Math.min(totalDrivers, start + driversPerPage - 1) : 0;
+
+  if(driverPanelIndicator){
+    driverPanelIndicator.textContent = totalDrivers
+      ? `Showing ${start}-${end} of ${totalDrivers} drivers`
+      : "No drivers to display";
+  }
+
+  if(driverPanelControls){
+    driverPanelControls.hidden = !hasMultiplePages;
+  }
+
+  if(driverPanelPrevBtn){
+    driverPanelPrevBtn.disabled = !hasMultiplePages || driverWorkloadPage <= 0;
+  }
+
+  if(driverPanelNextBtn){
+    driverPanelNextBtn.disabled = !hasMultiplePages || driverWorkloadPage >= totalPages - 1;
+  }
+}
+
+function changeDriverWorkloadPage(direction){
+  const workload = getDriverPerformanceData();
+  const totalPages = Math.max(1, Math.ceil(workload.length / driversPerPage));
+  const nextPage = clampDriverWorkloadPage(driverWorkloadPage + direction, totalPages);
+
+  if(nextPage === driverWorkloadPage){
+    return;
+  }
+
+  driverWorkloadPage = nextPage;
+  renderDriverPanel();
+}
+
+function handleDriverWorkloadResize(){
+  const nextDriversPerPage = getDriverWorkloadPerPage();
+
+  if(nextDriversPerPage === driversPerPage){
+    return;
+  }
+
+  const previousStartIndex = driverWorkloadPage * driversPerPage;
+  driversPerPage = nextDriversPerPage;
+  driverWorkloadPage = Math.floor(previousStartIndex / driversPerPage);
+  renderDriverPanel();
 }
 
 function getDriverPerformanceListMarkup(orders, options = {}){
@@ -4026,7 +4073,7 @@ function populateQuoteBankPresetOptions(selectedId = "", language = quoteLanguag
   const nextSelectedId = selectedId || quoteBankPresetSelect.value || QUOTE_BANK_PRESETS[0]?.id || "";
   quoteBankPresetSelect.innerHTML = QUOTE_BANK_PRESETS.map((preset) => `
     <option value="${escapeAttribute(preset.id)}" ${preset.id === nextSelectedId ? "selected" : ""}>
-      ${escapeHtml(preset.label[language] || preset.label.en)}
+      ${escapeHtml(preset.label.en || String(preset.id || "").toUpperCase())}
     </option>
   `).join("");
 
@@ -4708,7 +4755,7 @@ function buildQuoteRecord(draft, version){
     vatRate: VAT_RATE,
     grandTotal: draft.totals.grandTotal,
     bankPresetId: bankPreset.id,
-    bankPresetLabel: bankPreset.label[draft.language] || bankPreset.label.en,
+    bankPresetLabel: bankPreset.label.en || String(bankPreset.id || "").toUpperCase(),
     bankPreset,
     pdfFileName
   };
@@ -6433,6 +6480,15 @@ function closeDriverModal(){
   document.body.style.overflow = "auto";
 }
 
+function getDriverAssignmentOptionLabel(driver = {}){
+  const name = String(driver?.name || "Unnamed Driver").trim();
+  const phone = String(driver?.phone || "").trim();
+  const fallback = String(driver?.email || "").trim();
+  const secondaryLabel = phone || fallback;
+
+  return secondaryLabel ? `${name} (${secondaryLabel})` : name;
+}
+
 function openDriverAssignmentModal(orderId){
   selectedOrderId = orderId;
 
@@ -6449,7 +6505,7 @@ function openDriverAssignmentModal(orderId){
   }else{
     select.innerHTML = driversList.map((driver) => `
       <option value="${driver.id}" ${order?.driver?.uid === driver.uid || order?.driver?.phone === driver.phone ? "selected" : ""}>
-        ${driver.name} (${driver.email || driver.phone})
+        ${getDriverAssignmentOptionLabel(driver)}
       </option>
     `).join("");
     document.getElementById("confirmAssignDriver").disabled = false;
@@ -7097,8 +7153,11 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   document.getElementById("confirmAssignDriver")?.addEventListener("click", assignDriverToOrder);
   document.getElementById("prevPage")?.addEventListener("click", () => handlePageChange(-1));
   document.getElementById("nextPage")?.addEventListener("click", () => handlePageChange(1));
+  driverPanelPrevBtn?.addEventListener("click", () => changeDriverWorkloadPage(-1));
+  driverPanelNextBtn?.addEventListener("click", () => changeDriverWorkloadPage(1));
   prevMonthBtn?.addEventListener("click", ()=> changeMonth(-1));
   nextMonthBtn?.addEventListener("click", ()=> changeMonth(1));
+  window.addEventListener("resize", handleDriverWorkloadResize);
   safeAdminRenderStep("subscribe-drivers", () => subscribeToDrivers(), { source: "dom-content-loaded" });
   safeAdminRenderStep("subscribe-inventory", () => subscribeToInventory(), { source: "dom-content-loaded" });
   safeAdminRenderStep("subscribe-orders", () => subscribeToOrders(), { source: "dom-content-loaded" });

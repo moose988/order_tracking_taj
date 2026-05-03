@@ -1,6 +1,12 @@
 import { auth, db } from "./firebase.js";
-import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  DRIVER_LOGIN_PATH,
+  DRIVER_REDIRECT_MESSAGE,
+  consumeAuthRedirectMessage,
+  normalizeEmail,
+  resolveDriverProfile
+} from "./auth-access.js";
+import { onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const loginForm = document.getElementById("driverLoginForm");
 const loginButton = document.getElementById("driverLoginBtn");
@@ -13,99 +19,6 @@ function setError(message = ""){
 
   errorBox.textContent = message;
   errorBox.classList.toggle("visible", Boolean(message));
-}
-
-function normalizeEmail(email){
-  return String(email || "").trim().toLowerCase();
-}
-
-async function findDriverDocByUser(user){
-  const normalizedEmail = normalizeEmail(user.email);
-  console.debug("[driver-auth] resolving driver profile", {
-    uid: user?.uid || "",
-    email: normalizedEmail
-  });
-
-  const uidDocRef = doc(db, "drivers", user.uid);
-  const uidDocSnapshot = await getDoc(uidDocRef);
-
-  console.debug("[driver-auth] driver doc by document ID", {
-    uid: user?.uid || "",
-    exists: uidDocSnapshot.exists()
-  });
-
-  if(uidDocSnapshot.exists()){
-    return uidDocSnapshot;
-  }
-
-  const uidQuerySnapshot = await getDocs(
-    query(collection(db, "drivers"), where("uid", "==", user.uid))
-  );
-
-  console.debug("[driver-auth] driver fallback by uid field", {
-    uid: user?.uid || "",
-    found: !uidQuerySnapshot.empty
-  });
-
-  if(!uidQuerySnapshot.empty){
-    return uidQuerySnapshot.docs[0];
-  }
-
-  if(!normalizedEmail){
-    console.debug("[driver-auth] driver fallback by email skipped", {
-      reason: "missing-email"
-    });
-    return null;
-  }
-
-  const emailQuerySnapshot = await getDocs(
-    query(collection(db, "drivers"), where("email", "==", normalizedEmail))
-  );
-
-  console.debug("[driver-auth] driver fallback by email", {
-    email: normalizedEmail,
-    found: !emailQuerySnapshot.empty
-  });
-
-  return emailQuerySnapshot.empty ? null : emailQuerySnapshot.docs[0];
-}
-
-async function syncDriverProfile(user){
-  const email = normalizeEmail(user.email);
-  const driverDoc = await findDriverDocByUser(user);
-
-  if(!driverDoc){
-    console.debug("[driver-auth] no driver profile found", {
-      uid: user?.uid || "",
-      email
-    });
-    return null;
-  }
-
-  const driverData = driverDoc.data();
-  const nextData = {};
-
-  if(email && driverData.email !== email){
-    nextData.email = email;
-  }
-
-  if(driverData.uid !== user.uid){
-    nextData.uid = user.uid;
-  }
-
-  if(Object.keys(nextData).length){
-    await updateDoc(driverDoc.ref, nextData);
-    console.debug("[driver-auth] driver profile synced", {
-      driverDocId: driverDoc.id,
-      updates: nextData
-    });
-  }
-
-  return {
-    id: driverDoc.id,
-    ...driverData,
-    ...nextData
-  };
 }
 
 loginForm?.addEventListener("submit", async (event) => {
@@ -127,7 +40,7 @@ loginForm?.addEventListener("submit", async (event) => {
 
   try{
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const driverProfile = await syncDriverProfile(userCredential.user);
+    const driverProfile = await resolveDriverProfile(db, userCredential.user);
 
     if(!driverProfile){
       console.debug("[driver-auth] login rejected", {
@@ -135,8 +48,7 @@ loginForm?.addEventListener("submit", async (event) => {
         uid: userCredential.user?.uid || "",
         email: normalizeEmail(userCredential.user?.email)
       });
-      await signOut(auth);
-      setError("No driver profile was found for this account. Please contact admin.");
+      setError(DRIVER_REDIRECT_MESSAGE);
       return;
     }
 
@@ -152,3 +64,32 @@ loginForm?.addEventListener("submit", async (event) => {
     }
   }
 });
+
+onAuthStateChanged(auth, async (user) => {
+  if(!user){
+    return;
+  }
+
+  try{
+    const driverProfile = await resolveDriverProfile(db, user);
+
+    if(driverProfile){
+      localStorage.setItem("driverUid", user.uid);
+      window.location.href = "/driver";
+      return;
+    }
+
+    setError(DRIVER_REDIRECT_MESSAGE);
+  }catch(error){
+    console.error("Driver auth state verification failed:", error);
+    setError("Unable to verify driver access right now. Please try again.");
+  }
+});
+
+const authRedirectMessage = consumeAuthRedirectMessage();
+
+if(authRedirectMessage){
+  setError(authRedirectMessage);
+}else if(window.location.pathname === DRIVER_LOGIN_PATH){
+  setError("");
+}
