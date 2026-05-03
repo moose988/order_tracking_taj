@@ -1,0 +1,154 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && (
+        request.auth.token.admin == true ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active == true
+      );
+    }
+
+    function isDriver() {
+      return signedIn() && (
+        request.auth.token.driver == true ||
+        exists(/databases/$(database)/documents/drivers/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/drivers/$(request.auth.uid)).data.active != false
+      );
+    }
+
+    function isAssignedDriver() {
+      return isDriver() &&
+        resource.data.driver is map &&
+        resource.data.driver.uid == request.auth.uid;
+    }
+
+    function changedOnly(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    function validPublicOrderCreate() {
+      return !signedIn() &&
+        request.resource.data.keys().hasOnly([
+          "orderId", "trackingToken", "customerName", "phone", "eventDate",
+          "rentalDays", "eventTime", "setupTime", "eventLocation", "mapLink",
+          "notes", "items", "priority", "status", "createdAt", "destinationLocation"
+        ]) &&
+        request.resource.data.status == "quote-requested" &&
+        request.resource.data.priority == "normal" &&
+        request.resource.data.customerName is string &&
+        request.resource.data.customerName.size() >= 1 &&
+        request.resource.data.customerName.size() <= 120 &&
+        request.resource.data.phone is string &&
+        request.resource.data.phone.size() >= 6 &&
+        request.resource.data.phone.size() <= 30 &&
+        request.resource.data.eventLocation is string &&
+        request.resource.data.eventLocation.size() <= 500 &&
+        request.resource.data.notes is string &&
+        request.resource.data.notes.size() <= 1000 &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() > 0 &&
+        request.resource.data.items.size() <= 50 &&
+        request.resource.data.createdAt == request.time;
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin() ||
+        (signedIn() && adminId == request.auth.uid) ||
+        (signedIn() && resource.data.email == request.auth.token.email && resource.data.active == true);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /drivers/{driverId} {
+      allow read: if isAdmin() ||
+        (signedIn() && driverId == request.auth.uid) ||
+        (signedIn() && resource.data.uid == request.auth.uid) ||
+        (signedIn() && resource.data.email == request.auth.token.email);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /inventory/{itemId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /counters/{counterId} {
+      allow read: if isAdmin() || (!signedIn() && counterId == "orderCounter");
+      allow update: if isAdmin() || (
+        !signedIn() &&
+        counterId == "orderCounter" &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["current"]) &&
+        request.resource.data.current == resource.data.current + 1
+      );
+      allow create, delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow create: if isAdmin() || validPublicOrderCreate();
+      allow read: if isAdmin() || isAssignedDriver();
+      allow update: if isAdmin() || (
+        isAssignedDriver() &&
+        changedOnly(["status", "driver", "driverLocation", "outForDeliveryAt", "deliveredAt", "collectedAt", "collectedBy"]) &&
+        request.resource.data.driver.uid == request.auth.uid
+      );
+      allow delete: if isAdmin();
+
+      match /quotes/{quoteId} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    match /publicTracking/{trackingId} {
+      allow read: if true;
+      allow create: if isAdmin() || (
+        !signedIn() &&
+        request.resource.data.keys().hasOnly([
+          "orderId", "customerName", "eventDate", "rentalDays", "eventTime",
+          "setupTime", "eventLocation", "mapLink", "items", "status",
+          "createdAt", "updatedAt", "destinationLocation"
+        ]) &&
+        request.resource.data.status == "quote-requested" &&
+        request.resource.data.customerName is string &&
+        request.resource.data.customerName.size() >= 1 &&
+        request.resource.data.customerName.size() <= 120 &&
+        request.resource.data.eventLocation is string &&
+        request.resource.data.eventLocation.size() <= 500 &&
+        request.resource.data.items is list &&
+        request.resource.data.items.size() > 0 &&
+        request.resource.data.items.size() <= 50
+      );
+      allow update: if isAdmin() || (
+        isDriver() &&
+        resource.data.driver is map &&
+        resource.data.driver.uid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "driver", "driverLocation", "updatedAt"])
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if resource.data.approved == true || isAdmin();
+      allow create: if reviewId == request.resource.data.orderId &&
+        request.resource.data.keys().hasOnly([
+          "orderId", "rating", "comment", "name", "createdAt", "approved"
+        ]) &&
+        request.resource.data.rating is number &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5 &&
+        request.resource.data.comment is string &&
+        request.resource.data.comment.size() <= 1000 &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() <= 120 &&
+        request.resource.data.approved == false;
+      allow update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -6,9 +6,15 @@ import {
   getAuthorizedAdminDoc
 } from "./auth-access.js";
 import {
+  signOut,
   signInWithEmailAndPassword,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  clearAdminSession,
+  ensureAdminSessionMetadata,
+  startAdminSession
+} from "./session-timeouts.js";
 
 const loginForm = document.getElementById("adminLoginForm");
 const emailInput = document.getElementById("email");
@@ -30,11 +36,14 @@ window.login = async function(){
     const authorizedAdmin = await getAuthorizedAdminDoc(db, credential.user);
 
     if(!authorizedAdmin){
+      clearAdminSession();
+      await signOut(auth);
       setError(ADMIN_REDIRECT_MESSAGE);
       setLoadingState(false);
       return;
     }
 
+    startAdminSession();
     window.location.href = "/admin";
   }catch(error){
     console.error("Admin login failed:", error);
@@ -78,10 +87,13 @@ onAuthStateChanged(auth, async (user) => {
     const authorizedAdmin = await getAuthorizedAdminDoc(db, user);
 
     if(authorizedAdmin){
+      ensureAdminSessionMetadata();
       window.location.href = "/admin";
       return;
     }
 
+    clearAdminSession();
+    await signOut(auth);
     setError(ADMIN_REDIRECT_MESSAGE);
   }catch(error){
     console.error("Admin auth state verification failed:", error);

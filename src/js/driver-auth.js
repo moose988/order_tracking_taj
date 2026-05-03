@@ -6,7 +6,12 @@ import {
   normalizeEmail,
   resolveDriverProfile
 } from "./auth-access.js";
-import { onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  clearDriverSession,
+  ensureDriverSessionMetadata,
+  startDriverSession
+} from "./session-timeouts.js";
 
 const loginForm = document.getElementById("driverLoginForm");
 const loginButton = document.getElementById("driverLoginBtn");
@@ -48,10 +53,13 @@ loginForm?.addEventListener("submit", async (event) => {
         uid: userCredential.user?.uid || "",
         email: normalizeEmail(userCredential.user?.email)
       });
+      clearDriverSession();
+      await signOut(auth);
       setError(DRIVER_REDIRECT_MESSAGE);
       return;
     }
 
+    startDriverSession();
     localStorage.setItem("driverUid", userCredential.user.uid);
     window.location.href = "/driver";
   }catch(error){
@@ -74,11 +82,14 @@ onAuthStateChanged(auth, async (user) => {
     const driverProfile = await resolveDriverProfile(db, user);
 
     if(driverProfile){
+      ensureDriverSessionMetadata();
       localStorage.setItem("driverUid", user.uid);
       window.location.href = "/driver";
       return;
     }
 
+    clearDriverSession();
+    await signOut(auth);
     setError(DRIVER_REDIRECT_MESSAGE);
   }catch(error){
     console.error("Driver auth state verification failed:", error);

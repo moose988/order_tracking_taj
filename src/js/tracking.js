@@ -1,13 +1,13 @@
 import { db } from "./firebase.js";
 import { formatLocalizedDate, formatLocalizedTime, initI18n, onLanguageChange, t, translateStatus } from "./i18n.js";
 import {
-  addDoc,
   collection,
   doc,
   documentId,
   getDocs,
   onSnapshot,
   query,
+  setDoc,
   where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -53,6 +53,43 @@ const DESTINATION_MARKER_ICON_CANDIDATES = [
   "../images/icons/destination.svg",
   "../images/logo/destination.png"
 ];
+
+function escapeHtml(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value){
+  return escapeHtml(value).replaceAll("`", "&#96;");
+}
+
+function isSafeMapUrl(link){
+  if(!link){
+    return false;
+  }
+
+  try{
+    const url = new URL(String(link).trim());
+    const hostname = url.hostname.toLowerCase();
+    const allowedHosts = [
+      "google.com",
+      "www.google.com",
+      "maps.google.com",
+      "maps.app.goo.gl",
+      "goo.gl",
+      "openstreetmap.org",
+      "www.openstreetmap.org"
+    ];
+
+    return url.protocol === "https:" && allowedHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+  }catch{
+    return false;
+  }
+}
 const UAE_BOUNDS = {
   minLat: 22,
   maxLat: 26.6,
@@ -235,9 +272,11 @@ function getNormalizedMapUrl(link){
     return "";
   }
 
-  return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(link)
+  const normalizedLink = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(link)
     ? link
     : `https://${link}`;
+
+  return isSafeMapUrl(normalizedLink) ? normalizedLink : "";
 }
 
 function getLocationCoordinates(value){
@@ -974,14 +1013,21 @@ function renderTrackMessage(title, description = "", tone = "not-found"){
   }
 
   trackResult.innerHTML = `
-    <div class="track-status-message is-${tone}">
-      <strong>${title}</strong>
-      ${description ? `<p>${description}</p>` : ""}
+    <div class="track-status-message is-${escapeAttribute(tone)}">
+      <strong>${escapeHtml(title)}</strong>
+      ${description ? `<p>${escapeHtml(description)}</p>` : ""}
     </div>
   `;
 }
 
 async function resolveOrderRef(orderId){
+  const publicTrackingRef = doc(db, "publicTracking", orderId);
+  const publicTrackingSnapshot = await getDocs(query(collection(db, "publicTracking"), where(documentId(), "==", orderId)));
+
+  if(!publicTrackingSnapshot.empty){
+    return publicTrackingRef;
+  }
+
   const directRef = doc(db, "orders", orderId);
   const directSnapshot = await getDocs(query(collection(db, "orders"), where(documentId(), "==", orderId)));
 
@@ -1011,18 +1057,19 @@ async function renderOrder(order){
     ? getLocationCoordinates(order.driverLocation)
     : null;
   const openLocationUrl = getOpenLocationUrl(order, destinationCoordinates);
+  const safeOpenLocationUrl = escapeAttribute(openLocationUrl || "#");
   const fallbackEmbedLink = convertToEmbedLink(order.mapLink, order.eventLocation);
 
   info.innerHTML = `
 <div class="track-info-grid">
-  <p><strong>${t("track.orderIdLabel")}</strong> ${order.orderId}</p>
-  <p><strong>${t("track.customerLabel")}</strong> ${order.customerName}</p>
-  <p><strong>${t("track.eventDateLabel")}</strong> ${order.eventDate}</p>
+  <p><strong>${escapeHtml(t("track.orderIdLabel"))}</strong> ${escapeHtml(order.orderId)}</p>
+  <p><strong>${escapeHtml(t("track.customerLabel"))}</strong> ${escapeHtml(order.customerName)}</p>
+  <p><strong>${escapeHtml(t("track.eventDateLabel"))}</strong> ${escapeHtml(order.eventDate)}</p>
   <p><strong>${t("track.rentalDaysLabel")}</strong> ${getOrderRentalDays(order)}</p>
-  <p><strong>${t("track.eventTimeLabel")}</strong> ${order.eventTime || t("common.noData")}</p>
-  <p><strong>${t("track.setupTimeLabel")}</strong> ${order.setupTime || t("common.noData")}</p>
-  <p><strong>${t("track.locationLabel")}</strong> ${order.eventLocation}</p>
-  <p><strong>${t("track.mapLabel")}</strong> <a href="${openLocationUrl}" target="_blank" rel="noreferrer" class="track-inline-link">${t("track.openLocation")}</a></p>
+  <p><strong>${escapeHtml(t("track.eventTimeLabel"))}</strong> ${escapeHtml(order.eventTime || t("common.noData"))}</p>
+  <p><strong>${escapeHtml(t("track.setupTimeLabel"))}</strong> ${escapeHtml(order.setupTime || t("common.noData"))}</p>
+  <p><strong>${escapeHtml(t("track.locationLabel"))}</strong> ${escapeHtml(order.eventLocation)}</p>
+  <p><strong>${escapeHtml(t("track.mapLabel"))}</strong> <a href="${safeOpenLocationUrl}" target="_blank" rel="noreferrer" class="track-inline-link">${escapeHtml(t("track.openLocation"))}</a></p>
 </div>
 `;
 
@@ -1038,7 +1085,7 @@ async function renderOrder(order){
   itemsBox.innerHTML = `
 <h4>${t("track.orderInfoTitle")}</h4>
 <ul class="track-order-items-list">
-${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.max(1, Number(item.quantity) || 1)}</strong></li>`).join("")}
+${(order.items || []).map(item => `<li><span>${escapeHtml(item.name)}</span><strong>x${Math.max(1, Number(item.quantity) || 1)}</strong></li>`).join("")}
 </ul>
   `;
 
@@ -1063,11 +1110,11 @@ ${(order.items || []).map(item => `<li><span>${item.name}</span><strong>x${Math.
     locationInfo.innerHTML = `
 <div class="track-location-overview">
   <div class="track-location-copy">
-    <span class="track-status-eyebrow">${t("track.deliveryLocation")}</span>
-    <strong>${order.eventLocation || t("track.locationPending")}</strong>
+    <span class="track-status-eyebrow">${escapeHtml(t("track.deliveryLocation"))}</span>
+    <strong>${escapeHtml(order.eventLocation || t("track.locationPending"))}</strong>
   </div>
-  <a href="${openLocationUrl}" target="_blank" class="track-open-location-link">
-    ${t("track.openLocation")}
+  <a href="${safeOpenLocationUrl}" target="_blank" rel="noreferrer" class="track-open-location-link">
+    ${escapeHtml(t("track.openLocation"))}
   </a>
 </div>
 <div class="track-status-grid">
@@ -1684,11 +1731,12 @@ async function submitReview(event){
       return;
     }
 
-    await addDoc(collection(db, "reviews"), {
+    await setDoc(doc(db, "reviews", currentOrder.orderId), {
       orderId: currentOrder.orderId,
       rating,
-      comment,
-      name: name || "",
+      comment: comment.slice(0, 1000),
+      name: (name || "").slice(0, 120),
+      approved: false,
       createdAt: new Date()
     });
 

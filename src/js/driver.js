@@ -14,8 +14,14 @@ import {
   normalizeMapUrl
 } from "./location-utils.js";
 import { initScrollTopButton } from "./scroll-top.js";
+import {
+  SESSION_EXPIRED_MESSAGE,
+  clearDriverSession,
+  ensureDriverSessionMetadata,
+  getDriverSessionStatus
+} from "./session-timeouts.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const driverWelcomeTitle = document.getElementById("driverWelcomeTitle");
 const driverSummaryText = document.getElementById("driverSummaryText");
@@ -59,6 +65,22 @@ let isFindingCollectionOrder = false;
 let isMarkingCollected = false;
 let hasDashboardHydrated = false;
 let isResolvingDriverAccess = false;
+let driverSessionCheckIntervalId = null;
+const driverPageBody = document.body;
+const driverAuthLoading = document.getElementById("driverAuthLoading");
+
+function setDriverPageAuthorizedState(isAuthorized){
+  if(!driverPageBody){
+    return;
+  }
+
+  driverPageBody.classList.toggle("auth-checking", !isAuthorized);
+  driverPageBody.classList.toggle("driver-authorized", isAuthorized);
+
+  if(driverAuthLoading){
+    driverAuthLoading.setAttribute("aria-hidden", isAuthorized ? "true" : "false");
+  }
+}
 
 const GEOLOCATION_OPTIONS = {
   enableHighAccuracy: true,
@@ -79,6 +101,8 @@ const DRIVER_LANGUAGE_CONFIG = {
   ur: { dir: "rtl", locale: "ur-PK", htmlLang: "ur" }
 };
 const DRIVER_I18N = {};
+const DRIVER_MAX_SESSION_MS = 24 * 60 * 60 * 1000;
+const DRIVER_SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 const LOCATION_SHARING_PREFERENCE_KEY = "tajDriverLocationSharingEnabled";
 
@@ -1050,10 +1074,6 @@ function normalizeOrderIdInput(value){
   return String(value || "").trim().replace(/\s+/g, "").toUpperCase();
 }
 
-function normalizeEmail(email){
-  return String(email || "").trim().toLowerCase();
-}
-
 function escapeHtml(value){
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -1535,6 +1555,84 @@ async function resolveDriverProfile(user){
   return driverProfile;
 }
 
+function getTrackingId(order){
+  return String(order?.trackingToken || order?.publicTrackingId || order?.id || order?.orderId || "").trim();
+}
+
+function buildPublicTrackingPayload(order, patch = {}){
+  const nextOrder = {
+    ...order,
+    ...patch
+  };
+
+  return {
+    orderId: nextOrder.orderId || nextOrder.id || "",
+    customerName: nextOrder.customerName || "",
+    eventDate: nextOrder.eventDate || "",
+    rentalDays: getOrderRentalDays(nextOrder),
+    eventTime: nextOrder.eventTime || "",
+    setupTime: nextOrder.setupTime || "",
+    eventLocation: nextOrder.eventLocation || "",
+    mapLink: normalizeMapUrl(nextOrder.mapLink || "") || "",
+    items: Array.isArray(nextOrder.items) ? nextOrder.items : [],
+    status: normalizeStatus(nextOrder.status),
+    updatedAt: serverTimestamp(),
+    ...(nextOrder.destinationLocation ? { destinationLocation: nextOrder.destinationLocation } : {}),
+    ...(nextOrder.driver ? { driver: nextOrder.driver } : {}),
+    ...(nextOrder.driverLocation ? { driverLocation: nextOrder.driverLocation } : {})
+  };
+}
+
+async function upsertPublicTracking(order, patch = {}){
+  const trackingId = getTrackingId(order);
+
+  if(!trackingId){
+    return;
+  }
+
+  try{
+    await setDoc(doc(db, "publicTracking", trackingId), buildPublicTrackingPayload(order, patch), { merge: true });
+  }catch(error){
+    console.warn("Could not sync public tracking document:", error);
+  }
+}
+
+async function expireDriverSession(){
+  stopLocationSharing();
+  ordersUnsubscribe?.();
+  localStorage.removeItem("driverUid");
+  clearDriverSession();
+
+  try{
+    await signOut(auth);
+  }catch(error){
+    console.error("Failed to sign out expired driver session:", error);
+  }
+
+  redirectToAuthPage(DRIVER_LOGIN_PATH, SESSION_EXPIRED_MESSAGE);
+}
+
+function checkDriverSessionTimeout(){
+  const sessionStatus = getDriverSessionStatus({
+    maxSessionMs: DRIVER_MAX_SESSION_MS
+  });
+
+  if(sessionStatus.isExpired){
+    expireDriverSession();
+  }
+}
+
+function startDriverSessionTimeoutMonitoring(){
+  ensureDriverSessionMetadata();
+  checkDriverSessionTimeout();
+
+  if(driverSessionCheckIntervalId){
+    window.clearInterval(driverSessionCheckIntervalId);
+  }
+
+  driverSessionCheckIntervalId = window.setInterval(checkDriverSessionTimeout, DRIVER_SESSION_CHECK_INTERVAL_MS);
+}
+
 async function backfillAssignedOrders(user, driverProfile){
   const email = normalizeEmail(driverProfile?.email || user.email);
 
@@ -1671,6 +1769,7 @@ function redirectUnauthorizedDriver(reason, message = ""){
   ordersUnsubscribe?.();
   currentDriver = null;
   localStorage.removeItem("driverUid");
+  setDriverPageAuthorizedState(false);
   redirectToAuthPage(DRIVER_LOGIN_PATH, message);
 }
 
@@ -2637,12 +2736,17 @@ async function startDelivery(orderId){
       ? {}
       : { outForDeliveryAt: serverTimestamp() };
 
-    await updateDoc(doc(db, "orders", orderId), {
+    const patch = {
       status: "out-for-delivery",
       driver: getAssignedDriverMeta(order),
       driverLocation: null,
       ...deliveryLifecyclePatch
-    });
+    };
+
+    await Promise.all([
+      updateDoc(doc(db, "orders", orderId), patch),
+      upsertPublicTracking(order, patch)
+    ]);
 
     setDashboardMessage("statusBanner.startSuccess", "success", {
       orderId: order.orderId || order.id
@@ -2782,9 +2886,14 @@ function ensureLocationSharingWatch(reason = "resume"){
       }
 
       await Promise.all(activeLiveOrders.map((liveOrder) =>
-        updateDoc(doc(db, "orders", liveOrder.id), {
-          driverLocation: nextLocation
-        })
+        Promise.all([
+          updateDoc(doc(db, "orders", liveOrder.id), {
+            driverLocation: nextLocation
+          }),
+          upsertPublicTracking(liveOrder, {
+            driverLocation: nextLocation
+          })
+        ])
       ));
 
       lastSharedLocation = {
@@ -2856,12 +2965,17 @@ async function finishOrder(orderId){
       ? {}
       : { deliveredAt: serverTimestamp() };
 
-    await updateDoc(doc(db, "orders", orderId), {
+    const patch = {
       status: "delivered",
       driver: getAssignedDriverMeta(order),
       driverLocation: null,
       ...deliveredLifecyclePatch
-    });
+    };
+
+    await Promise.all([
+      updateDoc(doc(db, "orders", orderId), patch),
+      upsertPublicTracking(order, patch)
+    ]);
 
     setDashboardMessage("statusBanner.finishSuccess", "success", {
       orderId: confirmOrderId
@@ -2977,6 +3091,7 @@ driverLogoutBtn?.addEventListener("click", async () => {
   stopLocationSharing();
   ordersUnsubscribe?.();
   localStorage.removeItem("driverUid");
+  clearDriverSession();
   await signOut(auth);
   window.location.href = "/driver-login";
 });
@@ -3038,10 +3153,13 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      startDriverSessionTimeoutMonitoring();
       await initializeDriverDashboard(user, driverProfile);
+      setDriverPageAuthorizedState(true);
       syncCollectionControls();
     }catch(error){
       console.error("Driver dashboard init failed:", error);
+      setDriverPageAuthorizedState(false);
       setDashboardMessage("statusBanner.openFailed", "error");
     }finally{
       isResolvingDriverAccess = false;

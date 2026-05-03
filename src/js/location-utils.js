@@ -16,9 +16,35 @@ export function normalizeMapUrl(link){
     return "";
   }
 
-  return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmedLink)
+  const normalizedLink = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmedLink)
     ? trimmedLink
     : `https://${trimmedLink}`;
+
+  return isSafeMapUrl(normalizedLink) ? normalizedLink : "";
+}
+
+export function isSafeMapUrl(link){
+  if(!link){
+    return false;
+  }
+
+  try{
+    const url = new URL(String(link).trim());
+    const hostname = url.hostname.toLowerCase();
+    const allowedHosts = [
+      "google.com",
+      "www.google.com",
+      "maps.google.com",
+      "maps.app.goo.gl",
+      "goo.gl",
+      "openstreetmap.org",
+      "www.openstreetmap.org"
+    ];
+
+    return url.protocol === "https:" && allowedHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+  }catch{
+    return false;
+  }
 }
 
 export function parseCoordinateString(value){
@@ -126,7 +152,8 @@ export function normalizeGoogleMapsLink(link){
   const query = extractGoogleMapsQuery(trimmedLink);
 
   if(!query){
-    return trimmedLink;
+    const normalizedLink = normalizeMapUrl(trimmedLink);
+    return normalizedLink || "";
   }
 
   return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;

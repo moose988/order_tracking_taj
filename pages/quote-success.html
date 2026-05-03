@@ -118,8 +118,10 @@
       }
 
       const stateOrderId = String(successState?.orderId || "").trim();
-      const orderId = paramOrderId || stateOrderId;
-      const canUseStoredWhatsApp = Boolean(successState) && (!paramOrderId || stateOrderId === paramOrderId);
+      const stateTrackingId = String(successState?.trackingId || "").trim();
+      const trackingId = paramOrderId || stateTrackingId || stateOrderId;
+      const orderId = stateOrderId || paramOrderId;
+      const canUseStoredWhatsApp = Boolean(successState) && (!paramOrderId || stateOrderId === paramOrderId || stateTrackingId === paramOrderId);
       const shouldAutoOpenWhatsApp = Boolean(successState?.autoOpenWhatsApp) && canUseStoredWhatsApp;
       const storedWhatsAppMessage = String(successState?.whatsappMessage || "").trim();
       let whatsappUrl = canUseStoredWhatsApp ? String(successState?.whatsappUrl || "").trim() : "";
@@ -145,8 +147,8 @@
 
       orderIdEl.textContent = orderId || "Not available";
 
-      if(orderId){
-        trackBtn.href = `/track?id=${encodeURIComponent(orderId)}`;
+      if(trackingId){
+        trackBtn.href = `/track?id=${encodeURIComponent(trackingId)}`;
       }else{
         trackBtn.href = "/track";
       }

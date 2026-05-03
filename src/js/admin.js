@@ -18,6 +18,13 @@ import {
 } from "./location-utils.js";
 import { WAREHOUSE_LOCATION } from "./app-config.js";
 import { initScrollTopButton } from "./scroll-top.js";
+import {
+  SESSION_EXPIRED_MESSAGE,
+  clearAdminSession,
+  ensureAdminSessionMetadata,
+  getAdminSessionStatus,
+  touchAdminSessionActivity
+} from "./session-timeouts.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 import { db } from "./firebase.js";
@@ -38,6 +45,104 @@ import {
 
 let hasVerifiedAdminAccess = false;
 let isHandlingAdminUnauthorized = false;
+let adminSessionCheckIntervalId = null;
+let adminSessionActivityBound = false;
+const adminPageBody = document.body;
+const adminProtectedContent = document.getElementById("adminProtectedContent");
+const adminAuthLoading = document.getElementById("adminAuthLoading");
+const ADMIN_MAX_SESSION_MS = 8 * 60 * 60 * 1000;
+const ADMIN_INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
+const ADMIN_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
+
+function setAdminPageAuthorizedState(isAuthorized){
+  if(!adminPageBody){
+    return;
+  }
+
+  adminPageBody.classList.toggle("auth-checking", !isAuthorized);
+  adminPageBody.classList.toggle("admin-authorized", isAuthorized);
+
+  if(adminProtectedContent){
+    adminProtectedContent.setAttribute("aria-hidden", isAuthorized ? "false" : "true");
+  }
+
+  if(adminAuthLoading){
+    adminAuthLoading.setAttribute("aria-hidden", isAuthorized ? "true" : "false");
+  }
+}
+
+function isStrictAuthorizedAdmin(profile = {}){
+  const role = typeof profile?.role === "string" ? profile.role.trim().toLowerCase() : "";
+  return profile?.active === true && role === "admin";
+}
+
+async function expireAdminSession(){
+  clearAdminSession();
+
+  try{
+    await signOut(auth);
+  }catch(error){
+    console.error("Failed to sign out expired admin session:", error);
+  }
+
+  redirectUnauthorizedAdmin(SESSION_EXPIRED_MESSAGE);
+}
+
+function checkAdminSessionTimeout(){
+  if(!hasVerifiedAdminAccess || isHandlingAdminUnauthorized){
+    return;
+  }
+
+  const sessionStatus = getAdminSessionStatus({
+    maxSessionMs: ADMIN_MAX_SESSION_MS,
+    inactivityLimitMs: ADMIN_INACTIVITY_LIMIT_MS
+  });
+
+  if(sessionStatus.isExpired){
+    expireAdminSession();
+  }
+}
+
+function bindAdminSessionActivityTracking(){
+  if(adminSessionActivityBound){
+    return;
+  }
+
+  adminSessionActivityBound = true;
+  const activityEvents = ["pointerdown", "keydown", "touchstart", "scroll", "mousemove"];
+  let lastTrackedAt = 0;
+
+  const handleActivity = () => {
+    if(!hasVerifiedAdminAccess || isHandlingAdminUnauthorized){
+      return;
+    }
+
+    const now = Date.now();
+
+    if(now - lastTrackedAt < 10000){
+      return;
+    }
+
+    lastTrackedAt = now;
+    touchAdminSessionActivity();
+  };
+
+  activityEvents.forEach((eventName) => {
+    window.addEventListener(eventName, handleActivity, { passive: true });
+  });
+}
+
+function startAdminSessionTimeoutMonitoring(){
+  ensureAdminSessionMetadata();
+  bindAdminSessionActivityTracking();
+  checkAdminSessionTimeout();
+
+  if(adminSessionCheckIntervalId){
+    window.clearInterval(adminSessionCheckIntervalId);
+  }
+
+  adminSessionCheckIntervalId = window.setInterval(checkAdminSessionTimeout, ADMIN_SESSION_CHECK_INTERVAL_MS);
+}
 
 function redirectUnauthorizedAdmin(message = ""){
   if(isHandlingAdminUnauthorized){
@@ -45,6 +150,7 @@ function redirectUnauthorizedAdmin(message = ""){
   }
 
   isHandlingAdminUnauthorized = true;
+  setAdminPageAuthorizedState(false);
   redirectToAuthPage(ADMIN_LOGIN_PATH, message);
 }
 
@@ -58,12 +164,14 @@ onAuthStateChanged(auth, async (user) => {
   try{
     const authorizedAdmin = await getAuthorizedAdminDoc(db, user);
 
-    if(!authorizedAdmin){
+    if(!authorizedAdmin || !isStrictAuthorizedAdmin(authorizedAdmin)){
       redirectUnauthorizedAdmin(ADMIN_REDIRECT_MESSAGE);
       return;
     }
 
     hasVerifiedAdminAccess = true;
+    setAdminPageAuthorizedState(true);
+    startAdminSessionTimeoutMonitoring();
   }catch(error){
     console.error("Admin authorization guard failed:", error);
     redirectUnauthorizedAdmin(ADMIN_REDIRECT_MESSAGE);
@@ -286,6 +394,68 @@ const OPERATIONS_DRIVER_ICON_URL = new URL("../../images/logo/drivericon.png", i
 const DRIVER_LOCATION_LIVE_THRESHOLD_MS = 5 * 60 * 1000;
 const DEFAULT_RENTAL_DAYS = 1;
 const DEFAULT_LOW_STOCK_THRESHOLD = 1;
+
+function generateTrackingToken(){
+  if(window.crypto?.randomUUID){
+    return window.crypto.randomUUID().replaceAll("-", "");
+  }
+
+  const randomValues = new Uint8Array(16);
+  window.crypto?.getRandomValues?.(randomValues);
+
+  return Array.from(randomValues, (value) => value.toString(16).padStart(2, "0")).join("")
+    || `${Date.now()}${Math.random().toString(36).slice(2)}`;
+}
+
+function getTrackingId(order){
+  return String(order?.trackingToken || order?.publicTrackingId || order?.id || order?.orderId || "").trim();
+}
+
+function getTrackingUrl(order){
+  const trackingId = getTrackingId(order);
+  return trackingId
+    ? `${window.location.origin}/track?id=${encodeURIComponent(trackingId)}`
+    : `${window.location.origin}/track`;
+}
+
+function buildPublicTrackingPayload(order, patch = {}){
+  const nextOrder = {
+    ...order,
+    ...patch
+  };
+
+  return {
+    orderId: nextOrder.orderId || nextOrder.id || "",
+    customerName: nextOrder.customerName || "",
+    eventDate: nextOrder.eventDate || "",
+    rentalDays: getOrderRentalDays(nextOrder),
+    eventTime: nextOrder.eventTime || "",
+    setupTime: nextOrder.setupTime || "",
+    eventLocation: nextOrder.eventLocation || "",
+    mapLink: normalizeGoogleMapsLink(nextOrder.mapLink || "") || "",
+    items: Array.isArray(nextOrder.items) ? nextOrder.items : [],
+    status: normalizeOrderStatusValue(nextOrder.status),
+    updatedAt: serverTimestamp(),
+    ...(nextOrder.destinationLocation ? { destinationLocation: nextOrder.destinationLocation } : {}),
+    ...(nextOrder.driver ? { driver: nextOrder.driver } : {}),
+    ...(nextOrder.driverLocation ? { driverLocation: nextOrder.driverLocation } : {})
+  };
+}
+
+async function upsertPublicTracking(order, patch = {}){
+  const trackingId = getTrackingId(order);
+
+  if(!trackingId){
+    return;
+  }
+
+  try{
+    await setDoc(doc(db, "publicTracking", trackingId), buildPublicTrackingPayload(order, patch), { merge: true });
+  }catch(error){
+    console.warn("Could not sync public tracking document:", error);
+  }
+}
+
 const CATALOG_INVENTORY_DEMO_STOCK = {
   "Dining Table 1": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 2": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
@@ -751,22 +921,22 @@ function renderOrders(orders, source = "general"){
     row.classList.add("order-row");
 
     row.innerHTML = `
-    <td class="admin-order-id-cell"><span class="admin-cell-nowrap">${order.orderId}</span></td>
-    <td>${order.customerName}</td>
-    <td class="admin-date-cell"><span class="admin-cell-nowrap">${eventDateLabel}</span></td>
+    <td class="admin-order-id-cell"><span class="admin-cell-nowrap">${escapeHtml(order.orderId)}</span></td>
+    <td>${escapeHtml(order.customerName)}</td>
+    <td class="admin-date-cell"><span class="admin-cell-nowrap">${escapeHtml(eventDateLabel)}</span></td>
     <td>${getOrderRentalDays(order)}</td>
-    <td>${order.eventTime || "N/A"}</td>
-    <td>${order.eventLocation}</td>
+    <td>${escapeHtml(order.eventTime || "N/A")}</td>
+    <td>${escapeHtml(order.eventLocation)}</td>
   
     <td>
-      <select class="status-select no-modal" data-id="${order.id}">
+      <select class="status-select no-modal" data-id="${escapeAttribute(order.id)}">
           ${getStatusOptions(order.status)}
         </select>
       </td>
 
     <td>
       <div class="priority-cell">
-        <select class="priority-select no-modal" data-id="${order.id}">
+        <select class="priority-select no-modal" data-id="${escapeAttribute(order.id)}">
           ${getPriorityOptions(priority)}
         </select>
       </div>
@@ -774,32 +944,32 @@ function renderOrders(orders, source = "general"){
 
       <td>
         <div class="action-buttons admin-order-actions admin-actions">
-          <button class="btn btn-secondary edit-order-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
+          <button class="btn btn-secondary edit-order-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
             Edit
           </button>
 
           ${statusValue === "quote-requested" || statusValue === "quote-sent" ? `
-            <button class="btn btn-secondary quote-builder-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
+            <button class="btn btn-secondary quote-builder-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
               ${statusValue === "quote-requested" ? "Prepare Quote" : "Open Quote"}
             </button>
           ` : ""}
 
-          <button class="btn btn-primary wa-btn admin-order-action-btn admin-order-action-btn-primary no-modal" data-id="${order.id}">
+          <button class="btn btn-primary wa-btn admin-order-action-btn admin-order-action-btn-primary no-modal" data-id="${escapeAttribute(order.id)}">
             WhatsApp
           </button>
 
           ${order.driver
-            ? `<button class="btn btn-secondary driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
-                Driver: ${order.driver.name}
+            ? `<button class="btn btn-secondary driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
+                Driver: ${escapeHtml(order.driver.name)}
               </button>`
             : statusValue === "preparing"
-              ? `<button class="btn btn-secondary assign-driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${order.id}" type="button">
+              ? `<button class="btn btn-secondary assign-driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
                   Assign Driver
                 </button>`
               : ""}
 
           ${statusValue === "delivered" || statusValue === "collected" ? `
-            <button class="btn btn-dark review-request-btn admin-order-action-btn admin-order-action-btn-dark no-modal" data-id="${order.id}">
+            <button class="btn btn-dark review-request-btn admin-order-action-btn admin-order-action-btn-dark no-modal" data-id="${escapeAttribute(order.id)}">
               Send Review Request
             </button>
           ` : ""}
@@ -3434,10 +3604,15 @@ function attachEvents(){
         status: newStatus
       });
 
-      await updateDoc(doc(db, "orders", orderId), {
+      const patch = {
         status: newStatus,
         ...lifecyclePatch
-      });
+      };
+
+      await Promise.all([
+        updateDoc(doc(db, "orders", orderId), patch),
+        order ? upsertPublicTracking(order, patch) : Promise.resolve()
+      ]);
       showToast("Status updated");
     });
 
@@ -3480,7 +3655,7 @@ document.querySelectorAll(".wa-btn").forEach(btn => {
   .join("\n");
 
 // 🔥 dynamic tracking link
-const trackingLink = `${window.location.origin}/track?id=${encodeURIComponent(order.id)}`;
+const trackingLink = getTrackingUrl(order);
 
 const message = `
 Hello ${order.customerName},
@@ -3531,7 +3706,7 @@ ${trackingLink}
         formattedPhone = "971" + cleanPhone.slice(1);
       }
 
-      const reviewLink = `${window.location.origin}/track?id=${encodeURIComponent(order.id)}`;
+      const reviewLink = getTrackingUrl(order);
       const message = `Hello ${order.customerName},
 
 We hope everything looked perfect for your event 🙌
@@ -3650,7 +3825,7 @@ function openOrderModal(order, options = {}){
     modalMapBtn.disabled = !mapUrl;
     modalMapBtn.onclick = () => {
       if(mapUrl){
-        window.open(mapUrl, "_blank");
+        window.open(mapUrl, "_blank", "noopener,noreferrer");
       }
     };
   }
@@ -4879,6 +5054,10 @@ async function handleGenerateQuote(){
         latestQuoteDiscountPercentage: quotePayload.discountPercentage,
         latestQuoteDiscountAmount: quotePayload.discountAmount,
         ...lifecyclePatch
+      }),
+      upsertPublicTracking(latestQuoteOrder, {
+        status: "quote-sent",
+        rentalDays: quotePayload.rentalDays
       })
     ]);
 
@@ -6323,7 +6502,10 @@ async function handleEditOrderSubmit(event){
 
   try{
     await ensureInventoryItemsForOrderItems(items);
-    await updateDoc(doc(db, "orders", currentEditingOrder.id), updatedData);
+    await Promise.all([
+      updateDoc(doc(db, "orders", currentEditingOrder.id), updatedData),
+      upsertPublicTracking(currentEditingOrder, updatedData)
+    ]);
     upsertOrderInAdminState({
       ...currentEditingOrder,
       ...updatedData
@@ -6415,11 +6597,13 @@ async function handleCreateOrderSubmit(event){
   try{
     await ensureInventoryItemsForOrderItems(items);
     const orderId = await generateOrderId();
+    const trackingToken = generateTrackingToken();
     const lifecyclePatch = buildOrderLifecyclePatch({}, {
       status
     });
     const orderPayload = {
       orderId,
+      trackingToken,
       customerName,
       phone,
       eventDate,
@@ -6437,7 +6621,13 @@ async function handleCreateOrderSubmit(event){
       ...lifecyclePatch
     };
 
-    await setDoc(doc(db, "orders", orderId), orderPayload);
+    await Promise.all([
+      setDoc(doc(db, "orders", orderId), orderPayload),
+      setDoc(doc(db, "publicTracking", trackingToken), {
+        ...buildPublicTrackingPayload(orderPayload),
+        createdAt: serverTimestamp()
+      })
+    ]);
     closeCreateOrderModal(true);
     showToast("Order created successfully");
   }catch(error){
@@ -6504,8 +6694,8 @@ function openDriverAssignmentModal(orderId){
     document.getElementById("confirmAssignDriver").disabled = true;
   }else{
     select.innerHTML = driversList.map((driver) => `
-      <option value="${driver.id}" ${order?.driver?.uid === driver.uid || order?.driver?.phone === driver.phone ? "selected" : ""}>
-        ${getDriverAssignmentOptionLabel(driver)}
+      <option value="${escapeAttribute(driver.id)}" ${order?.driver?.uid === driver.uid || order?.driver?.phone === driver.phone ? "selected" : ""}>
+        ${escapeHtml(getDriverAssignmentOptionLabel(driver))}
       </option>
     `).join("");
     document.getElementById("confirmAssignDriver").disabled = false;
@@ -6549,7 +6739,7 @@ async function assignDriverToOrder(){
     actionTypes: ["driver-assigned"]
   });
 
-  await updateDoc(orderRef, {
+  const patch = {
     driver: {
       name: driver.name,
       phone: driver.phone,
@@ -6557,7 +6747,12 @@ async function assignDriverToOrder(){
       uid: driver.uid || ""
     },
     ...driverLifecyclePatch
-  });
+  };
+
+  await Promise.all([
+    updateDoc(orderRef, patch),
+    upsertPublicTracking(latestOrderForLifecycle, patch)
+  ]);
 
   closeDriverModal();
   showToast("Driver assigned");
@@ -6796,12 +6991,12 @@ function renderCalendar(){
       return `
         <button
           type="button"
-          class="calendar-event ${statusMeta.className}"
-          data-order-id="${order.id}"
-          title="${order.customerName} | ${statusMeta.label}"
+          class="calendar-event ${escapeAttribute(statusMeta.className)}"
+          data-order-id="${escapeAttribute(order.id)}"
+          title="${escapeAttribute(`${order.customerName || "Unknown"} | ${statusMeta.label}`)}"
         >
-          <span class="calendar-event-name">${order.customerName || "Unknown"}</span>
-          <span class="calendar-event-status">${statusMeta.label}</span>
+          <span class="calendar-event-name">${escapeHtml(order.customerName || "Unknown")}</span>
+          <span class="calendar-event-status">${escapeHtml(statusMeta.label)}</span>
         </button>
       `;
     }).join("");
@@ -7366,6 +7561,7 @@ document.getElementById("driverModal")?.addEventListener("click", (e)=>{
 });
 
 window.logout = function(){
+  clearAdminSession();
   signOut(auth);
 };
 

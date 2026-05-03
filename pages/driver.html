@@ -6,7 +6,14 @@
   <title>Driver Dashboard | Al Taj Al Malaky</title>
   <link rel="stylesheet" href="../src/css/styles.css" />
 </head>
-<body class="driver-dashboard-page">
+<body class="driver-dashboard-page auth-checking">
+  <div id="driverAuthLoading" class="driver-auth-loading" role="status" aria-live="polite">
+    <div class="admin-auth-loading-card">
+      <div class="section-kicker">Driver Access</div>
+      <h1>Checking driver access...</h1>
+      <p>Please wait while we verify your driver permissions.</p>
+    </div>
+  </div>
   <header class="site-header">
     <div class="container navbar driver-navbar">
       <a href="/" class="brand">

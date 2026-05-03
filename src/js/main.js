@@ -61,6 +61,36 @@ function getRentalDaysValue(){
     : 1;
 }
 
+function generateTrackingToken(){
+  if(window.crypto?.randomUUID){
+    return window.crypto.randomUUID().replaceAll("-", "");
+  }
+
+  const randomValues = new Uint8Array(16);
+  window.crypto?.getRandomValues?.(randomValues);
+
+  return Array.from(randomValues, (value) => value.toString(16).padStart(2, "0")).join("")
+    || `${Date.now()}${Math.random().toString(36).slice(2)}`;
+}
+
+function buildPublicTrackingPayload(orderPayload){
+  return {
+    orderId: orderPayload.orderId,
+    customerName: orderPayload.customerName,
+    eventDate: orderPayload.eventDate,
+    rentalDays: orderPayload.rentalDays,
+    eventTime: orderPayload.eventTime,
+    setupTime: orderPayload.setupTime,
+    eventLocation: orderPayload.eventLocation,
+    mapLink: orderPayload.mapLink,
+    items: orderPayload.items,
+    status: orderPayload.status,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...(orderPayload.destinationLocation ? { destinationLocation: orderPayload.destinationLocation } : {})
+  };
+}
+
 function buildWhatsAppUrl(phone, generatedMessage){
   const message = encodeURIComponent(generatedMessage);
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -744,9 +774,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const orderId = await generateOrderId();
-
-      await setDoc(doc(db, "orders", orderId), {
+      const trackingToken = generateTrackingToken();
+      const orderPayload = {
         orderId,
+        trackingToken,
         customerName: name,
         phone,
         eventDate: date,
@@ -761,7 +792,12 @@ document.addEventListener("DOMContentLoaded", () => {
         status: "quote-requested",
         createdAt: serverTimestamp(),
         ...(destinationLocation ? { destinationLocation } : {})
-      });
+      };
+
+      await Promise.all([
+        setDoc(doc(db, "orders", orderId), orderPayload),
+        setDoc(doc(db, "publicTracking", trackingToken), buildPublicTrackingPayload(orderPayload))
+      ]);
 
       const itemsText = order.map(item => `${item.name} x${item.quantity}`).join("\n");
 
@@ -790,6 +826,7 @@ ${notes || "None"}
       const whatsappUrl = buildWhatsAppUrl("971505373383", message);
       saveQuoteSuccessState({
         orderId,
+        trackingId: trackingToken,
         customerName: name,
         whatsappUrl,
         whatsappMessage: message,
@@ -797,7 +834,7 @@ ${notes || "None"}
       });
 
       localStorage.removeItem("tajOrder");
-      window.location.href = buildQuoteSuccessUrl(orderId);
+      window.location.href = buildQuoteSuccessUrl(trackingToken || orderId);
     }catch(error){
       console.error("Quote submission failed:", error);
       alert(t("quote.submitError"));

@@ -12,7 +12,16 @@
     crossorigin=""
   />
 </head>
-<body class="admin-page">
+<body class="admin-page auth-checking">
+  <div id="adminAuthLoading" class="admin-auth-loading" role="status" aria-live="polite">
+    <div class="admin-auth-loading-card">
+      <div class="section-kicker">Admin Access</div>
+      <h1>Checking admin access...</h1>
+      <p>Please wait while we verify your administrator permissions.</p>
+    </div>
+  </div>
+
+  <div id="adminProtectedContent" class="admin-protected-content">
   <header class="site-header">
     <div class="container navbar">
       <div class="navbar-left">
@@ -1222,6 +1231,8 @@
 <button class="scroll-top-btn" type="button" data-scroll-top aria-label="Scroll back to top" title="Back to top">
   Top
 </button>
+
+  </div>
 
 </body>
 </html>
