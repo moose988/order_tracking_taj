@@ -173,16 +173,6 @@ export const PRODUCTS = [
     ]
   },
   {
-    id: 22,
-    name: "Dining Table 16",
-    category: "Dining Tables",
-    shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
-    images: [
-      "../images/dinning tables/IN9A9846.JPG"
-    ]
-  },
-  {
     id: 23,
     name: "Dining Table 17",
     category: "Dining Tables",
@@ -373,7 +363,7 @@ export const PRODUCTS = [
     name: "Chair 14",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 48 x 47 CM",
     images: [
       "../images/chairs/11360308/14/CW4A4612.jpg",
       "../images/chairs/11360308/14/CW4A4613 copy.jpg",
@@ -445,7 +435,7 @@ export const PRODUCTS = [
     name: "Chair 20",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 46 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0660/CW4A4475 copy.jpg",
       "../images/chairs/11360308/\u0662\u0660/CW4A4476 copy.jpg",
@@ -541,7 +531,7 @@ export const PRODUCTS = [
     name: "Chair 28",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "56 x 51 x 47 CM",
     images: [
       "../images/chairs/11360308/\u0662\u0668/CW4A4532 copy.jpg",
       "../images/chairs/11360308/\u0662\u0668/CW4A4534 copy.jpg",
@@ -589,7 +579,7 @@ export const PRODUCTS = [
     name: "Chair 32",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "59 x 51 x 50 CM",
     images: [
       "../images/chairs/11360308/\u0663\u0662/CW4A4616 copy.jpg",
       "../images/chairs/11360308/\u0663\u0662/CW4A4617 copy.jpg",
@@ -649,7 +639,7 @@ export const PRODUCTS = [
     name: "Chair 37",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "50 x 50 x 43 CM",
     images: [
       "../images/chairs/11360308/\u0663\u0667/CW4A4586 copy.jpg",
       "../images/chairs/11360308/\u0663\u0667/CW4A4587 copy.jpg",
@@ -757,7 +747,7 @@ export const PRODUCTS = [
     name: "Chair 46",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "47 x 44 x 49 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0666/CW4A4496 copy.jpg",
       "../images/chairs/11360308/\u0664\u0666/CW4A4497.jpg",
@@ -781,7 +771,7 @@ export const PRODUCTS = [
     name: "Chair 48",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "43 x 43 x 47 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0668/CW4A4419 copy.jpg",
       "../images/chairs/11360308/\u0664\u0668/CW4A4421 copy.jpg",
@@ -793,7 +783,7 @@ export const PRODUCTS = [
     name: "Chair 49",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "73 x 70 x 50 CM",
     images: [
       "../images/chairs/11360308/\u0664\u0669/CW4A4626 copy.jpg",
       "../images/chairs/11360308/\u0664\u0669/CW4A4628 copy.jpg",
@@ -805,7 +795,7 @@ export const PRODUCTS = [
     name: "Chair 50",
     category: "Chairs",
     shortDescription: "Refined seating for elegant events and premium guest arrangements.",
-    measurements: "Standard event chair size",
+    measurements: "74 x 71 x 45 CM",
     images: [
       "../images/chairs/11360308/\u0665\u0660/CW4A4622 copy.jpg",
       "../images/chairs/11360308/\u0665\u0660/CW4A4623 copy.jpg",
@@ -981,7 +971,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 15",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "300 x 50 x 40 CM",
     images: [
       "../images/bridal sofa/IN9A9869.JPG"
     ]
@@ -1001,7 +991,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 17",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "202 x 70 x 36 CM",
     images: [
       "../images/bridal sofa/IN9A9873.JPG"
     ]
@@ -1011,7 +1001,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 18",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "202 x 70 x 46 CM",
     images: [
       "../images/bridal sofa/IN9A9875.JPG"
     ]
@@ -1021,7 +1011,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 19",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "247 x 70 x 50 CM",
     images: [
       "../images/bridal sofa/IN9A9876.JPG"
     ]
@@ -1031,7 +1021,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 20",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "225 x 73 x 37 CM",
     images: [
       "../images/bridal sofa/IN9A9901.JPG"
     ]
@@ -1041,7 +1031,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 21",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "250 x 44 x 72 CM",
     images: [
       "../images/bridal sofa/IN9A9903.JPG"
     ]
@@ -1051,7 +1041,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 22",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "264 x 80 x 46 CM",
+    measurements: "260 x 52 x 63 CM",
     images: [
       "../images/bridal sofa/IN9A9906.JPG"
     ]
@@ -1061,19 +1051,9 @@ export const PRODUCTS = [
     name: "Bridal Sofa 23",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "280 x 43 x 90 CM",
     images: [
       "../images/bridal sofa/IN9A9909.JPG"
-    ]
-  },
-  {
-    id: 48,
-    name: "Bridal Sofa 24",
-    category: "Bridal Sofa",
-    shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
-    images: [
-      "../images/bridal sofa/IN9A9912.JPG"
     ]
   },
   {
@@ -1091,7 +1071,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 26",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "155 x 71 x 43 CM",
     images: [
       "../images/bridal sofa/IN9A9917.JPG"
     ]
@@ -1101,7 +1081,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 27",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "230 x 80 x 50 CM",
     images: [
       "../images/bridal sofa/IN9A9919.jpg"
     ]
@@ -1111,7 +1091,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 28",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "188 x 60 x 50 CM",
     images: [
       "../images/bridal sofa/IN9A9929.JPG"
     ]
@@ -1121,7 +1101,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 29",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "245 x 70 x 45 CM",
     images: [
       "../images/bridal sofa/IN9A9932.JPG"
     ]
@@ -1181,7 +1161,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 35",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "240 x 60 x 50 CM",
     images: [
       "../images/bridal sofa/IN9A9963.JPG"
     ]
@@ -1241,7 +1221,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 41",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "230 x 65 x 53 CM",
     images: [
       "../images/bridal sofa/IN9A9987.JPG"
     ]
@@ -1261,7 +1241,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 43",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "242 x 60 x 57 CM",
     images: [
       "../images/bridal sofa/IN9A9994.JPG"
     ]
@@ -1271,7 +1251,7 @@ export const PRODUCTS = [
     name: "Bridal Sofa 44",
     category: "Bridal Sofa",
     shortDescription: "Bridal statement sofas for stages, engagements, and graceful focal settings.",
-    measurements: "Standard bridal sofa size",
+    measurements: "245 x 50 x 68 CM",
     images: [
       "../images/bridal sofa/IN9A9997.JPG"
     ]
@@ -1817,16 +1797,6 @@ export const PRODUCTS = [
     ]
   },
   {
-    id: 78,
-    name: "Sofa 11",
-    category: "Majlis Sofa",
-    shortDescription: "Refined sofa seating for majlis lounges and upscale event comfort.",
-    measurements: "Standard event sofa size",
-    images: [
-      "../images/sofa/IN9A9855.JPG"
-    ]
-  },
-  {
     id: 79,
     name: "Sofa 12",
     category: "Majlis Sofa",
@@ -1881,7 +1851,7 @@ export const PRODUCTS = [
     name: "Sofa 17",
     category: "Majlis Sofa",
     shortDescription: "Refined sofa seating for majlis lounges and upscale event comfort.",
-    measurements: "Standard event sofa size",
+    measurements: "85 x 72 x 47 CM",
     images: [
       "../images/sofa/IN9A9951.JPG"
     ]

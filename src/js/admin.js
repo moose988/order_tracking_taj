@@ -483,7 +483,6 @@ const CATALOG_INVENTORY_DEMO_STOCK = {
   "Dining Table 13": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 14": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 15": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
-  "Dining Table 16": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 17": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 18": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
   "Dining Table 19": { totalStock: 10, damagedStock: 0, lowStockThreshold: 2 },
