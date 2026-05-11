@@ -20,6 +20,15 @@ import { WAREHOUSE_LOCATION } from "./app-config.js";
 import { initScrollTopButton } from "./scroll-top.js";
 import { normalizeOrderStatus } from "./order-status.js";
 import {
+  adminT,
+  getAdminDirection,
+  getAdminLanguage,
+  getAdminLocale,
+  initAdminI18n,
+  onAdminLanguageChange,
+  setAdminLanguage
+} from "./admin-i18n.js";
+import {
   SESSION_EXPIRED_MESSAGE,
   clearAdminSession,
   ensureAdminSessionMetadata,
@@ -51,9 +60,91 @@ let adminSessionActivityBound = false;
 const adminPageBody = document.body;
 const adminProtectedContent = document.getElementById("adminProtectedContent");
 const adminAuthLoading = document.getElementById("adminAuthLoading");
+const adminLanguageSwitcher = document.getElementById("adminLanguageSwitcher");
 const ADMIN_MAX_SESSION_MS = 8 * 60 * 60 * 1000;
 const ADMIN_INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
 const ADMIN_SESSION_CHECK_INTERVAL_MS = 60 * 1000;
+let currentAdminLanguage = initAdminI18n();
+
+function escapeAdminText(value){
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function adminFormatDate(value, options = {
+  year: "numeric",
+  month: "long",
+  day: "numeric"
+}){
+  if(!value){
+    return "";
+  }
+
+  const date = typeof value?.toDate === "function" ? value.toDate() : new Date(value);
+
+  if(Number.isNaN(date.getTime())){
+    return String(value);
+  }
+
+  return date.toLocaleDateString(getAdminLocale(), options);
+}
+
+function setElementText(selector, key, params = {}){
+  const element = typeof selector === "string" ? document.querySelector(selector) : selector;
+
+  if(element){
+    element.textContent = adminT(key, params);
+  }
+}
+
+function setElementHtml(selector, html){
+  const element = typeof selector === "string" ? document.querySelector(selector) : selector;
+
+  if(element){
+    element.innerHTML = html;
+  }
+}
+
+function setElementPlaceholder(selector, key){
+  const element = typeof selector === "string" ? document.querySelector(selector) : selector;
+
+  if(element){
+    element.setAttribute("placeholder", adminT(key));
+  }
+}
+
+function setElementAriaLabel(selector, key){
+  const element = typeof selector === "string" ? document.querySelector(selector) : selector;
+
+  if(element){
+    element.setAttribute("aria-label", adminT(key));
+  }
+}
+
+function updateAdminDocumentLanguage(){
+  const direction = getAdminDirection(currentAdminLanguage);
+  document.documentElement.lang = currentAdminLanguage;
+  document.documentElement.dir = direction;
+  adminPageBody?.classList.toggle("admin-lang-ar", direction === "rtl");
+}
+
+function syncAdminLanguageSwitcher(){
+  if(!adminLanguageSwitcher){
+    return;
+  }
+
+  adminLanguageSwitcher.setAttribute("aria-label", adminT("switcher.label"));
+  adminLanguageSwitcher.querySelectorAll("[data-admin-lang-option]").forEach((button) => {
+    const isActive = button.dataset.adminLangOption === currentAdminLanguage;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+    button.textContent = adminT(`common.${button.dataset.adminLangOption}`);
+  });
+}
 
 function setAdminPageAuthorizedState(isAuthorized){
   if(!adminPageBody){
@@ -245,6 +336,8 @@ const editLocationSummary = document.getElementById("editLocationSummary");
 const createLocationSummary = document.getElementById("createLocationSummary");
 const searchInput = document.getElementById("searchInput");
 const clearSearchBtn = document.getElementById("clearSearchBtn");
+const statusFilter = document.getElementById("statusFilter");
+const priorityFilter = document.getElementById("priorityFilter");
 const driverFilter = document.getElementById("driverFilter");
 const quoteModal = document.getElementById("quoteModal");
 const closeQuoteModalBtn = document.getElementById("closeQuoteModalBtn");
@@ -264,7 +357,10 @@ const quoteEventLocationInput = document.getElementById("quoteEventLocationInput
 const quoteNotesInput = document.getElementById("quoteNotesInput");
 const quoteItemsContainer = document.getElementById("quoteItemsContainer");
 const quoteDeliveryChargeInput = document.getElementById("quoteDeliveryChargeInput");
+const quoteDiscountTypeSelect = document.getElementById("quoteDiscountTypeSelect");
 const quoteDiscountInput = document.getElementById("quoteDiscountInput");
+const quoteDiscountHelp = document.getElementById("quoteDiscountHelp");
+const quoteDiscountError = document.getElementById("quoteDiscountError");
 const quoteItemsTotalValue = document.getElementById("quoteItemsTotalValue");
 const quoteDeliveryChargeValue = document.getElementById("quoteDeliveryChargeValue");
 const quoteDiscountSummaryLabel = document.getElementById("quoteDiscountSummaryLabel");
@@ -307,6 +403,204 @@ const inventoryMarkDamagedBtn = document.getElementById("inventoryMarkDamagedBtn
 const inventoryRestoreDamagedBtn = document.getElementById("inventoryRestoreDamagedBtn");
 const createInventoryWarnings = document.getElementById("createInventoryWarnings");
 const editInventoryWarnings = document.getElementById("editInventoryWarnings");
+
+function applyAdminStaticTranslations(){
+  updateAdminDocumentLanguage();
+  syncAdminLanguageSwitcher();
+
+  setElementText("#adminAuthLoading .section-kicker", "auth.access");
+  setElementText("#adminAuthLoading h1", "auth.checking");
+  setElementText("#adminAuthLoading p", "auth.waiting");
+  setElementText(".nav-links a[href='/']", "common.home");
+  setElementText(".nav-links a[href='/order']", "common.order");
+  setElementText(".nav-links a[href='/track']", "common.trackOrder");
+  setElementText(".nav-links a[href='/reviews']", "common.reviews");
+  setElementText(".admin-logout-btn", "common.logout");
+  setElementAriaLabel(".mobile-menu-btn", "common.open");
+  setElementText(".admin-sidebar-panel .section-kicker", "nav.quickNavigation");
+  document.querySelectorAll(".admin-sidebar-group-title").forEach((element, index) => {
+    const keys = ["nav.operations", "nav.logistics", "nav.inventory", "nav.insights", "nav.system"];
+    if(keys[index]){
+      element.textContent = adminT(keys[index]);
+    }
+  });
+  document.querySelectorAll(".admin-sidebar-link").forEach((element, index) => {
+    const keys = ["nav.dashboard", "nav.orders", "nav.drivers", "nav.liveMap", "nav.collection", "nav.inventoryLink", "nav.reservations", "nav.analytics", "nav.support"];
+    if(keys[index]){
+      element.textContent = adminT(keys[index]);
+    }
+  });
+  setElementText("#adminDashboardSection .section-kicker", "dashboard.kicker");
+  setElementText("#opsPanelTitle", "dashboard.attentionNow");
+  setElementText("#calendarViewTitle", "calendar.title");
+  setElementText("#prevMonthBtn", "calendar.previous");
+  setElementText("#nextMonthBtn", "calendar.next");
+  document.querySelectorAll(".calendar-weekdays span").forEach((element, index) => {
+    const keys = ["calendar.sun", "calendar.mon", "calendar.tue", "calendar.wed", "calendar.thu", "calendar.fri", "calendar.sat"];
+    if(keys[index]){
+      element.textContent = adminT(keys[index]);
+    }
+  });
+  setElementText("#driverPanelTitle", "drivers.title");
+  setElementText("#operationsMapTitle", "operationsMap.title");
+  setElementText("#collectionPanelTitle", "collection.title");
+  setElementText("#analyticsDashboardTitle", "analytics.title");
+  setElementText("#topProductsTitle", "analytics.topProducts");
+  setElementText("#inventoryManagementTitle", "inventory.title");
+  setElementText("#upcomingReservationsTitle", "inventory.upcomingReservations");
+  setElementText("#adminSupportTitle", "support.title");
+
+  setElementText("#openCreateOrderBtn", "orders.createOrder");
+  setElementPlaceholder(searchInput, "orders.searchPlaceholder");
+  setElementAriaLabel(clearSearchBtn, "common.clearSearch");
+  setElementText("#prevPage", "common.previous");
+  setElementText("#nextPage", "common.next");
+  document.querySelectorAll("#adminOrdersSection thead th").forEach((element, index) => {
+    const keys = ["common.orderId", "common.customer", "common.date", "common.rentalDays", "common.eventTime", "common.location", "common.status", "common.priority", "common.actions"];
+    if(keys[index]){
+      element.textContent = adminT(keys[index]);
+    }
+  });
+  setElementText("#addInventoryItemBtn", "inventory.addItem");
+  setElementPlaceholder(inventorySearchInput, "inventory.searchPlaceholder");
+  setElementText("#inventoryPrevPage", "common.previous");
+  setElementText("#inventoryNextPage", "common.next");
+  document.querySelectorAll("#adminInventorySection .inventory-table thead th").forEach((element, index) => {
+    const keys = ["inventory.productName", "common.variant", "common.category", "common.source", "inventory.totalStock", "common.available", "common.reserved", "common.damaged", "inventory.lowStockThreshold", "inventory.warningStatus", "common.actions"];
+    if(keys[index]){
+      const button = element.querySelector("button");
+      if(button){
+        button.textContent = adminT(keys[index]);
+      }else{
+        element.textContent = adminT(keys[index]);
+      }
+    }
+  });
+  document.querySelectorAll(".inventory-reservations-table thead th").forEach((element, index) => {
+    const keys = ["common.date", "common.orderId", "common.customer", "common.item", "common.quantity", "common.status"];
+    if(keys[index]){
+      element.textContent = adminT(keys[index]);
+    }
+  });
+  setElementText(".admin-support-copy .section-kicker", "support.kicker");
+  setElementText(".admin-support-copy p", "support.text");
+  setElementText("#quoteModalTitle", "quote.title");
+  setElementText("#quoteModalSubtitle", "quote.subtitle");
+  setElementText("#generateQuoteBtn", isGeneratingQuote ? "quote.generating" : "quote.generatePdf");
+  setElementText("#sendQuoteWhatsappBtn", "quote.sendWhatsapp");
+  setElementText("#resetQuoteDraftBtn", "quote.resetToOrder");
+  setElementText("#inventoryModalTitle", currentInventoryItemId ? "inventory.editItem" : "inventory.addInventoryItemTitle");
+  setElementText("#saveInventoryBtn", isSavingInventory ? "inventory.savingItem" : "inventory.saveItem");
+  setElementText("#deleteInventoryBtn", "inventory.deleteItem");
+  setElementText("#cancelInventoryBtn", "common.cancel");
+  setElementText("#inventoryMarkDamagedBtn", "inventory.markDamaged");
+  setElementText("#inventoryRestoreDamagedBtn", "inventory.restoreDamaged");
+  setElementText("#quoteModal .quote-builder-section:nth-of-type(1) h4", "quote.quotationDetails");
+  setElementText("#quoteModal .quote-builder-section:nth-of-type(2) h4", "quote.quoteItems");
+  setElementText("#quoteModal .quote-builder-section:nth-of-type(3) h4", "quote.charges");
+  setElementText(".quote-builder-bottom .quote-builder-section:nth-of-type(1) h4", "quote.quoteHistory");
+  setElementText(".quote-builder-actions-section h4", "quote.actions");
+  setElementText("label[for='quoteNumberInput']", "quote.quotationNumber");
+  setElementText("label[for='quoteLanguageSelect']", "quote.language");
+  setElementText("label[for='quoteBankPresetSelect']", "quote.bankPreset");
+  setElementText("label[for='quoteCustomerNameInput']", "modals.customerName");
+  setElementText("label[for='quoteCustomerPhoneInput']", "quote.customerPhone");
+  setElementText("label[for='quoteEventDateInput']", "common.eventDate");
+  setElementText("label[for='quoteEventTimeInput']", "common.eventTime");
+  setElementText("label[for='quoteSetupTimeInput']", "common.setupTime");
+  setElementText("label[for='quoteRentalDaysInput']", "common.rentalDays");
+  setElementText("label[for='quoteEventLocationInput']", "modals.eventLocation");
+  setElementText("label[for='quoteNotesInput']", "common.notes");
+  setElementText("label[for='quoteDeliveryChargeInput']", "quote.deliveryCharge");
+  setElementText("label[for='quoteDiscountTypeSelect']", "quote.discountType");
+  setElementText("label[for='quoteDiscountInput']", "quote.discountValue");
+  setElementText("#quoteModal .quote-builder-section:nth-of-type(1) p", "quote.quotationDetailsText");
+  setElementText("#quoteModal .quote-builder-section:nth-of-type(2) p", "quote.quoteItemsText");
+  setElementText("#quoteModal .quote-builder-section:nth-of-type(3) p", "quote.chargesText");
+  setElementText(".quote-builder-bottom .quote-builder-section:nth-of-type(1) p", "quote.quoteHistoryText");
+  setElementText(".quote-builder-actions-section p", "quote.actionsText");
+  setElementText("#orderModal .section-kicker", "modals.orderDetailsKicker");
+  setElementText("#modalCopyOrderIdBtn", "modals.copyOrderId");
+  setElementText("#adminOrderDetailsTitle", "modals.eventDetails");
+  setElementText("#adminOrderItemsTitle", "modals.items");
+  setElementText("#adminOrderTimelineTitle", "modals.orderTimeline");
+  setElementText("#modalMapBtn", "modals.openMap");
+  setElementText("#modalCopyBtn", "modals.copyFullDetails");
+  setElementText("#driverModal h3", "modals.selectDriver");
+  setElementText("label[for='driverSelect']", "modals.driver");
+  setElementText("#confirmAssignDriver", "modals.assignDriver");
+  setElementText("#editOrderTitle", "modals.editOrder");
+  setElementText("#createOrderModal h3", "modals.createOrder");
+  setElementText("#createOrderModal .edit-order-head p", "modals.createOrderSubtitle");
+
+  if(statusFilter){
+    const currentValue = statusFilter.value || "all";
+    statusFilter.innerHTML = `
+      <option value="all">${escapeAdminText(adminT("orders.allStatus"))}</option>
+      <option value="quote-requested">${escapeAdminText(adminT("status.quote-requested"))}</option>
+      <option value="quote-sent">${escapeAdminText(adminT("status.quote-sent"))}</option>
+      <option value="confirmed">${escapeAdminText(adminT("status.confirmed"))}</option>
+      <option value="preparing">${escapeAdminText(adminT("status.preparing"))}</option>
+      <option value="out-for-delivery">${escapeAdminText(adminT("status.out-for-delivery"))}</option>
+      <option value="delivered">${escapeAdminText(adminT("status.delivered"))}</option>
+      <option value="collected">${escapeAdminText(adminT("status.collected"))}</option>
+      <option value="cancelled">${escapeAdminText(adminT("status.cancelled"))}</option>
+    `;
+    statusFilter.value = currentValue;
+  }
+
+  if(priorityFilter){
+    const currentValue = priorityFilter.value || "all";
+    priorityFilter.innerHTML = `
+      <option value="all">${escapeAdminText(adminT("orders.allPriorities"))}</option>
+      <option value="normal">${escapeAdminText(adminT("priority.normal"))}</option>
+      <option value="urgent">${escapeAdminText(adminT("priority.urgent"))}</option>
+      <option value="vip">${escapeAdminText(adminT("priority.vip"))}</option>
+    `;
+    priorityFilter.value = currentValue;
+  }
+
+  if(inventorySourceFilter){
+    const currentValue = inventorySourceFilter.value || "all";
+    inventorySourceFilter.innerHTML = `
+      <option value="all">${escapeAdminText(adminT("inventory.allSources"))}</option>
+      <option value="catalog">${escapeAdminText(adminT("inventory.catalog"))}</option>
+      <option value="custom">${escapeAdminText(adminT("inventory.custom"))}</option>
+    `;
+    inventorySourceFilter.value = currentValue;
+  }
+
+  if(inventoryStatusFilter){
+    const currentValue = inventoryStatusFilter.value || "all";
+    inventoryStatusFilter.innerHTML = `
+      <option value="all">${escapeAdminText(adminT("inventory.allStatus"))}</option>
+      <option value="healthy">${escapeAdminText(adminT("inventory.healthy"))}</option>
+      <option value="low">${escapeAdminText(adminT("inventory.low"))}</option>
+      <option value="overbooked">${escapeAdminText(adminT("inventory.overbooked"))}</option>
+      <option value="damaged">${escapeAdminText(adminT("inventory.damaged"))}</option>
+      <option value="archived">${escapeAdminText(adminT("inventory.archived"))}</option>
+    `;
+    inventoryStatusFilter.value = currentValue;
+  }
+
+  if(quoteLanguageSelect){
+    const currentValue = quoteLanguageSelect.value || "en";
+    quoteLanguageSelect.innerHTML = `
+      <option value="en">${escapeAdminText(adminT("quote.languageEnglish"))}</option>
+      <option value="ar">${escapeAdminText(adminT("quote.languageArabic"))}</option>
+    `;
+    quoteLanguageSelect.value = currentValue;
+  }
+
+  if(quoteDiscountTypeSelect){
+    const currentValue = quoteDiscountTypeSelect.value || "percentage";
+    quoteDiscountTypeSelect.innerHTML = `
+      <option value="percentage">${escapeAdminText(adminT("quote.discountTypePercentage"))}</option>
+      <option value="fixed">${escapeAdminText(adminT("quote.discountTypeFixed"))}</option>
+    `;
+    quoteDiscountTypeSelect.value = currentValue === "fixed" ? "fixed" : "percentage";
+  }
+}
 
 let allOrders = [];
 let driversList = [];
@@ -358,6 +652,56 @@ let hasInitializedQuoteDraft = false;
 let isQuoteDraftDirty = false;
 let inventoryUnsubscribe = null;
 let currentInventoryItemId = null;
+
+function bindAdminLanguageSwitcher(){
+  if(!adminLanguageSwitcher || adminLanguageSwitcher.dataset.bound === "true"){
+    return;
+  }
+
+  adminLanguageSwitcher.dataset.bound = "true";
+  adminLanguageSwitcher.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-admin-lang-option]");
+
+    if(!button){
+      return;
+    }
+
+    setAdminLanguage(button.dataset.adminLangOption || "en");
+  });
+}
+
+function formatStatusLabel(status){
+  return adminT(`status.${normalizeOrderStatusValue(status)}`);
+}
+
+function formatPriorityLabel(priority){
+  return adminT(`priority.${getPriorityValue(priority)}`);
+}
+
+function refreshAdminLanguageState(){
+  currentAdminLanguage = getAdminLanguage();
+  applyAdminStaticTranslations();
+  renderOpsPanel();
+  populateDriverFilter();
+  applyFilters(false);
+  renderCalendar();
+  renderDriverWorkload();
+  renderCollectionAssignmentSection();
+  renderInventoryDashboard();
+  if(currentOpenOrderId){
+    syncOpenOrderModal();
+  }
+  if(currentDriverPerformanceKey){
+    syncOpenDriverPerformanceModal();
+  }
+  if(currentQuoteOrder){
+    setQuoteOrderFields(activeQuoteVersion || currentQuoteOrder);
+    renderQuoteHistory();
+    syncQuoteDiscountFieldUi();
+    updateQuoteTotals();
+    populateQuoteBankPresetOptions(quoteBankPresetSelect?.value || "", quoteLanguageSelect?.value || "en");
+  }
+}
 let isSavingInventory = false;
 let hasAttemptedCatalogInventorySeed = false;
 let inventoryClockIntervalId = null;
@@ -912,8 +1256,8 @@ function renderOrders(orders, source = "general"){
   if(orders.length === 0){
     tableBody.innerHTML = `
       <tr>
-        <td colspan="9" style="text-align:center;padding:20px;">
-          No orders found
+        <td colspan="9" style="text-align:center;padding:20px;" data-label="${escapeAttribute(adminT("orders.noOrdersFound"))}">
+          ${escapeAdminText(adminT("orders.noOrdersFound"))}
         </td>
       </tr>
     `;
@@ -926,27 +1270,27 @@ function renderOrders(orders, source = "general"){
 
   paginatedOrders.forEach(order => {
     const priority = getPriorityValue(order.priority);
-    const eventDateLabel = normalizeEventDateValue(order.eventDate) || "N/A";
+    const eventDateLabel = normalizeEventDateValue(order.eventDate) || adminT("common.notAvailable");
     const statusValue = normalizeOrderStatusValue(order.status);
 
     const row = document.createElement("tr");
     row.classList.add("order-row");
 
     row.innerHTML = `
-    <td class="admin-order-id-cell"><span class="admin-cell-nowrap">${escapeHtml(order.orderId)}</span></td>
-    <td>${escapeHtml(order.customerName)}</td>
-    <td class="admin-date-cell"><span class="admin-cell-nowrap">${escapeHtml(eventDateLabel)}</span></td>
-    <td>${getOrderRentalDays(order)}</td>
-    <td>${escapeHtml(order.eventTime || "N/A")}</td>
-    <td>${escapeHtml(order.eventLocation)}</td>
+    <td class="admin-order-id-cell" data-label="${escapeAttribute(adminT("common.orderId"))}"><span class="admin-cell-nowrap">${escapeHtml(order.orderId)}</span></td>
+    <td data-label="${escapeAttribute(adminT("common.customer"))}">${escapeHtml(order.customerName)}</td>
+    <td class="admin-date-cell" data-label="${escapeAttribute(adminT("common.date"))}"><span class="admin-cell-nowrap">${escapeHtml(eventDateLabel)}</span></td>
+    <td data-label="${escapeAttribute(adminT("common.days"))}">${getOrderRentalDays(order)}</td>
+    <td data-label="${escapeAttribute(adminT("common.time"))}">${escapeHtml(order.eventTime || adminT("common.notAvailable"))}</td>
+    <td data-label="${escapeAttribute(adminT("common.location"))}">${escapeHtml(order.eventLocation)}</td>
   
-    <td>
+    <td data-label="${escapeAttribute(adminT("common.status"))}">
       <select class="status-select no-modal" data-id="${escapeAttribute(order.id)}">
           ${getStatusOptions(order.status)}
         </select>
       </td>
 
-    <td>
+    <td data-label="${escapeAttribute(adminT("common.priority"))}">
       <div class="priority-cell">
         <select class="priority-select no-modal" data-id="${escapeAttribute(order.id)}">
           ${getPriorityOptions(priority)}
@@ -954,35 +1298,35 @@ function renderOrders(orders, source = "general"){
       </div>
     </td>
 
-      <td>
+      <td data-label="${escapeAttribute(adminT("common.actions"))}">
         <div class="action-buttons admin-order-actions admin-actions">
           <button class="btn btn-secondary edit-order-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
-            Edit
+            ${escapeAdminText(adminT("orders.edit"))}
           </button>
 
           ${statusValue === "quote-requested" || statusValue === "quote-sent" ? `
             <button class="btn btn-secondary quote-builder-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
-              ${statusValue === "quote-requested" ? "Prepare Quote" : "Open Quote"}
+              ${escapeAdminText(statusValue === "quote-requested" ? adminT("orders.prepareQuote") : adminT("orders.openQuote"))}
             </button>
           ` : ""}
 
           <button class="btn btn-primary wa-btn admin-order-action-btn admin-order-action-btn-primary no-modal" data-id="${escapeAttribute(order.id)}">
-            WhatsApp
+            ${escapeAdminText(adminT("common.whatsapp"))}
           </button>
 
           ${order.driver
             ? `<button class="btn btn-secondary driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
-                Driver: ${escapeHtml(order.driver.name)}
+                ${escapeAdminText(adminT("orders.driverPrefix", { name: order.driver.name }))}
               </button>`
             : statusValue === "preparing"
               ? `<button class="btn btn-secondary assign-driver-btn admin-order-action-btn admin-order-action-btn-secondary no-modal" data-id="${escapeAttribute(order.id)}" type="button">
-                  Assign Driver
+                  ${escapeAdminText(adminT("orders.assignDriver"))}
                 </button>`
               : ""}
 
           ${statusValue === "delivered" || statusValue === "collected" ? `
             <button class="btn btn-dark review-request-btn admin-order-action-btn admin-order-action-btn-dark no-modal" data-id="${escapeAttribute(order.id)}">
-              Send Review Request
+              ${escapeAdminText(adminT("orders.sendReviewRequest"))}
             </button>
           ` : ""}
         </div>
@@ -1025,7 +1369,10 @@ function updatePaginationControls(totalOrders){
   currentPage = Math.min(currentPage, totalPages);
 
   if(pageInfo){
-    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    pageInfo.textContent = adminT("orders.page", {
+      current: currentPage,
+      total: totalPages
+    });
   }
 
   if(prevPageBtn){
@@ -1171,9 +1518,9 @@ function renderOpsPanel(){
 
   const { todayOrders, weekOrders, tomorrowOrders } = getOpsBuckets();
   const cards = [
-    { key: "today", eyebrow: "Today", label: "Orders happening today", count: todayOrders.length },
-    { key: "tomorrow", eyebrow: "Tomorrow", label: "Orders scheduled tomorrow", count: tomorrowOrders.length },
-    { key: "week", eyebrow: "This Week", label: "Orders in the current week", count: weekOrders.length }
+    { key: "today", eyebrow: adminT("dashboard.opsToday"), label: adminT("dashboard.opsTodayLabel"), count: todayOrders.length },
+    { key: "tomorrow", eyebrow: adminT("dashboard.opsTomorrow"), label: adminT("dashboard.opsTomorrowLabel"), count: tomorrowOrders.length },
+    { key: "week", eyebrow: adminT("dashboard.opsWeek"), label: adminT("dashboard.opsWeekLabel"), count: weekOrders.length }
   ];
 
   opsPanel.innerHTML = cards.map(card => `
@@ -1191,8 +1538,14 @@ function renderOpsPanel(){
 
   if(opsPanelSummary){
     opsPanelSummary.textContent = activeOpsFilter === "all"
-      ? `${todayOrders.length} today, ${tomorrowOrders.length} tomorrow, ${weekOrders.length} in this week.`
-      : `${formatOpsFilterLabel(activeOpsFilter)} filter is active. Click the same card again to clear it.`;
+      ? adminT("dashboard.opsSummaryAll", {
+        today: todayOrders.length,
+        tomorrow: tomorrowOrders.length,
+        week: weekOrders.length
+      })
+      : adminT("dashboard.opsSummaryFilter", {
+        filter: formatOpsFilterLabel(activeOpsFilter)
+      });
   }
 
   attachOpsPanelEvents();
@@ -1211,13 +1564,13 @@ function attachOpsPanelEvents(){
 
 function formatOpsFilterLabel(filter){
   const labels = {
-    today: "Today",
-    week: "This Week",
-    tomorrow: "Tomorrow",
-    all: "All orders"
+    today: adminT("dashboard.opsToday"),
+    week: adminT("dashboard.opsWeek"),
+    tomorrow: adminT("dashboard.opsTomorrow"),
+    all: adminT("dashboard.opsFilterAll")
   };
 
-  return labels[filter] || "Selected";
+  return labels[filter] || adminT("common.actions");
 }
 
 function getPriorityValue(priority){
@@ -1279,7 +1632,7 @@ function populateDriverFilter(){
 
   const currentValue = driverFilter.value || "all";
   driverFilter.innerHTML = `
-    <option value="all">All Drivers</option>
+    <option value="all">${escapeAdminText(adminT("orders.allDrivers"))}</option>
     ${options.map((option) => `
       <option value="${escapeAttribute(option.value)}">${escapeHtml(option.label)}</option>
     `).join("")}
@@ -1331,7 +1684,7 @@ function getCategoryOptionsMarkup(selectedCategory = ""){
     : baseCategories;
 
   return [
-    '<option value="">Select category</option>',
+    `<option value="">${escapeAdminText(adminT("inventory.selectCategory"))}</option>`,
     ...categories.map((category) => `
       <option value="${escapeAttribute(category)}" ${category === selectedCategory ? "selected" : ""}>
         ${escapeHtml(category)}
@@ -1498,7 +1851,7 @@ function getCatalogProductByName(name){
 
 function getInventoryProductOptionsMarkup(selectedProductId = ""){
   return [
-    '<option value="">No catalog link</option>',
+    `<option value="">${escapeAdminText(adminT("inventory.noCatalogLink"))}</option>`,
     ...PRODUCTS.map((product) => `
       <option value="${escapeAttribute(product.id)}" ${String(product.id) === String(selectedProductId || "") ? "selected" : ""}>
         ${escapeHtml(product.name)}
@@ -1509,13 +1862,13 @@ function getInventoryProductOptionsMarkup(selectedProductId = ""){
 
 function getCreateItemProductOptionsMarkup(category, selectedProductId = "", isCustom = false){
   return [
-    '<option value="">Select product</option>',
+    `<option value="">${escapeAdminText(adminT("inventory.selectProduct"))}</option>`,
     ...getProductsForCategory(category).map((product) => `
       <option value="${escapeAttribute(product.id)}" ${String(product.id) === String(selectedProductId) ? "selected" : ""}>
         ${escapeHtml(product.name)}
       </option>
     `),
-    `<option value="__custom" ${isCustom ? "selected" : ""}>Custom / internal item</option>`
+    `<option value="__custom" ${isCustom ? "selected" : ""}>${escapeAdminText(adminT("inventory.customInternalItem"))}</option>`
   ].join("");
 }
 
@@ -1527,8 +1880,8 @@ function getCreateItemRowMarkup(item = {}, index = 0){
   const detailsText = selectedProduct
     ? [selectedProduct.measurements, selectedProduct.shortDescription].filter(Boolean).join(" - ")
     : isCustom
-      ? "Custom inventory item will be matched or created automatically."
-      : "Select a category and product";
+      ? adminT("inventory.customItemHelp")
+      : adminT("inventory.selectCategoryAndProduct");
 
   return `
     <div class="edit-item-row create-item-row" data-index="${index}">
@@ -1542,7 +1895,7 @@ function getCreateItemRowMarkup(item = {}, index = 0){
         type="text"
         class="create-item-custom-name"
         value="${escapeAttribute(isCustom ? item.name || "" : "")}"
-        placeholder="Custom item name"
+        placeholder="${escapeAttribute(adminT("inventory.customInternalItem"))}"
         aria-label="Create custom item name ${index + 1}"
         ${isCustom ? "" : "hidden disabled"}
       />
@@ -1554,7 +1907,7 @@ function getCreateItemRowMarkup(item = {}, index = 0){
         value="${Number(item.quantity) > 0 ? Number(item.quantity) : 1}"
         aria-label="Create item quantity ${index + 1}"
       />
-      <button type="button" class="btn btn-dark remove-create-item-btn">Remove</button>
+      <button type="button" class="btn btn-dark remove-create-item-btn">${escapeAdminText(adminT("common.delete"))}</button>
       <div class="create-item-details">${escapeHtml(detailsText)}</div>
     </div>
   `;
@@ -1610,8 +1963,8 @@ function refreshCreateItemRow(row, nextState = {}){
     details.textContent = selectedProduct
       ? [selectedProduct.measurements, selectedProduct.shortDescription].filter(Boolean).join(" - ")
       : isCustom
-        ? "Custom inventory item will be matched or created automatically."
-        : "Select a category and product";
+        ? adminT("inventory.customItemHelp")
+        : adminT("inventory.selectCategoryAndProduct");
   }
 }
 
@@ -1642,9 +1995,9 @@ async function generateOrderId(){
 
 function getPriorityOptions(currentPriority){
   const priorities = [
-    { value: "normal", label: "Normal" },
-    { value: "urgent", label: "Urgent" },
-    { value: "vip", label: "VIP" }
+    { value: "normal", label: adminT("priority.normal") },
+    { value: "urgent", label: adminT("priority.urgent") },
+    { value: "vip", label: adminT("priority.vip") }
   ];
 
   return priorities.map(priority => `
@@ -1683,18 +2036,6 @@ function getPriorityBadgeClass(priority){
   }
 
   return "is-normal";
-}
-
-function formatPriorityLabel(priority){
-  if(priority === "urgent"){
-    return "Urgent";
-  }
-
-  if(priority === "vip"){
-    return "VIP";
-  }
-
-  return "Normal";
 }
 
 function getDriverWorkload(){
@@ -3434,19 +3775,19 @@ async function handleSendCollectionRequest(){
   const selectedDriver = getSelectedCollectionDriver();
 
   if(!selectedOrder){
-    showToast("Select a delivered order first", "warning");
+    showToast(adminT("toasts.collectionOrderFirst"), "warning");
     renderCollectionRequestPreview();
     return;
   }
 
   if(normalizeOrderStatusValue(selectedOrder.status) !== "delivered"){
-    showToast("Only delivered orders can be assigned for collection", "warning");
+    showToast(adminT("toasts.deliveredOnly"), "warning");
     renderCollectionAssignmentSection();
     return;
   }
 
   if(!selectedDriver){
-    showToast("Select a driver first", "warning");
+    showToast(adminT("toasts.selectDriverFirst"), "warning");
     renderCollectionRequestPreview();
     return;
   }
@@ -3454,7 +3795,7 @@ async function handleSendCollectionRequest(){
   const whatsappPhone = getFormattedWhatsAppPhone(selectedDriver.phone);
 
   if(!whatsappPhone){
-    showToast("Selected driver does not have a WhatsApp phone number", "warning");
+    showToast(adminT("toasts.selectedDriverNoWhatsapp"), "warning");
     return;
   }
 
@@ -3465,7 +3806,7 @@ async function handleSendCollectionRequest(){
     const latestOrderSnapshot = await getDoc(doc(db, "orders", selectedOrder.id));
 
     if(!latestOrderSnapshot.exists()){
-      showToast("This order no longer exists", "error");
+      showToast(adminT("toasts.orderNoLongerExists"), "error");
       renderCollectionAssignmentSection();
       return;
     }
@@ -3476,7 +3817,7 @@ async function handleSendCollectionRequest(){
     };
 
     if(normalizeOrderStatusValue(latestOrder.status) !== "delivered"){
-      showToast("This order is no longer eligible for collection assignment", "warning");
+      showToast(adminT("toasts.orderNoLongerEligible"), "warning");
       renderCollectionAssignmentSection();
       return;
     }
@@ -3537,11 +3878,11 @@ async function handleSendCollectionRequest(){
     }
 
     renderCollectionAssignmentSection();
-    showToast("Collection request sent to driver", "success");
+    showToast(adminT("toasts.collectionSent"), "success");
     redirectToWhatsApp(whatsappPhone, message);
   }catch(error){
     console.error("Failed to send collection request:", error);
-    showToast("Could not send collection request", "error");
+    showToast(adminT("toasts.collectionFailed"), "error");
   }finally{
     isSendingCollectionRequest = false;
     syncCollectionRequestActionState();
@@ -3583,7 +3924,7 @@ function attachEvents(){
       await updateDoc(doc(db, "orders", orderId), {
         priority: nextPriority
       });
-      showToast("Priority updated");
+      showToast(adminT("toasts.priorityUpdated"));
     });
   });
 
@@ -3630,7 +3971,7 @@ function attachEvents(){
         updateDoc(doc(db, "orders", orderId), patch),
         order ? upsertPublicTracking(order, patch) : Promise.resolve()
       ]);
-      showToast("Status updated");
+      showToast(adminT("toasts.statusUpdated"));
     });
 
   });
@@ -3779,13 +4120,13 @@ function openOrderModal(order, options = {}){
   orderModal.dataset.orderId = order.id;
 
   if(modalOrderTitle){
-    modalOrderTitle.textContent = order.customerName || "Unknown customer";
+    modalOrderTitle.textContent = order.customerName || adminT("common.unknownCustomer");
   }
 
   if(modalOrderSubtitle){
     const statusLabel = formatStatusLabel(order.status);
-    const eventDateLabel = order.eventDate || "date pending";
-    modalOrderSubtitle.textContent = `${statusLabel} order scheduled for ${eventDateLabel}.`;
+    const eventDateLabel = order.eventDate || adminT("common.pending");
+    modalOrderSubtitle.textContent = `${statusLabel} - ${eventDateLabel}`;
   }
 
   if(modalOrderIdValue){
@@ -3793,11 +4134,11 @@ function openOrderModal(order, options = {}){
   }
 
   if(modalPhone){
-    modalPhone.textContent = order.phone || "N/A";
+    modalPhone.textContent = order.phone || adminT("common.notAvailable");
   }
 
   if(modalEventDate){
-    modalEventDate.textContent = order.eventDate || "N/A";
+    modalEventDate.textContent = order.eventDate || adminT("common.notAvailable");
   }
 
   if(modalRentalDays){
@@ -3805,31 +4146,31 @@ function openOrderModal(order, options = {}){
   }
 
   if(modalEventTime){
-    modalEventTime.textContent = order.eventTime || "N/A";
+    modalEventTime.textContent = order.eventTime || adminT("common.notAvailable");
   }
 
   if(modalSetupTime){
-    modalSetupTime.textContent = order.setupTime || "N/A";
+    modalSetupTime.textContent = order.setupTime || adminT("common.notAvailable");
   }
 
   if(modalEventLocation){
-    modalEventLocation.textContent = order.eventLocation || "N/A";
+    modalEventLocation.textContent = order.eventLocation || adminT("common.notAvailable");
   }
 
   if(modalMapLink){
     if(mapUrl){
       modalMapLink.href = mapUrl;
-      modalMapLink.textContent = order.mapLink ? "Open saved map pin" : "Open event location";
+      modalMapLink.textContent = adminT("common.open");
       modalMapLink.removeAttribute("aria-disabled");
     }else{
       modalMapLink.href = "#";
-      modalMapLink.textContent = "No map link available";
+      modalMapLink.textContent = adminT("common.notAvailable");
       modalMapLink.setAttribute("aria-disabled", "true");
     }
   }
 
   if(modalNotes){
-    modalNotes.textContent = order.notes || "None";
+    modalNotes.textContent = order.notes || adminT("common.none");
   }
 
   if(modalItems){
@@ -3851,10 +4192,10 @@ function openOrderModal(order, options = {}){
     modalCopyOrderIdBtn.onclick = async () => {
       try{
         await navigator.clipboard.writeText(order.orderId || "");
-        showToast("Order ID copied");
+        showToast(adminT("toasts.orderIdCopied"));
       }catch(error){
         console.error("Failed to copy order ID:", error);
-        showToast("Could not copy order ID", "error");
+        showToast(adminT("toasts.orderIdCopyFailed"), "error");
       }
     };
   }
@@ -3883,10 +4224,10 @@ ${order.notes || "None"}
 
       try{
         await navigator.clipboard.writeText(text.trim());
-        showToast("Order details copied");
+        showToast(adminT("toasts.orderDetailsCopied"));
       }catch(error){
         console.error("Failed to copy order details:", error);
-        showToast("Could not copy order details", "error");
+        showToast(adminT("toasts.orderDetailsCopyFailed"), "error");
       }
     };
   }
@@ -4035,34 +4376,118 @@ function clampDiscountPercentage(value){
   return Math.min(100, Math.max(0, percentage));
 }
 
-function getQuoteDiscountPercentage(source = {}){
+function normalizeQuoteDiscountType(value){
+  return value === "fixed" ? "fixed" : "percentage";
+}
+
+function normalizeQuoteDiscountValue(value){
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue >= 0 ? numericValue : 0;
+}
+
+function getQuoteDiscountType(source = {}){
+  return normalizeQuoteDiscountType(source.discountType);
+}
+
+function getQuoteDiscountValue(source = {}){
+  const discountType = getQuoteDiscountType(source);
+
+  if(discountType === "fixed"){
+    const explicitFixedValue = Number(source.discountValue);
+
+    if(Number.isFinite(explicitFixedValue)){
+      return Math.max(0, explicitFixedValue);
+    }
+
+    const explicitDiscountAmount = Number(source.discountAmount);
+
+    if(Number.isFinite(explicitDiscountAmount)){
+      return Math.max(0, explicitDiscountAmount);
+    }
+
+    const legacyDiscountAmount = Number(source.discount);
+    return Number.isFinite(legacyDiscountAmount) ? Math.max(0, legacyDiscountAmount) : 0;
+  }
+
+  const explicitDiscountValue = Number(source.discountValue);
+
+  if(Number.isFinite(explicitDiscountValue)){
+    return clampDiscountPercentage(explicitDiscountValue);
+  }
+
   const explicitDiscountPercentage = Number(source.discountPercentage);
 
   if(Number.isFinite(explicitDiscountPercentage)){
     return clampDiscountPercentage(explicitDiscountPercentage);
   }
 
-  if(source.discountType === "percentage"){
+  if(Number.isFinite(Number(source.discount))){
     return clampDiscountPercentage(source.discount);
   }
 
-  const itemsTotal = Number(source.itemsTotal) || 0;
-  const deliveryCharge = Number(source.deliveryCharge) || 0;
-  const preDiscountSubtotal = Math.max(
-    0,
-    Number(source.preDiscountSubtotal) || (itemsTotal + deliveryCharge)
-  );
-  const explicitDiscountAmount = Number(source.discountAmount);
-  const legacyDiscountAmount = Number(source.discount);
-  const discountAmount = Number.isFinite(explicitDiscountAmount)
-    ? explicitDiscountAmount
-    : legacyDiscountAmount;
+  return 0;
+}
 
-  if(!Number.isFinite(discountAmount) || discountAmount <= 0 || preDiscountSubtotal <= 0){
-    return 0;
+function getQuoteDiscountHelpKey(discountType = quoteDiscountTypeSelect?.value){
+  return normalizeQuoteDiscountType(discountType) === "fixed"
+    ? "quote.discountHelpFixed"
+    : "quote.discountHelpPercentage";
+}
+
+function getQuoteDiscountSummaryLabelText(discountType, discountValue){
+  if(normalizeQuoteDiscountType(discountType) === "fixed"){
+    return `${adminT("quote.discountFixed")} (${formatCurrencyDisplay(discountValue)})`;
   }
 
-  return clampDiscountPercentage((discountAmount / preDiscountSubtotal) * 100);
+  return `${adminT("quote.discountPercentage")} (${formatPercentageDisplay(discountValue)})`;
+}
+
+function setQuoteDiscountError(message = ""){
+  const discountFieldGroup = quoteDiscountInput?.closest(".form-group");
+  const hasMessage = Boolean(String(message || "").trim());
+
+  if(discountFieldGroup){
+    discountFieldGroup.classList.toggle("has-error", hasMessage);
+  }
+
+  if(quoteDiscountError){
+    quoteDiscountError.textContent = hasMessage ? message : "";
+    quoteDiscountError.hidden = !hasMessage;
+  }
+}
+
+function syncQuoteDiscountFieldUi(){
+  const discountType = normalizeQuoteDiscountType(quoteDiscountTypeSelect?.value);
+  const suffix = quoteDiscountInput?.closest(".currency-input-wrap")?.querySelector(".currency-input-suffix");
+
+  if(quoteDiscountInput){
+    quoteDiscountInput.max = discountType === "percentage" ? "100" : "";
+    quoteDiscountInput.placeholder = discountType === "fixed" ? "0.00" : "0";
+  }
+
+  if(quoteDiscountHelp){
+    quoteDiscountHelp.textContent = adminT(getQuoteDiscountHelpKey(discountType));
+  }
+
+  if(suffix){
+    suffix.textContent = discountType === "fixed" ? QUOTE_CURRENCY : "%";
+  }
+
+  setQuoteDiscountError("");
+}
+
+function getQuoteDiscountValidationMessage(discountType, discountValue, preDiscountSubtotal){
+  if(discountValue < 0){
+    return normalizeQuoteDiscountType(discountType) === "fixed"
+      ? adminT("validation.discountFixedRange")
+      : adminT("validation.discountRange");
+  }
+
+  if(normalizeQuoteDiscountType(discountType) === "percentage"){
+    return discountValue > 100 ? adminT("validation.discountRange") : "";
+  }
+
+  return discountValue > preDiscountSubtotal ? adminT("validation.discountFixedRange") : "";
 }
 
 function getQuoteRentalDaysValue(){
@@ -4087,21 +4512,21 @@ function getOrderItemsListMarkup(items = []){
   return items.length
     ? items.map((item) => `
       <li class="admin-order-item">
-        <span class="admin-order-item-name">${escapeHtml(item.name || "Unnamed item")}</span>
+        <span class="admin-order-item-name">${escapeHtml(item.name || adminT("inventory.unnamedItem"))}</span>
         <span class="admin-order-item-qty">x${Math.max(1, Number(item.quantity) || 1)}</span>
       </li>
     `).join("")
     : `
       <li class="admin-order-item is-empty">
-        <span class="admin-order-item-name">No items added</span>
+        <span class="admin-order-item-name">${escapeAdminText(adminT("quote.noItems"))}</span>
       </li>
     `;
 }
 
 function getOrderItemsText(items = []){
   return items.length
-    ? items.map((item) => `- ${item.name || "Unnamed item"} x${Math.max(1, Number(item.quantity) || 1)}`).join("\n")
-    : "- No items added";
+    ? items.map((item) => `- ${item.name || adminT("inventory.unnamedItem")} x${Math.max(1, Number(item.quantity) || 1)}`).join("\n")
+    : `- ${adminT("quote.noItems")}`;
 }
 
 function getTimestampValue(value){
@@ -4125,10 +4550,16 @@ function formatQuoteHistoryDate(value){
   const timestamp = getTimestampValue(value);
 
   if(!timestamp){
-    return "Just now";
+    return adminFormatDate(Date.now(), {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
   }
 
-  return new Date(timestamp).toLocaleString("en-AE", {
+  return new Date(timestamp).toLocaleString(getAdminLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -4139,19 +4570,19 @@ function formatQuoteHistoryDate(value){
 
 function getOrderTimelineConfig(order){
   const timeline = [
-    { key: "createdAt", label: "Created" },
-    { key: "quoteSentAt", label: "Quote Sent" },
-    { key: "confirmedAt", label: "Confirmed" },
-    { key: "preparingAt", label: "Preparing" },
-    { key: "driverAssignedAt", label: "Driver Assigned" },
-    { key: "outForDeliveryAt", label: "Out for Delivery" },
-    { key: "deliveredAt", label: "Delivered" },
-    { key: "collectionRequestedAt", label: "Collection Requested" },
-    { key: "collectedAt", label: "Collected" }
+    { key: "createdAt", label: adminT("status.quote-requested") },
+    { key: "quoteSentAt", label: adminT("status.quote-sent") },
+    { key: "confirmedAt", label: adminT("status.confirmed") },
+    { key: "preparingAt", label: adminT("status.preparing") },
+    { key: "driverAssignedAt", label: adminT("status.driver-assigned") },
+    { key: "outForDeliveryAt", label: adminT("status.out-for-delivery") },
+    { key: "deliveredAt", label: adminT("status.delivered") },
+    { key: "collectionRequestedAt", label: adminT("status.collection-requested") },
+    { key: "collectedAt", label: adminT("status.collected") }
   ];
 
   if(order?.cancelledAt || normalizeOrderStatusValue(order?.status) === "cancelled"){
-    timeline.push({ key: "cancelledAt", label: "Cancelled" });
+    timeline.push({ key: "cancelledAt", label: adminT("status.cancelled") });
   }
 
   return timeline;
@@ -4166,7 +4597,7 @@ function renderOrderTimeline(order){
 
   const timelineMarkup = getOrderTimelineConfig(order).map((entry) => {
     const hasTimestamp = Boolean(getTimestampValue(order?.[entry.key]));
-    const timestampLabel = hasTimestamp ? formatQuoteHistoryDate(order?.[entry.key]) : "Pending";
+    const timestampLabel = hasTimestamp ? formatQuoteHistoryDate(order?.[entry.key]) : adminT("common.pending");
 
     return `
       <div class="admin-order-timeline-row ${hasTimestamp ? "is-complete" : "is-pending"}">
@@ -4183,7 +4614,7 @@ function renderOrderTimeline(order){
 }
 
 function getQuoteVersionLanguageLabel(language){
-  return language === "ar" ? "Arabic" : "English";
+  return language === "ar" ? adminT("quote.languageArabic") : adminT("quote.languageEnglish");
 }
 
 async function getLatestOrderData(orderOrId){
@@ -4265,7 +4696,7 @@ function populateQuoteBankPresetOptions(selectedId = "", language = quoteLanguag
   const nextSelectedId = selectedId || quoteBankPresetSelect.value || QUOTE_BANK_PRESETS[0]?.id || "";
   quoteBankPresetSelect.innerHTML = QUOTE_BANK_PRESETS.map((preset) => `
     <option value="${escapeAttribute(preset.id)}" ${preset.id === nextSelectedId ? "selected" : ""}>
-      ${escapeHtml(preset.label.en || String(preset.id || "").toUpperCase())}
+      ${escapeHtml((language === "ar" ? preset.label.ar : preset.label.en) || preset.label.en || String(preset.id || "").toUpperCase())}
     </option>
   `).join("");
 
@@ -4296,11 +4727,11 @@ function setQuoteOrderFields(source){
   }
 
   if(quoteEventTimeInput){
-    quoteEventTimeInput.value = source.eventTime || "N/A";
+    quoteEventTimeInput.value = source.eventTime || adminT("common.notAvailable");
   }
 
   if(quoteSetupTimeInput){
-    quoteSetupTimeInput.value = source.setupTime || "N/A";
+    quoteSetupTimeInput.value = source.setupTime || adminT("common.notAvailable");
   }
 
   if(quoteEventLocationInput){
@@ -4308,15 +4739,15 @@ function setQuoteOrderFields(source){
   }
 
   if(quoteNotesInput){
-    quoteNotesInput.value = source.notes || "None";
+    quoteNotesInput.value = source.notes || adminT("common.none");
   }
 
   if(quoteModalTitle && currentQuoteOrder){
-    quoteModalTitle.textContent = `Prepare Quote - ${currentQuoteOrder.orderId}`;
+    quoteModalTitle.textContent = `${adminT("quote.title")} - ${currentQuoteOrder.orderId}`;
   }
 
   if(quoteModalSubtitle && currentQuoteOrder){
-    quoteModalSubtitle.textContent = `${currentQuoteOrder.customerName || "Unknown customer"} • ${formatStatusLabel(currentQuoteOrder.status)}`;
+    quoteModalSubtitle.textContent = `${currentQuoteOrder.customerName || adminT("common.unknownCustomer")} • ${formatStatusLabel(currentQuoteOrder.status)}`;
   }
 }
 
@@ -4368,7 +4799,7 @@ function initAdminLocationBindings(){
 function syncQuoteModalActionState(){
   if(generateQuoteBtn){
     generateQuoteBtn.disabled = isGeneratingQuote;
-    generateQuoteBtn.textContent = isGeneratingQuote ? "Generating..." : "Generate Quote PDF";
+    generateQuoteBtn.textContent = isGeneratingQuote ? adminT("quote.generating") : adminT("quote.generatePdf");
   }
 
   if(sendQuoteWhatsappBtn){
@@ -4388,6 +4819,7 @@ function syncQuoteModalActionState(){
     quoteBankPresetSelect,
     quoteRentalDaysInput,
     quoteDeliveryChargeInput,
+    quoteDiscountTypeSelect,
     quoteDiscountInput
   ].forEach((field) => {
     if(field){
@@ -4412,7 +4844,7 @@ function renderQuoteItems(items = []){
   }
 
   if(!items.length){
-    quoteItemsContainer.innerHTML = '<div class="quote-history-empty">No valid order items available for quotation.</div>';
+    quoteItemsContainer.innerHTML = `<div class="quote-history-empty">${escapeAdminText(adminT("quote.noItems"))}</div>`;
     updateQuoteTotals();
     syncQuoteModalActionState();
     return;
@@ -4429,31 +4861,31 @@ function renderQuoteItems(items = []){
       <article class="quote-item-card ${isEditing ? "is-editing" : ""}" data-index="${index}" data-editing="${isEditing ? "true" : "false"}">
         <div class="quote-item-card-head">
           <div>
-            <strong>Item ${index + 1}</strong>
-            <span>${isEditing ? "Edited in the quote draft" : "Inherited from the latest saved order"}</span>
+            <strong>${escapeAdminText(adminT("quote.itemNumber", { index: index + 1 }))}</strong>
+            <span>${escapeAdminText(isEditing ? adminT("quote.editedDraft") : adminT("quote.inheritedOrder"))}</span>
           </div>
           <button class="btn btn-secondary btn-small quote-item-edit-btn" data-index="${index}" type="button">
-            ${isEditing ? "Lock Item" : "Edit Item"}
+            ${escapeAdminText(isEditing ? adminT("quote.lockItem") : adminT("quote.editItem"))}
           </button>
         </div>
         <div class="quote-item-card-grid">
           <div class="form-group quote-item-name-group">
-            <label>Item Name</label>
+            <label>${escapeAdminText(adminT("quote.itemName"))}</label>
             <textarea class="quote-item-name" rows="1" ${isEditing ? "" : "readonly"}>${escapeHtml(item.name || "")}</textarea>
           </div>
           <div class="form-group quote-item-quantity-group">
-            <label>Quantity</label>
+            <label>${escapeAdminText(adminT("common.quantity"))}</label>
             <input class="quote-item-quantity" type="number" min="1" step="1" value="${quantity}" ${isEditing ? "" : "readonly"} />
           </div>
           <div class="form-group quote-item-unit-price-group">
-            <label>Unit Price</label>
+            <label>${escapeAdminText(adminT("quote.unitPrice"))}</label>
             <div class="currency-input-wrap">
               <input class="quote-item-unit-price" type="number" min="0" step="0.01" placeholder="0.00" value="${hasUnitPrice ? unitPrice : ""}" />
               <span class="currency-input-suffix">${QUOTE_CURRENCY}</span>
             </div>
           </div>
           <div class="form-group quote-item-amount-group">
-            <label>Amount</label>
+            <label>${escapeAdminText(adminT("quote.amount"))}</label>
             <input class="quote-item-amount" type="text" value="${formatCurrencyDisplay(amount)}" readonly />
           </div>
         </div>
@@ -4493,8 +4925,13 @@ function updateQuoteTotals(){
   }));
   const rentalDays = getQuoteRentalDaysValue();
   const deliveryCharge = Math.max(0, Number(quoteDeliveryChargeInput?.value) || 0);
-  const discountPercentage = clampDiscountPercentage(quoteDiscountInput?.value);
-  const totals = calculateQuoteTotals(safeItems, rentalDays, deliveryCharge, discountPercentage);
+  const discountType = normalizeQuoteDiscountType(quoteDiscountTypeSelect?.value);
+  const discountValue = normalizeQuoteDiscountValue(quoteDiscountInput?.value);
+  const totals = calculateQuoteTotals(safeItems, rentalDays, deliveryCharge, {
+    type: discountType,
+    value: discountValue
+  });
+  const discountValidationMessage = getQuoteDiscountValidationMessage(discountType, discountValue, totals.preDiscountSubtotal);
 
   totals.items.forEach((item, index) => {
     const amountInput = getQuoteItemRows()[index]?.querySelector(".quote-item-amount");
@@ -4513,7 +4950,7 @@ function updateQuoteTotals(){
   }
 
   if(quoteDiscountSummaryLabel){
-    quoteDiscountSummaryLabel.textContent = `Discount (${formatPercentageDisplay(totals.discountPercentage)})`;
+    quoteDiscountSummaryLabel.textContent = getQuoteDiscountSummaryLabelText(discountType, discountValue);
   }
 
   if(quoteDiscountValue){
@@ -4531,6 +4968,8 @@ function updateQuoteTotals(){
   if(quoteGrandTotalValue){
     quoteGrandTotalValue.textContent = formatCurrencyDisplay(totals.grandTotal);
   }
+
+  setQuoteDiscountError(discountValidationMessage);
 }
 
 function setQuoteWhatsappState(quoteData){
@@ -4562,9 +5001,15 @@ function loadOrderDraftIntoQuoteForm(order){
     quoteDeliveryChargeInput.value = "0";
   }
 
+  if(quoteDiscountTypeSelect){
+    quoteDiscountTypeSelect.value = "percentage";
+  }
+
   if(quoteDiscountInput){
     quoteDiscountInput.value = "0";
   }
+
+  syncQuoteDiscountFieldUi();
 
   renderQuoteItems((order.items || []).map((item) => ({
     name: item.name || "",
@@ -4601,9 +5046,15 @@ function loadQuoteVersionIntoForm(quoteVersion){
     quoteDeliveryChargeInput.value = String(Number(quoteVersion.deliveryCharge) || 0);
   }
 
-  if(quoteDiscountInput){
-    quoteDiscountInput.value = String(getQuoteDiscountPercentage(quoteVersion));
+  if(quoteDiscountTypeSelect){
+    quoteDiscountTypeSelect.value = getQuoteDiscountType(quoteVersion);
   }
+
+  if(quoteDiscountInput){
+    quoteDiscountInput.value = String(getQuoteDiscountValue(quoteVersion));
+  }
+
+  syncQuoteDiscountFieldUi();
 
   renderQuoteItems((quoteVersion.items || []).map((item) => ({
     name: item.name || "",
@@ -4622,7 +5073,7 @@ function renderQuoteHistory(){
   }
 
   if(!currentQuoteVersions.length){
-    quoteHistoryList.innerHTML = '<div class="quote-history-empty">No saved quotations yet.</div>';
+    quoteHistoryList.innerHTML = `<div class="quote-history-empty">${escapeAdminText(adminT("quote.noSavedQuotes"))}</div>`;
     return;
   }
 
@@ -4630,16 +5081,16 @@ function renderQuoteHistory(){
     <article class="quote-history-card ${activeQuoteVersion?.version === quoteVersion.version ? "is-active" : ""}">
       <div class="quote-history-card-head">
         <div>
-          <strong>Version ${quoteVersion.version}</strong>
+          <strong>${escapeAdminText(adminT("common.version"))} ${quoteVersion.version}</strong>
           <span>${getQuoteVersionLanguageLabel(quoteVersion.language)}</span>
         </div>
         <span>${formatCurrencyDisplay(quoteVersion.grandTotal)}</span>
       </div>
       <div class="quote-history-meta">${formatQuoteHistoryDate(quoteVersion.generatedAt || quoteVersion.generatedAtMs || quoteVersion.generatedAtISO)}</div>
       <div class="quote-history-actions">
-        <button class="btn btn-secondary" type="button" data-action="open" data-version="${quoteVersion.version}">Open</button>
-        <button class="btn btn-secondary" type="button" data-action="pdf" data-version="${quoteVersion.version}">PDF</button>
-        <button class="btn btn-dark" type="button" data-action="whatsapp" data-version="${quoteVersion.version}">WhatsApp</button>
+        <button class="btn btn-secondary" type="button" data-action="open" data-version="${quoteVersion.version}">${escapeAdminText(adminT("common.open"))}</button>
+        <button class="btn btn-secondary" type="button" data-action="pdf" data-version="${quoteVersion.version}">${escapeAdminText(adminT("common.pdf"))}</button>
+        <button class="btn btn-dark" type="button" data-action="whatsapp" data-version="${quoteVersion.version}">${escapeAdminText(adminT("common.whatsapp"))}</button>
       </div>
     </article>
   `).join("");
@@ -4661,8 +5112,8 @@ function subscribeToQuoteHistory(order){
         loadOrderDraftIntoQuoteForm(currentQuoteOrder);
         setQuoteBuilderStatus(
           currentQuoteVersions.length
-            ? "Draft ready from the latest saved order. Open history to reuse an older version."
-            : "Draft ready. Add prices and generate the quotation.",
+            ? adminT("quote.draftReadyLatest")
+            : adminT("quote.draftReady"),
           "warning"
         );
 
@@ -4679,7 +5130,7 @@ function subscribeToQuoteHistory(order){
     },
     (error) => {
       console.error("Failed to subscribe to quote history:", error);
-      setQuoteBuilderStatus("Could not load quote history.", "warning");
+      setQuoteBuilderStatus(adminT("quote.couldNotLoadHistory"), "warning");
     }
   );
 }
@@ -4692,7 +5143,7 @@ async function openQuoteModal(order){
   const latestOrder = await getLatestOrderData(order);
 
   if(!latestOrder){
-    showToast("Could not load the latest order", "error");
+    showToast(adminT("toasts.latestOrderFailed"), "error");
     return;
   }
 
@@ -4704,7 +5155,7 @@ async function openQuoteModal(order){
 
   loadOrderDraftIntoQuoteForm(latestOrder);
   renderQuoteHistory();
-  setQuoteBuilderStatus("Loading quote history...", "loading");
+  setQuoteBuilderStatus(adminT("quote.loadingHistory"), "loading");
   syncQuoteModalActionState();
 
   quoteModal.classList.add("active");
@@ -4779,7 +5230,7 @@ function markQuoteDraftDirty(){
   isQuoteDraftDirty = true;
   setQuoteWhatsappState(null);
   renderQuoteHistory();
-  setQuoteBuilderStatus("Draft updated. Generate to save a new version.", "warning");
+  setQuoteBuilderStatus(adminT("quote.draftUpdated"), "warning");
 }
 
 function getNextQuoteVersion(){
@@ -4811,7 +5262,7 @@ function openWhatsAppApp(phone, text){
   const encodedText = encodeURIComponent(text || "");
 
   if(!cleanPhone){
-    alert("Customer phone number is missing.");
+    alert(adminT("quote.customerPhoneMissing"));
     return;
   }
 
@@ -4845,50 +5296,53 @@ function validateQuoteDraft(){
   const items = getQuoteItemsFromForm();
 
   if(!items.length){
-    setQuoteBuilderStatus("Add at least one valid item before generating.", "warning");
-    showToast("Add at least one valid item", "warning");
+    setQuoteBuilderStatus(adminT("validation.addItemFirst"), "warning");
+    showToast(adminT("validation.addItemFirst"), "warning");
     return null;
   }
 
   for(const [index, item] of items.entries()){
     if(!item.name){
-      setQuoteBuilderStatus(`Item ${index + 1} needs a name.`, "warning");
-      showToast("Each item needs a name", "warning");
+      setQuoteBuilderStatus(`${adminT("quote.itemNumber", { index: index + 1 })} ${adminT("validation.eachItemName")}.`, "warning");
+      showToast(adminT("validation.eachItemName"), "warning");
       return null;
     }
 
     if(!Number.isFinite(item.quantity) || item.quantity < 1){
-      setQuoteBuilderStatus(`Item ${index + 1} must have quantity 1 or more.`, "warning");
-      showToast("Quantity must be at least 1", "warning");
+      setQuoteBuilderStatus(`${adminT("quote.itemNumber", { index: index + 1 })} ${adminT("validation.quantityMin")}.`, "warning");
+      showToast(adminT("validation.quantityMin"), "warning");
       return null;
     }
 
     if(item.unitPriceRaw === "" || !Number.isFinite(item.unitPrice) || item.unitPrice < 0){
-      setQuoteBuilderStatus(`Item ${index + 1} needs a valid unit price.`, "warning");
-      showToast("Add a valid unit price for each item", "warning");
+      setQuoteBuilderStatus(`${adminT("quote.itemNumber", { index: index + 1 })} ${adminT("validation.validUnitPrice")}.`, "warning");
+      showToast(adminT("validation.validUnitPrice"), "warning");
       return null;
     }
   }
 
   const rentalDays = Number(quoteRentalDaysInput?.value);
   const deliveryCharge = Number(quoteDeliveryChargeInput?.value);
-  const discountPercentage = Number(quoteDiscountInput?.value);
+  const discountType = normalizeQuoteDiscountType(quoteDiscountTypeSelect?.value);
+  const discountValue = quoteDiscountInput?.value === "" ? 0 : Number(quoteDiscountInput?.value);
 
   if(!Number.isFinite(rentalDays) || rentalDays < 1){
-    setQuoteBuilderStatus("Rental days must be 1 or more.", "warning");
-    showToast("Rental days must be at least 1", "warning");
+    setQuoteBuilderStatus(adminT("validation.rentalDaysMin"), "warning");
+    showToast(adminT("validation.rentalDaysMin"), "warning");
     return null;
   }
 
   if(!Number.isFinite(deliveryCharge) || deliveryCharge < 0){
-    setQuoteBuilderStatus("Delivery charge must be 0 or more.", "warning");
-    showToast("Delivery charge must be 0 or more", "warning");
+    setQuoteBuilderStatus(adminT("validation.deliveryChargeMin"), "warning");
+    showToast(adminT("validation.deliveryChargeMin"), "warning");
     return null;
   }
 
-  if(!Number.isFinite(discountPercentage) || discountPercentage < 0 || discountPercentage > 100){
-    setQuoteBuilderStatus("Discount percentage must be between 0 and 100.", "warning");
-    showToast("Discount percentage must be between 0 and 100", "warning");
+  if(!Number.isFinite(discountValue) || discountValue < 0){
+    const message = discountType === "fixed" ? adminT("validation.discountFixedRange") : adminT("validation.discountRange");
+    setQuoteDiscountError(message);
+    setQuoteBuilderStatus(message, "warning");
+    showToast(message, "warning");
     return null;
   }
 
@@ -4898,14 +5352,30 @@ function validateQuoteDraft(){
     unitPrice: Number(item.unitPrice) || 0,
     isEdited: Boolean(item.isEdited)
   }));
-  const totals = calculateQuoteTotals(normalizedItems, rentalDays, deliveryCharge, discountPercentage);
+  const totals = calculateQuoteTotals(normalizedItems, rentalDays, deliveryCharge, {
+    type: discountType,
+    value: discountValue
+  });
+  const discountValidationMessage = getQuoteDiscountValidationMessage(discountType, discountValue, totals.preDiscountSubtotal);
+
+  if(discountValidationMessage){
+    setQuoteDiscountError(discountValidationMessage);
+    setQuoteBuilderStatus(discountValidationMessage, "warning");
+    showToast(discountValidationMessage, "warning");
+    return null;
+  }
+
+  setQuoteDiscountError("");
 
   return {
     language: quoteLanguageSelect?.value === "ar" ? "ar" : "en",
     bankPreset: getQuoteBankPreset(quoteBankPresetSelect?.value),
     rentalDays: Math.max(1, Math.floor(Number(rentalDays) || 1)),
     deliveryCharge,
-    discountPercentage: clampDiscountPercentage(discountPercentage),
+    discountType,
+    discountValue: discountType === "percentage"
+      ? clampDiscountPercentage(discountValue)
+      : Math.max(0, discountValue),
     totals
   };
 }
@@ -4937,9 +5407,10 @@ function buildQuoteRecord(draft, version){
     itemsTotal: draft.totals.itemsTotal,
     deliveryCharge: draft.deliveryCharge,
     preDiscountSubtotal: draft.totals.preDiscountSubtotal,
-    discountType: "percentage",
-    discount: draft.discountPercentage,
-    discountPercentage: draft.discountPercentage,
+    discountType: draft.discountType,
+    discountValue: draft.discountValue,
+    discount: draft.discountType === "percentage" ? draft.discountValue : draft.totals.discountAmount,
+    discountPercentage: draft.totals.discountPercentage,
     discountAmount: draft.totals.discountAmount,
     subtotal: draft.totals.subtotal,
     vat: draft.totals.vatAmount,
@@ -4973,7 +5444,7 @@ async function downloadSavedQuotePdf(quoteVersion){
     return;
   }
 
-  setQuoteBuilderStatus(`Generating PDF for version ${quoteVersion.version}...`, "loading");
+  setQuoteBuilderStatus(adminT("quote.generatingVersion", { version: quoteVersion.version }), "loading");
 
   try{
     const pdfBlob = await generateQuotePdfBlob({
@@ -4982,17 +5453,17 @@ async function downloadSavedQuotePdf(quoteVersion){
     });
 
     downloadBlob(pdfBlob, quoteVersion.pdf?.fileName || quoteVersion.pdfFileName || buildQuotePdfFileName(quoteVersion.orderId, quoteVersion.version, quoteVersion.language));
-    setQuoteBuilderStatus(`Version ${quoteVersion.version} PDF downloaded.`, "success");
+    setQuoteBuilderStatus(adminT("quote.pdfDownloaded", { version: quoteVersion.version }), "success");
   }catch(error){
     console.error("Failed to download quote PDF:", error);
-    setQuoteBuilderStatus("Could not generate the PDF right now.", "warning");
-    showToast("Could not generate PDF", "error");
+    setQuoteBuilderStatus(adminT("quote.pdfFailed"), "warning");
+    showToast(adminT("toasts.pdfFailed"), "error");
   }
 }
 
 function openQuoteWhatsApp(quoteVersion = lastGeneratedQuoteData){
   if(!quoteVersion){
-    setQuoteBuilderStatus("Generate or open a saved quote before sending on WhatsApp.", "warning");
+    setQuoteBuilderStatus(adminT("quote.openSavedFirst"), "warning");
     return;
   }
 
@@ -5004,15 +5475,25 @@ function openQuoteWhatsApp(quoteVersion = lastGeneratedQuoteData){
   );
 
   if(!phone){
-    setQuoteBuilderStatus("Customer phone number is missing.", "warning");
-    showToast("Customer phone number is missing", "warning");
+    setQuoteBuilderStatus(adminT("quote.customerPhoneMissing"), "warning");
+    showToast(adminT("quote.customerPhoneMissing"), "warning");
     return;
   }
 
   const existingQuoteMessage = quoteVersion.whatsappMessage || quoteVersion.message || "";
   const message = existingQuoteMessage || (quoteVersion.language === "ar"
-    ? `Hello ${quoteVersion.customerName || ""},\n\nYour Arabic quotation ${quoteVersion.quotationNumber} (version ${quoteVersion.version}) is ready.\nPlease see the attached PDF.\n\nGrand Total: ${formatCurrencyDisplay(quoteVersion.grandTotal)}`
-    : `Hello ${quoteVersion.customerName || ""},\n\nYour quotation ${quoteVersion.quotationNumber} (version ${quoteVersion.version}) is ready.\nPlease see the attached PDF.\n\nGrand Total: ${formatCurrencyDisplay(quoteVersion.grandTotal)}`)
+    ? adminT("quote.whatsappMessageArabic", {
+      name: quoteVersion.customerName || "",
+      quotation: quoteVersion.quotationNumber,
+      version: quoteVersion.version,
+      total: formatCurrencyDisplay(quoteVersion.grandTotal)
+    })
+    : adminT("quote.whatsappMessage", {
+      name: quoteVersion.customerName || "",
+      quotation: quoteVersion.quotationNumber,
+      version: quoteVersion.version,
+      total: formatCurrencyDisplay(quoteVersion.grandTotal)
+    }))
     || "Hello, regarding your quote from Al Taj Al Malaky.";
 
   openWhatsAppApp(phone, message);
@@ -5031,7 +5512,7 @@ async function handleGenerateQuote(){
 
   isGeneratingQuote = true;
   syncQuoteModalActionState();
-  setQuoteBuilderStatus("Generating PDF and saving quote version...", "loading");
+  setQuoteBuilderStatus(adminT("quote.generatingSave"), "loading");
 
   try{
     const latestQuoteOrder = await getLatestOrderData(currentQuoteOrder) || currentQuoteOrder;
@@ -5068,6 +5549,8 @@ async function handleGenerateQuote(){
         latestQuoteGeneratedAtMs: quotePayload.generatedAtMs,
         latestQuoteGrandTotal: quotePayload.grandTotal,
         latestQuoteBankPresetId: quotePayload.bankPresetId,
+        latestQuoteDiscountType: quotePayload.discountType,
+        latestQuoteDiscountValue: quotePayload.discountValue,
         latestQuoteDiscountPercentage: quotePayload.discountPercentage,
         latestQuoteDiscountAmount: quotePayload.discountAmount,
         ...lifecyclePatch
@@ -5083,12 +5566,12 @@ async function handleGenerateQuote(){
     isQuoteDraftDirty = false;
     setQuoteWhatsappState(quotePayload);
     renderQuoteHistory();
-    setQuoteBuilderStatus(`Version ${version} saved. PDF downloaded and ready for WhatsApp.`, "success");
-    showToast("Quote saved successfully");
+    setQuoteBuilderStatus(adminT("quote.versionSaved", { version }), "success");
+    showToast(adminT("toasts.quoteSaved"));
   }catch(error){
     console.error("Failed to generate quote:", error);
-    setQuoteBuilderStatus("Could not generate and save the quotation.", "warning");
-    showToast("Could not generate quote", "error");
+    setQuoteBuilderStatus(adminT("quote.generateSaveFailed"), "warning");
+    showToast(adminT("toasts.quoteSaveFailed"), "error");
   }finally{
     isGeneratingQuote = false;
     syncQuoteModalActionState();
@@ -5112,7 +5595,7 @@ function handleQuoteHistoryAction(event){
   if(actionButton.dataset.action === "open"){
     loadQuoteVersionIntoForm(quoteVersion);
     renderQuoteHistory();
-    setQuoteBuilderStatus(`Version ${quoteVersion.version} loaded into the builder.`, "success");
+    setQuoteBuilderStatus(adminT("quote.versionLoaded", { version: quoteVersion.version }), "success");
   }else if(actionButton.dataset.action === "pdf"){
     downloadSavedQuotePdf(quoteVersion);
   }else if(actionButton.dataset.action === "whatsapp"){
@@ -5166,7 +5649,7 @@ function attachEditableItemEvents(){
 
       if(rows.length <= 1){
         rows[0]?.querySelector(".edit-item-name")?.focus();
-        showToast("At least one item is required", "warning");
+        showToast(adminT("validation.addItemFirst"), "warning");
         return;
       }
 
@@ -5287,7 +5770,7 @@ function attachCreateItemEvents(){
 
       if(rows.length <= 1){
         rows[0]?.querySelector(".create-item-category")?.focus();
-        showToast("At least one item is required", "warning");
+        showToast(adminT("validation.addItemFirst"), "warning");
         return;
       }
 
@@ -5625,18 +6108,18 @@ function getInventoryComputedState(item){
 
 function getInventoryStatusCopy(item, state = getInventoryComputedState(item)){
   if(item.isArchived === true || item.active === false){
-    return { label: "Archived", className: "is-muted" };
+    return { label: adminT("inventory.archived"), className: "is-muted" };
   }
 
   if(state.isOverbooked){
-    return { label: `Overbooked by ${Math.abs(state.rawAvailable)}`, className: "is-danger" };
+    return { label: `${adminT("inventory.overbooked")} ${Math.abs(state.rawAvailable)}`, className: "is-danger" };
   }
 
   if(state.isLowStock){
-    return { label: "Low stock", className: "is-warning" };
+    return { label: adminT("inventory.low"), className: "is-warning" };
   }
 
-  return { label: "Healthy", className: "is-success" };
+  return { label: adminT("inventory.healthy"), className: "is-success" };
 }
 
 function getFilteredInventoryItems(){
@@ -5755,7 +6238,7 @@ function renderInventoryTable(){
   if(!items.length){
     inventoryTableBody.innerHTML = `
       <tr>
-        <td colspan="11" class="inventory-empty-cell">No inventory items found.</td>
+        <td colspan="11" class="inventory-empty-cell">${escapeAdminText(adminT("inventory.noItemsFound"))}</td>
       </tr>
     `;
     return;
@@ -5767,23 +6250,23 @@ function renderInventoryTable(){
 
     return `
       <tr>
-        <td>
-          <strong>${escapeHtml(item.name || "Unnamed item")}</strong>
-          ${item.productId ? `<span class="inventory-subtext">Product ID: ${escapeHtml(item.productId)}</span>` : ""}
+        <td data-label="${escapeAttribute(adminT("common.product"))}">
+          <strong>${escapeHtml(item.name || adminT("inventory.unnamedItem"))}</strong>
+          ${item.productId ? `<span class="inventory-subtext">${escapeAdminText(adminT("inventory.productIdPrefix", { id: item.productId }))}</span>` : ""}
         </td>
-        <td>${escapeHtml(item.variant || "-")}</td>
-        <td>${escapeHtml(item.category || "Uncategorized")}</td>
-        <td><span class="inventory-source-pill">${escapeHtml(item.sourceType || "custom")}</span></td>
-        <td class="inventory-cell-number">${state.totalStock}</td>
-        <td class="inventory-cell-number">${state.availableStock}</td>
-        <td class="inventory-cell-number">${state.reservedStock}</td>
-        <td class="inventory-cell-number">${state.damagedStock}</td>
-        <td class="inventory-cell-number">${state.lowStockThreshold}</td>
-        <td><span class="inventory-status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
-        <td>
+        <td data-label="${escapeAttribute(adminT("common.variant"))}">${escapeHtml(item.variant || "-")}</td>
+        <td data-label="${escapeAttribute(adminT("common.category"))}">${escapeHtml(item.category || adminT("inventory.uncategorized"))}</td>
+        <td data-label="${escapeAttribute(adminT("common.source"))}"><span class="inventory-source-pill">${escapeHtml(adminT(`inventory.${item.sourceType || "custom"}`))}</span></td>
+        <td class="inventory-cell-number" data-label="${escapeAttribute(adminT("common.total"))}">${state.totalStock}</td>
+        <td class="inventory-cell-number" data-label="${escapeAttribute(adminT("common.available"))}">${state.availableStock}</td>
+        <td class="inventory-cell-number" data-label="${escapeAttribute(adminT("common.reserved"))}">${state.reservedStock}</td>
+        <td class="inventory-cell-number" data-label="${escapeAttribute(adminT("common.damaged"))}">${state.damagedStock}</td>
+        <td class="inventory-cell-number" data-label="${escapeAttribute(adminT("common.lowStock"))}">${state.lowStockThreshold}</td>
+        <td data-label="${escapeAttribute(adminT("common.status"))}"><span class="inventory-status-pill ${status.className}">${escapeHtml(status.label)}</span></td>
+        <td data-label="${escapeAttribute(adminT("common.actions"))}">
           <div class="inventory-row-actions">
-            <button class="btn btn-secondary btn-small inventory-edit-btn" type="button" data-id="${escapeAttribute(item.id)}">Edit</button>
-            <button class="btn btn-dark btn-small inventory-delete-btn" type="button" data-id="${escapeAttribute(item.id)}">Delete</button>
+            <button class="btn btn-secondary btn-small inventory-edit-btn" type="button" data-id="${escapeAttribute(item.id)}">${escapeAdminText(adminT("common.edit"))}</button>
+            <button class="btn btn-dark btn-small inventory-delete-btn" type="button" data-id="${escapeAttribute(item.id)}">${escapeAdminText(adminT("common.delete"))}</button>
           </div>
         </td>
       </tr>
@@ -5799,11 +6282,17 @@ function syncInventoryPaginationControls({
 } = {}){
   if(inventoryPageInfo){
     if(totalItems <= 0){
-      inventoryPageInfo.textContent = "No inventory items to display";
+      inventoryPageInfo.textContent = adminT("inventory.noItemsToDisplay");
     }else{
       const start = ((inventoryCurrentPage - 1) * inventoryRowsPerPage) + 1;
       const end = Math.min(totalItems, inventoryCurrentPage * inventoryRowsPerPage);
-      inventoryPageInfo.textContent = `Page ${inventoryCurrentPage} of ${totalPages} - showing ${start}-${end} of ${totalItems}`;
+      inventoryPageInfo.textContent = adminT("inventory.pageSummary", {
+        current: inventoryCurrentPage,
+        total: totalPages,
+        start,
+        end,
+        count: totalItems
+      });
     }
   }
 
@@ -5916,14 +6405,18 @@ function renderUpcomingReservations(){
   if(inventoryReservationsSummary){
     const totalQuantity = rows.reduce((sum, row) => sum + row.quantity, 0);
     inventoryReservationsSummary.textContent = rows.length
-      ? `${rows.length} reservation line${rows.length === 1 ? "" : "s"} and ${totalQuantity} unit${totalQuantity === 1 ? "" : "s"} reserved for ${selectedDate}.`
-      : `No active reservations found for ${selectedDate}.`;
+      ? adminT("inventory.reservationsForDate", {
+        count: rows.length,
+        plural: rows.length === 1 ? "" : "s",
+        date: selectedDate
+      })
+      : adminT("inventory.noActiveReservationsForDate", { date: selectedDate });
   }
 
   if(!rows.length){
     upcomingReservationsBody.innerHTML = `
       <tr>
-        <td colspan="6" class="inventory-empty-cell">No reservations for this date.</td>
+        <td colspan="6" class="inventory-empty-cell">${escapeAdminText(adminT("inventory.noReservationsForDate"))}</td>
       </tr>
     `;
     return;
@@ -5931,12 +6424,12 @@ function renderUpcomingReservations(){
 
   upcomingReservationsBody.innerHTML = rows.map((row) => `
     <tr>
-      <td>${escapeHtml(row.order.eventDate || "-")}</td>
-      <td>${escapeHtml(row.order.orderId || row.order.id || "-")}</td>
-      <td>${escapeHtml(row.order.customerName || "Unknown customer")}</td>
-      <td>${escapeHtml(row.inventoryItem?.name || row.orderItem.name || "Unlinked item")}</td>
-      <td>${row.quantity}</td>
-      <td>${escapeHtml(formatStatusLabel(row.order.status))}</td>
+      <td data-label="${escapeAttribute(adminT("common.date"))}">${escapeHtml(row.order.eventDate || "-")}</td>
+      <td data-label="${escapeAttribute(adminT("common.orderId"))}">${escapeHtml(row.order.orderId || row.order.id || "-")}</td>
+      <td data-label="${escapeAttribute(adminT("common.customer"))}">${escapeHtml(row.order.customerName || adminT("common.unknownCustomer"))}</td>
+      <td data-label="${escapeAttribute(adminT("common.item"))}">${escapeHtml(row.inventoryItem?.name || row.orderItem.name || adminT("inventory.unnamedItem"))}</td>
+      <td data-label="${escapeAttribute(adminT("common.quantity"))}">${row.quantity}</td>
+      <td data-label="${escapeAttribute(adminT("common.status"))}">${escapeHtml(formatStatusLabel(row.order.status))}</td>
     </tr>
   `).join("");
 }
@@ -5945,13 +6438,13 @@ function openInventoryModal(item = null){
   currentInventoryItemId = item?.id || null;
 
   if(inventoryModalTitle){
-    inventoryModalTitle.textContent = item ? "Edit Inventory Item" : "Add Inventory Item";
+    inventoryModalTitle.textContent = item ? adminT("inventory.editItem") : adminT("inventory.addInventoryItemTitle");
   }
 
   if(inventoryModalSubtitle){
     inventoryModalSubtitle.textContent = item
-      ? "Update stock, damaged units, and catalog linking."
-      : "Create a catalog-linked or internal inventory row.";
+      ? adminT("inventory.editItemSubtitle")
+      : adminT("inventory.addItemSubtitle");
   }
 
   if(inventoryProductSelect){
@@ -5996,7 +6489,7 @@ function syncInventoryModalState(isSaving){
 
   if(saveInventoryBtn){
     saveInventoryBtn.disabled = isSaving;
-    saveInventoryBtn.textContent = isSaving ? "Saving..." : "Save Inventory Item";
+    saveInventoryBtn.textContent = isSaving ? adminT("inventory.savingItem") : adminT("inventory.saveItem");
   }
 
   if(deleteInventoryBtn){
@@ -6024,7 +6517,7 @@ function getInventoryPayloadFromForm(){
 
   if(!name){
     inventoryForm.name.focus();
-    showToast("Inventory name is required", "warning");
+    showToast(adminT("validation.inventoryNameRequired"), "warning");
     return null;
   }
 
@@ -6075,10 +6568,10 @@ async function handleInventoryFormSubmit(event){
     }
 
     closeInventoryModal();
-    showToast("Inventory item saved");
+    showToast(adminT("toasts.inventorySaved"));
   }catch(error){
     console.error("Failed to save inventory item:", error);
-    showToast("Could not save inventory item", "error");
+    showToast(adminT("toasts.inventorySaveFailed"), "error");
     syncInventoryModalState(false);
   }
 }
@@ -6093,11 +6586,11 @@ async function handleDeleteInventoryItem(itemId = currentInventoryItemId){
   const activeReservations = getReservationsForInventoryItem(item);
 
   if(activeReservations.length > 0){
-    showToast("Cannot delete inventory with active or future reservations", "warning");
+    showToast(adminT("toasts.inventoryDeleteBlocked"), "warning");
     return;
   }
 
-  const shouldDelete = window.confirm(`Delete inventory item "${item.name}"? This cannot be undone.`);
+  const shouldDelete = window.confirm(adminT("confirm.deleteInventory", { name: item.name }));
 
   if(!shouldDelete){
     return;
@@ -6106,10 +6599,10 @@ async function handleDeleteInventoryItem(itemId = currentInventoryItemId){
   try{
     await deleteDoc(doc(db, "inventory", item.id));
     closeInventoryModal();
-    showToast("Inventory item deleted");
+    showToast(adminT("toasts.inventoryDeleted"));
   }catch(error){
     console.error("Failed to delete inventory item:", error);
-    showToast("Could not delete inventory item", "error");
+    showToast(adminT("toasts.inventoryDeleteFailed"), "error");
   }
 }
 
@@ -6122,7 +6615,7 @@ async function adjustInventoryDamage(direction){
   const adjustment = normalizeStockNumber(inventoryDamagedAdjustInput?.value || 0);
 
   if(!item || adjustment <= 0){
-    showToast("Enter a damaged quantity to adjust", "warning");
+    showToast(adminT("validation.damagedQuantityRequired"), "warning");
     return;
   }
 
@@ -6138,10 +6631,10 @@ async function adjustInventoryDamage(direction){
       updatedAt: serverTimestamp()
     });
     inventoryForm.damagedStock.value = String(nextDamaged);
-    showToast(direction === "restore" ? "Damaged stock restored" : "Damaged stock updated");
+    showToast(direction === "restore" ? adminT("toasts.damagedRestored") : adminT("toasts.damagedUpdated"));
   }catch(error){
     console.error("Failed to adjust damaged stock:", error);
-    showToast("Could not adjust damaged stock", "error");
+    showToast(adminT("toasts.damagedFailed"), "error");
   }
 }
 
@@ -6316,7 +6809,7 @@ function confirmInventoryWarningsIfNeeded(orderDraft){
     return true;
   }
 
-  return window.confirm(`${warnings.join("\n")}\n\nContinue anyway?`);
+  return window.confirm(adminT("confirm.continueAnyway", { warnings: warnings.join("\n") }));
 }
 
 function convertTimeToInputValue(timeString){
@@ -6485,7 +6978,7 @@ async function handleEditOrderSubmit(event){
   const items = getUpdatedItemsFromUI();
 
   if(!items.length){
-    showToast("Add at least one valid item", "warning");
+    showToast(adminT("validation.addItemFirst"), "warning");
     return;
   }
 
@@ -6538,10 +7031,10 @@ async function handleEditOrderSubmit(event){
     generateAnalytics();
     renderCalendar();
     closeEditOrderModal();
-    showToast("Order updated successfully");
+    showToast(adminT("toasts.orderUpdated"));
   }catch(error){
     console.error("Failed to update order:", error);
-    showToast("Could not save changes", "error");
+    showToast(adminT("toasts.orderUpdateFailed"), "error");
   }finally{
     setEditSaveState(false);
   }
@@ -6570,31 +7063,31 @@ async function handleCreateOrderSubmit(event){
 
   if(!customerName){
     createOrderForm.customerName.focus();
-    showToast("Customer name is required", "warning");
+    showToast(adminT("validation.customerNameRequired"), "warning");
     return;
   }
 
   if(!phone){
     createOrderForm.phone.focus();
-    showToast("Phone is required", "warning");
+    showToast(adminT("validation.phoneRequired"), "warning");
     return;
   }
 
   if(!eventDate){
     createOrderForm.eventDate.focus();
-    showToast("Event date is required", "warning");
+    showToast(adminT("validation.eventDateRequired"), "warning");
     return;
   }
 
   if(!eventLocation){
     createOrderForm.eventLocation.focus();
-    showToast("Event location is required", "warning");
+    showToast(adminT("validation.eventLocationRequired"), "warning");
     return;
   }
 
   if(!items.length){
     createItemsContainer?.querySelector(".create-item-category")?.focus();
-    showToast("Add at least one valid item", "warning");
+    showToast(adminT("validation.addItemFirst"), "warning");
     return;
   }
 
@@ -6646,10 +7139,10 @@ async function handleCreateOrderSubmit(event){
       })
     ]);
     closeCreateOrderModal(true);
-    showToast("Order created successfully");
+    showToast(adminT("toasts.orderCreated"));
   }catch(error){
     console.error("Failed to create order:", error);
-    showToast("Could not create order", "error");
+    showToast(adminT("toasts.orderCreateFailed"), "error");
     setCreateSubmitState(false);
   }
 }
@@ -6659,9 +7152,9 @@ async function handleDeleteOrder(){
     return;
   }
 
-  const orderIdLabel = currentEditingOrder.orderId || "this order";
+  const orderIdLabel = currentEditingOrder.orderId || adminT("common.order");
   const shouldDelete = window.confirm(
-    `Are you sure you want to permanently delete ${orderIdLabel}? This action cannot be undone.`
+    adminT("confirm.deleteOrder", { orderId: orderIdLabel })
   );
 
   if(!shouldDelete){
@@ -6673,10 +7166,10 @@ async function handleDeleteOrder(){
   try{
     await deleteDoc(doc(db, "orders", currentEditingOrder.id));
     closeEditOrderModal(true);
-    showToast("Order deleted successfully");
+    showToast(adminT("toasts.orderDeleted"));
   }catch(error){
     console.error("Failed to delete order:", error);
-    showToast("Could not delete order", "error");
+    showToast(adminT("toasts.orderDeleteFailed"), "error");
     setEditDeleteState(false);
   }
 }
@@ -6733,7 +7226,7 @@ async function assignDriverToOrder(){
   const driver = driversList.find((item) => item.id === selectedDriverId);
 
   if(!driver){
-    alert("Please select a driver.");
+    alert(adminT("validation.selectDriver"));
     return;
   }
 
@@ -6772,7 +7265,7 @@ async function assignDriverToOrder(){
   ]);
 
   closeDriverModal();
-  showToast("Driver assigned");
+  showToast(adminT("toasts.driverAssigned"));
 }
 
 function generateAnalytics(){
@@ -6969,7 +7462,7 @@ function renderCalendar(){
   const todayString = formatLocalDate(new Date());
   const totalCells = Math.ceil((startDay + daysInMonth) / 7) * 7;
 
-  calendarMonthLabel.textContent = firstDay.toLocaleDateString("en-US", {
+  calendarMonthLabel.textContent = firstDay.toLocaleDateString(getAdminLocale(), {
     month: "long",
     year: "numeric"
   });
@@ -7002,7 +7495,7 @@ function renderCalendar(){
     const eventMarkup = dayOrders.map(order => {
       const normalizedStatus = normalizeOrderStatusValue(order.status);
       const statusMeta = STATUS_META[normalizedStatus] || {
-        label: normalizedStatus || "unknown",
+        label: formatStatusLabel(normalizedStatus || "unknown"),
         className: ""
       };
 
@@ -7011,9 +7504,9 @@ function renderCalendar(){
           type="button"
           class="calendar-event ${escapeAttribute(statusMeta.className)}"
           data-order-id="${escapeAttribute(order.id)}"
-          title="${escapeAttribute(`${order.customerName || "Unknown"} | ${statusMeta.label}`)}"
+          title="${escapeAttribute(`${order.customerName || adminT("common.unknownCustomer")} | ${statusMeta.label}`)}"
         >
-          <span class="calendar-event-name">${escapeHtml(order.customerName || "Unknown")}</span>
+          <span class="calendar-event-name">${escapeHtml(order.customerName || adminT("common.unknownCustomer"))}</span>
           <span class="calendar-event-status">${escapeHtml(statusMeta.label)}</span>
         </button>
       `;
@@ -7022,10 +7515,10 @@ function renderCalendar(){
     cell.innerHTML = `
       <div class="calendar-day-header">
         <span class="calendar-day-number">${dayNumber}</span>
-        <span class="calendar-day-count">${dayOrders.length ? `${dayOrders.length} event${dayOrders.length > 1 ? "s" : ""}` : ""}</span>
+        <span class="calendar-day-count">${dayOrders.length ? `${dayOrders.length}` : ""}</span>
       </div>
       <div class="calendar-day-events">
-        ${eventMarkup || '<p class="calendar-empty-text">No events</p>'}
+        ${eventMarkup || `<p class="calendar-empty-text">${escapeAdminText(adminT("calendar.noEvents"))}</p>`}
       </div>
     `;
 
@@ -7064,12 +7557,6 @@ function formatDateParts(year, monthIndex, day){
 
 function formatLocalDate(date){
   return formatDateParts(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function formatStatusLabel(status){
-  return (status || "unknown")
-    .replaceAll("-", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function getStatusColor(status){
@@ -7315,6 +7802,12 @@ function attachAdminSummaryCardEvents(){
 /* INIT */
 
 document.addEventListener("DOMContentLoaded", async ()=>{
+  bindAdminLanguageSwitcher();
+  applyAdminStaticTranslations();
+  onAdminLanguageChange((language) => {
+    currentAdminLanguage = language;
+    refreshAdminLanguageState();
+  });
   ensureValidAdminFilterState();
   console.debug("[admin] page initialization", {
     ...getAdminInitialFilterState(),
@@ -7352,15 +7845,15 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       const latestOrder = await getLatestOrderData(currentQuoteOrder);
 
       if(!latestOrder){
-        setQuoteBuilderStatus("Could not reload the latest order items.", "warning");
-        showToast("Could not reload the latest order", "error");
+        setQuoteBuilderStatus(adminT("quote.reloadLatestWarning"), "warning");
+        showToast(adminT("toasts.latestOrderFailed"), "error");
         return;
       }
 
       currentQuoteOrder = latestOrder;
       loadOrderDraftIntoQuoteForm(latestOrder);
       renderQuoteHistory();
-      setQuoteBuilderStatus("Draft reset to the latest order items.", "warning");
+      setQuoteBuilderStatus(adminT("quote.draftReset"), "warning");
     }
   });
   document.getElementById("confirmAssignDriver")?.addEventListener("click", assignDriverToOrder);
@@ -7505,10 +7998,17 @@ document.addEventListener("DOMContentLoaded", async ()=>{
     updateQuoteTotals();
     markQuoteDraftDirty();
   });
+  quoteDiscountTypeSelect?.addEventListener("change", () => {
+    syncQuoteDiscountFieldUi();
+    updateQuoteTotals();
+    markQuoteDraftDirty();
+  });
   quoteDiscountInput?.addEventListener("input", () => {
-    const nextValue = clampDiscountPercentage(quoteDiscountInput.value);
-    if(String(nextValue) !== quoteDiscountInput.value){
-      quoteDiscountInput.value = String(nextValue);
+    if(normalizeQuoteDiscountType(quoteDiscountTypeSelect?.value) === "percentage"){
+      const nextValue = clampDiscountPercentage(quoteDiscountInput.value);
+      if(String(nextValue) !== quoteDiscountInput.value){
+        quoteDiscountInput.value = String(nextValue);
+      }
     }
     updateQuoteTotals();
     markQuoteDraftDirty();
@@ -7542,7 +8042,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
       quantityInput.readOnly = !nextEditing;
     }
 
-    editButton.textContent = nextEditing ? "Lock Item" : "Edit Item";
+    editButton.textContent = nextEditing ? adminT("quote.lockItem") : adminT("quote.editItem");
     markQuoteDraftDirty();
   });
   quoteItemsContainer?.addEventListener("input", (event) => {
@@ -7562,6 +8062,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   safeAdminRenderStep("populate-quote-bank-presets", () => populateQuoteBankPresetOptions(), { source: "dom-content-loaded" });
   safeAdminRenderStep("wrap-quote-delivery-charge", () => wrapInputWithCurrency(quoteDeliveryChargeInput), { source: "dom-content-loaded" });
   safeAdminRenderStep("wrap-quote-discount", () => wrapInputWithSuffix(quoteDiscountInput, "%"), { source: "dom-content-loaded" });
+  safeAdminRenderStep("sync-quote-discount-ui", () => syncQuoteDiscountFieldUi(), { source: "dom-content-loaded" });
   safeAdminRenderStep("sync-quote-modal-actions", () => syncQuoteModalActionState(), { source: "dom-content-loaded" });
 });
 

@@ -40,6 +40,10 @@
       </div>
 
       <div class="navbar-right">
+        <div id="adminLanguageSwitcher" class="lang-switcher" aria-label="Admin language selector">
+          <button id="adminLangEnBtn" class="lang-switcher-btn is-active" type="button" data-admin-lang-option="en" aria-pressed="true">EN</button>
+          <button id="adminLangArBtn" class="lang-switcher-btn" type="button" data-admin-lang-option="ar" aria-pressed="false">AR</button>
+        </div>
         <button onclick="logout()" class="btn btn-secondary admin-logout-btn">Logout</button>
         <button class="mobile-menu-btn" type="button" aria-label="Open navigation menu">&#9776;</button>
       </div>
@@ -1058,20 +1062,29 @@
             <div class="quote-builder-section-head">
               <div>
                 <h4>Charges</h4>
-                <p>Subtotal is based on item amounts plus delivery charge minus the discount percentage. VAT stays fixed at 5% after discount.</p>
+                <p>Subtotal is based on item amounts plus delivery charge minus the selected discount. VAT stays fixed at 5% after discount.</p>
               </div>
             </div>
 
-            <div class="quote-builder-grid quote-builder-grid-three">
+            <div class="quote-builder-grid quote-builder-grid-four quote-builder-charges-grid">
               <div class="form-group">
                 <label for="quoteDeliveryChargeInput">Delivery Charge</label>
                 <input id="quoteDeliveryChargeInput" type="number" min="0" step="0.01" value="0" />
               </div>
 
               <div class="form-group">
-                <label for="quoteDiscountInput">Discount Percentage</label>
-                <input id="quoteDiscountInput" type="number" min="0" max="100" step="0.01" value="0" />
-                <p class="help-text">Enter a percentage. Example: 10 means 10%.</p>
+                <label for="quoteDiscountTypeSelect">Discount Type</label>
+                <select id="quoteDiscountTypeSelect">
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="fixed">Fixed Amount (AED)</option>
+                </select>
+              </div>
+
+              <div class="form-group" id="quoteDiscountFieldGroup">
+                <label for="quoteDiscountInput">Discount Value</label>
+                <input id="quoteDiscountInput" type="number" min="0" step="0.01" value="0" />
+                <p id="quoteDiscountHelp" class="help-text">Enter a percentage. Example: 10 means 10%.</p>
+                <p id="quoteDiscountError" class="quote-inline-error" hidden></p>
               </div>
 
               <div class="form-group">

@@ -38,7 +38,7 @@ export const QUOTE_BANK_PRESETS = [
     id: "taj",
     label: {
       en: "TAJ",
-      ar: "الإمارات دبي الوطني - درهم"
+      ar: "TAJ"
     },
     bankName: "Emirates Islamic Bank",
     branch: "El Sharjah Rolla",
@@ -58,7 +58,7 @@ export const QUOTE_BANK_PRESETS = [
     id: "evo",
     label: {
       en: "EVO",
-      ar: "مشرق للأعمال - درهم"
+      ar: "EVO"
     },
     bankName: "Emirates Islamic Bank",
     branch: "El Sharjah Rolla",

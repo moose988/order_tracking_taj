@@ -359,6 +359,78 @@
   .admin-logout-btn {
     margin-left: 0;
   }
+
+  .admin-page.admin-lang-ar {
+    font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+  }
+
+  .admin-page.admin-lang-ar .navbar-right,
+  .admin-page.admin-lang-ar .admin-controls,
+  .admin-page.admin-lang-ar .inventory-toolbar,
+  .admin-page.admin-lang-ar .calendar-nav,
+  .admin-page.admin-lang-ar .location-field-actions,
+  .admin-page.admin-lang-ar .quote-builder-actions {
+    direction: rtl;
+  }
+
+  .admin-page.admin-lang-ar .section-head,
+  .admin-page.admin-lang-ar .ops-panel-head,
+  .admin-page.admin-lang-ar .driver-panel-head,
+  .admin-page.admin-lang-ar .driver-panel-toolbar,
+  .admin-page.admin-lang-ar .operations-map-head,
+  .admin-page.admin-lang-ar .collection-panel-head,
+  .admin-page.admin-lang-ar .inventory-section-head,
+  .admin-page.admin-lang-ar .quote-builder-head,
+  .admin-page.admin-lang-ar .quote-builder-section-head,
+  .admin-page.admin-lang-ar .admin-order-modal-head,
+  .admin-page.admin-lang-ar .admin-order-modal-actions,
+  .admin-page.admin-lang-ar .modal-actions,
+  .admin-page.admin-lang-ar .edit-order-items-head,
+  .admin-page.admin-lang-ar .analytics-head,
+  .admin-page.admin-lang-ar .upcoming-reservations-head {
+    direction: rtl;
+  }
+
+  .admin-page.admin-lang-ar input,
+  .admin-page.admin-lang-ar textarea,
+  .admin-page.admin-lang-ar select,
+  .admin-page.admin-lang-ar .quote-builder-status,
+  .admin-page.admin-lang-ar .inventory-empty-cell,
+  .admin-page.admin-lang-ar .quote-history-empty {
+    text-align: right;
+  }
+
+  .admin-page.admin-lang-ar .admin-search-clear {
+    right: auto;
+    left: 12px;
+  }
+
+  .admin-page.admin-lang-ar .admin-order-modal-head {
+    padding-right: 0;
+    padding-left: 72px;
+  }
+
+  .admin-page.admin-lang-ar .admin-order-id-chip {
+    justify-items: end;
+  }
+
+  .admin-page.admin-lang-ar .admin-order-detail-row {
+    grid-template-columns: minmax(0, 1fr) minmax(110px, 140px);
+  }
+
+  .admin-page.admin-lang-ar .admin-order-detail-label {
+    text-align: left;
+  }
+
+  .admin-page.admin-lang-ar .currency-input-suffix {
+    right: auto;
+    left: 14px;
+  }
+
+  .admin-page.admin-lang-ar .currency-input-wrap input {
+    padding-right: 14px;
+    padding-left: 64px;
+  }
   
   .mobile-menu-btn {
     display: none;
@@ -10155,6 +10227,10 @@
   grid-template-columns:repeat(3, minmax(0, 1fr));
 }
 
+.quote-builder-grid-four{
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+}
+
 .quote-builder-items{
   display:grid;
   gap:14px;
@@ -10262,6 +10338,20 @@
 .quote-item-unit-price-group .currency-input-wrap,
 .quote-builder-grid .currency-input-wrap{
   min-height:54px;
+}
+
+.quote-builder-grid .form-group.has-error .currency-input-wrap,
+.quote-builder-grid .form-group.has-error select,
+.quote-builder-grid .form-group.has-error input{
+  border-color:#d47452;
+  box-shadow:0 0 0 4px rgba(212, 116, 82, 0.12);
+}
+
+.quote-inline-error{
+  margin:8px 0 0;
+  color:#b14f2f;
+  font-size:0.9rem;
+  line-height:1.45;
 }
 
 .quote-item-amount{
@@ -11586,6 +11676,7 @@
   .quote-builder-bottom,
   .quote-builder-grid-two,
   .quote-builder-grid-three,
+  .quote-builder-grid-four,
   .quote-item-card-grid,
   .quote-history-actions{
     grid-template-columns:1fr;
@@ -12654,6 +12745,7 @@ body.admin-page .site-header .brand-logo {
   .admin-page #adminOrdersSection #ordersTableBody td::before,
   .admin-page #inventoryTableBody td::before,
   .admin-page #upcomingReservationsBody td::before {
+    content: attr(data-label);
     color: var(--text-soft);
     font-size: 0.73rem;
     font-weight: 800;
@@ -12661,35 +12753,6 @@ body.admin-page .site-header .brand-logo {
     text-transform: uppercase;
     line-height: 1.4;
   }
-
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(1)::before { content: "Order"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(2)::before { content: "Customer"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(3)::before { content: "Date"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(4)::before { content: "Days"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(5)::before { content: "Time"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(6)::before { content: "Location"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(7)::before { content: "Status"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(8)::before { content: "Priority"; }
-  .admin-page #adminOrdersSection #ordersTableBody td:nth-child(9)::before { content: "Actions"; }
-
-  .admin-page #inventoryTableBody td:nth-child(1)::before { content: "Product"; }
-  .admin-page #inventoryTableBody td:nth-child(2)::before { content: "Variant"; }
-  .admin-page #inventoryTableBody td:nth-child(3)::before { content: "Category"; }
-  .admin-page #inventoryTableBody td:nth-child(4)::before { content: "Source"; }
-  .admin-page #inventoryTableBody td:nth-child(5)::before { content: "Total"; }
-  .admin-page #inventoryTableBody td:nth-child(6)::before { content: "Available"; }
-  .admin-page #inventoryTableBody td:nth-child(7)::before { content: "Reserved"; }
-  .admin-page #inventoryTableBody td:nth-child(8)::before { content: "Damaged"; }
-  .admin-page #inventoryTableBody td:nth-child(9)::before { content: "Low Stock"; }
-  .admin-page #inventoryTableBody td:nth-child(10)::before { content: "Status"; }
-  .admin-page #inventoryTableBody td:nth-child(11)::before { content: "Actions"; }
-
-  .admin-page #upcomingReservationsBody td:nth-child(1)::before { content: "Date"; }
-  .admin-page #upcomingReservationsBody td:nth-child(2)::before { content: "Order"; }
-  .admin-page #upcomingReservationsBody td:nth-child(3)::before { content: "Customer"; }
-  .admin-page #upcomingReservationsBody td:nth-child(4)::before { content: "Item"; }
-  .admin-page #upcomingReservationsBody td:nth-child(5)::before { content: "Quantity"; }
-  .admin-page #upcomingReservationsBody td:nth-child(6)::before { content: "Status"; }
 
   .admin-page #adminOrdersSection #ordersTableBody .admin-actions {
     display: flex;

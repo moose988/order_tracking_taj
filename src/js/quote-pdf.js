@@ -82,6 +82,10 @@ function clampDiscountPercentage(value){
   return Math.min(100, Math.max(0, percentage));
 }
 
+function normalizeDiscountType(value){
+  return value === "fixed" ? "fixed" : "percentage";
+}
+
 function resolveQuoteDiscountValues(source = {}){
   const itemsTotal = Number(source.itemsTotal) || 0;
   const deliveryCharge = Number(source.deliveryCharge) || 0;
@@ -90,38 +94,41 @@ function resolveQuoteDiscountValues(source = {}){
     0,
     Number(source.preDiscountSubtotal) || fallbackPreDiscountSubtotal
   );
+  const discountType = normalizeDiscountType(source.discountType);
+
+  if(discountType === "fixed"){
+    const explicitDiscountValue = Number(source.discountValue);
+    const explicitDiscountAmount = Number(source.discountAmount);
+    const legacyDiscountAmount = Number(source.discount);
+    const resolvedDiscountAmount = Number.isFinite(explicitDiscountValue)
+      ? explicitDiscountValue
+      : (Number.isFinite(explicitDiscountAmount) ? explicitDiscountAmount : legacyDiscountAmount);
+    const discountAmount = Math.max(0, Math.min(preDiscountSubtotal, roundCurrency(resolvedDiscountAmount)));
+    const discountPercentage = preDiscountSubtotal > 0
+      ? roundCurrency((discountAmount / preDiscountSubtotal) * 100)
+      : 0;
+
+    return {
+      preDiscountSubtotal,
+      discountType,
+      discountValue: discountAmount,
+      discountPercentage,
+      discountAmount
+    };
+  }
+
+  const explicitDiscountValue = Number(source.discountValue);
   const explicitDiscountPercentage = Number(source.discountPercentage);
-
-  if(Number.isFinite(explicitDiscountPercentage)){
-    const discountPercentage = clampDiscountPercentage(explicitDiscountPercentage);
-    return {
-      preDiscountSubtotal,
-      discountPercentage,
-      discountAmount: roundCurrency(preDiscountSubtotal * (discountPercentage / 100))
-    };
-  }
-
-  if(source.discountType === "percentage"){
-    const discountPercentage = clampDiscountPercentage(source.discount);
-    return {
-      preDiscountSubtotal,
-      discountPercentage,
-      discountAmount: roundCurrency(preDiscountSubtotal * (discountPercentage / 100))
-    };
-  }
-
-  const explicitDiscountAmount = Number(source.discountAmount);
-  const legacyDiscountAmount = Number(source.discount);
-  const resolvedDiscountAmount = Number.isFinite(explicitDiscountAmount)
-    ? explicitDiscountAmount
-    : legacyDiscountAmount;
-  const discountAmount = Math.max(0, Math.min(preDiscountSubtotal, roundCurrency(resolvedDiscountAmount)));
-  const discountPercentage = preDiscountSubtotal > 0
-    ? roundCurrency((discountAmount / preDiscountSubtotal) * 100)
-    : 0;
+  const resolvedDiscountPercentage = Number.isFinite(explicitDiscountValue)
+    ? explicitDiscountValue
+    : (Number.isFinite(explicitDiscountPercentage) ? explicitDiscountPercentage : Number(source.discount));
+  const discountPercentage = clampDiscountPercentage(resolvedDiscountPercentage);
+  const discountAmount = roundCurrency(preDiscountSubtotal * (discountPercentage / 100));
 
   return {
     preDiscountSubtotal,
+    discountType: "percentage",
+    discountValue: discountPercentage,
     discountPercentage,
     discountAmount
   };
@@ -244,11 +251,14 @@ function buildEventRows(quote, labels, language){
 
 function buildTotalsRows(quote, labels){
   const discountState = resolveQuoteDiscountValues(quote);
+  const discountLabel = discountState.discountType === "fixed"
+    ? `${labels.discount} (${labels.currency} ${formatMoney(discountState.discountValue)})`
+    : `${labels.discount} (${formatPercentage(discountState.discountValue)})`;
 
   return [
     { label: labels.itemsTotal, value: `${formatMoney(quote.itemsTotal)} ${QUOTE_CURRENCY}` },
     { label: labels.deliveryCharge, value: `${formatMoney(quote.deliveryCharge)} ${QUOTE_CURRENCY}` },
-    { label: `${labels.discount} (${formatPercentage(discountState.discountPercentage)})`, value: `- ${formatMoney(discountState.discountAmount)} ${QUOTE_CURRENCY}` },
+    { label: discountLabel, value: `- ${formatMoney(discountState.discountAmount)} ${QUOTE_CURRENCY}` },
     { label: labels.subtotal, value: `${formatMoney(quote.subtotal)} ${QUOTE_CURRENCY}` },
     { label: `${labels.vat} (${Math.round(VAT_RATE * 100)}%)`, value: `${formatMoney(quote.vatAmount)} ${QUOTE_CURRENCY}` },
     { label: labels.grandTotal, value: `${formatMoney(quote.grandTotal)} ${QUOTE_CURRENCY}`, isGrand: true }
@@ -256,7 +266,7 @@ function buildTotalsRows(quote, labels){
 }
 
 function buildPreparedQuote(quote){
-  const language = "en";
+  const language = quote?.language === "ar" ? "ar" : "en";
   const labels = getQuoteLabels(language);
   const discountState = resolveQuoteDiscountValues(quote);
   const rentalDays = Math.max(1, Math.floor(Number(quote.rentalDays) || 1));
@@ -272,6 +282,8 @@ function buildPreparedQuote(quote){
     ...quote,
     language,
     direction: getDirection(language),
+    discountType: discountState.discountType,
+    discountValue: discountState.discountValue,
     discountPercentage: discountState.discountPercentage,
     discountAmount: discountState.discountAmount,
     preDiscountSubtotal: discountState.preDiscountSubtotal,
@@ -819,7 +831,7 @@ function drawHeaderSection(state){
   const metaTitleY = metaEyebrowY + metaEyebrowHeight + 12;
   const metaRowsY = metaTitleY + metaTitleMetrics.measurement.height + 26;
 
-  drawTextBlock(ctx, "Q U O T A T I O N", language, metaX, metaEyebrowY, metaContentWidth, {
+  drawTextBlock(ctx, state.quote.labels.quotation, language, metaX, metaEyebrowY, metaContentWidth, {
     size: 15,
     weight: 800,
     color: PDF_COLORS.accentGold,
@@ -976,7 +988,7 @@ function drawItemsTable(state){
 
   ensurePage(state, 120);
   let ctx = state.currentPage.ctx;
-  drawSectionHeading(state, "Items");
+  drawSectionHeading(state, quote.labels.itemDescription);
   drawTableHeader(ctx, quote, tableX, state.currentY, widths);
   state.currentY += 78;
 
@@ -999,7 +1011,7 @@ function drawItemsTable(state){
     if((state.currentY + rowHeight) > CONTENT_BOTTOM){
       startPage(state);
       ctx = state.currentPage.ctx;
-      drawSectionHeading(state, "Items");
+      drawSectionHeading(state, quote.labels.itemDescription);
       drawTableHeader(ctx, quote, tableX, state.currentY, widths);
       state.currentY += 78;
       rowHeight = measureItemRow(ctx, quote, item, widths);
@@ -1336,9 +1348,18 @@ export function calculateQuoteTotals(items, rentalDays = 1, deliveryCharge = 0, 
 
   const itemsTotal = roundCurrency(normalizedItems.reduce((sum, item) => sum + item.amount, 0));
   const safeDeliveryCharge = Math.max(0, Number(deliveryCharge) || 0);
-  const safeDiscountPercentage = clampDiscountPercentage(discountPercentage);
   const preDiscountSubtotal = roundCurrency(itemsTotal + safeDeliveryCharge);
-  const discountAmount = roundCurrency(preDiscountSubtotal * (safeDiscountPercentage / 100));
+  const discountConfig = typeof discountPercentage === "object" && discountPercentage !== null
+    ? discountPercentage
+    : { type: "percentage", value: discountPercentage };
+  const discountType = normalizeDiscountType(discountConfig.type);
+  const safeDiscountValue = Math.max(0, Number(discountConfig.value) || 0);
+  const safeDiscountPercentage = discountType === "percentage"
+    ? clampDiscountPercentage(safeDiscountValue)
+    : (preDiscountSubtotal > 0 ? roundCurrency((Math.min(preDiscountSubtotal, safeDiscountValue) / preDiscountSubtotal) * 100) : 0);
+  const discountAmount = discountType === "fixed"
+    ? roundCurrency(Math.min(preDiscountSubtotal, safeDiscountValue))
+    : roundCurrency(preDiscountSubtotal * (safeDiscountPercentage / 100));
   const subtotal = roundCurrency(Math.max(0, preDiscountSubtotal - discountAmount));
   const vatAmount = roundCurrency(subtotal * VAT_RATE);
   const grandTotal = roundCurrency(subtotal + vatAmount);
@@ -1349,6 +1370,8 @@ export function calculateQuoteTotals(items, rentalDays = 1, deliveryCharge = 0, 
     itemsTotal,
     deliveryCharge: safeDeliveryCharge,
     preDiscountSubtotal,
+    discountType,
+    discountValue: discountType === "fixed" ? roundCurrency(Math.min(preDiscountSubtotal, safeDiscountValue)) : safeDiscountPercentage,
     discountPercentage: safeDiscountPercentage,
     discountAmount,
     subtotal,
