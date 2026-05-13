@@ -27,7 +27,7 @@ export const PRODUCTS = [
     name: "Dining Table 1",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "80 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0010.JPG"
     ]
@@ -37,7 +37,7 @@ export const PRODUCTS = [
     name: "Dining Table 2",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "80 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0013.JPG"
     ]
@@ -47,7 +47,7 @@ export const PRODUCTS = [
     name: "Dining Table 3",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "80 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0020.JPG"
     ]
@@ -57,7 +57,7 @@ export const PRODUCTS = [
     name: "Dining Table 4",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "80 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0021.JPG"
     ]
@@ -67,7 +67,7 @@ export const PRODUCTS = [
     name: "Dining Table 5",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "77 x 180 CM",
     images: [
       "../images/dinning tables/IN9A0022.JPG"
     ]
@@ -77,7 +77,7 @@ export const PRODUCTS = [
     name: "Dining Table 6",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "77 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0027.JPG"
     ]
@@ -87,7 +87,7 @@ export const PRODUCTS = [
     name: "Dining Table 7",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "76 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0032.JPG"
     ]
@@ -107,7 +107,7 @@ export const PRODUCTS = [
     name: "Dining Table 9",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "75 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0039.JPG"
     ]
@@ -117,7 +117,7 @@ export const PRODUCTS = [
     name: "Dining Table 10",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "77 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A0060.JPG"
     ]
@@ -127,7 +127,7 @@ export const PRODUCTS = [
     name: "Dining Table 11",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "79 x 82 x 344 CM",
     images: [
       "../images/dinning tables/IN9A9831.JPG"
     ]
@@ -137,7 +137,7 @@ export const PRODUCTS = [
     name: "Dining Table 12",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "81 x 82 x 344 CM",
     images: [
       "../images/dinning tables/IN9A9837.JPG"
     ]
@@ -147,7 +147,7 @@ export const PRODUCTS = [
     name: "Dining Table 13",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "79 x 82 x 344 CM",
     images: [
       "../images/dinning tables/IN9A9839.JPG"
     ]
@@ -157,7 +157,7 @@ export const PRODUCTS = [
     name: "Dining Table 14",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "76 x 244 x 122 CM",
     images: [
       "../images/dinning tables/IN9A9843.JPG"
     ]
@@ -167,7 +167,7 @@ export const PRODUCTS = [
     name: "Dining Table 15",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "77 x 170 CM",
     images: [
       "../images/dinning tables/IN9A9845.JPG"
     ]
@@ -177,7 +177,7 @@ export const PRODUCTS = [
     name: "Dining Table 17",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "77 x 82 x 344 CM",
     images: [
       "../images/dinning tables/IN9A9850.JPG"
     ]
@@ -187,7 +187,7 @@ export const PRODUCTS = [
     name: "Dining Table 18",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "75 x 160 CM",
     images: [
       "../images/dinning tables/IN9A9950.JPG"
     ]
@@ -197,7 +197,7 @@ export const PRODUCTS = [
     name: "Dining Table 19",
     category: "Dining Tables",
     shortDescription: "Elegant dining tables for weddings, galas, and refined gatherings.",
-    measurements: "Standard event dining table size",
+    measurements: "77 x 180 CM",
     images: [
       "../images/dinning tables/IN9A9952.JPG"
     ]
